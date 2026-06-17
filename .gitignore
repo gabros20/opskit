@@ -1,2 +1,7 @@
 # Reference clone of garrytan/gbrain — re-clonable, analyzed for design ideas, not part of this project
 ref/
+
+# Harness run artifacts — regenerable, not source
+__pycache__/
+*.pyc
+test/last-run-*.json

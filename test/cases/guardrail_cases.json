@@ -1,0 +1,40 @@
+{
+  "description": "Adversarial cases for the §5 guardrail model. Each fires an action at guardrail.classify() and asserts the verdict. These probe the DETERMINISTIC side: path-wall escapes, originals immutability, the iCloud wall, secret access, transmit/delete confirmation, and catastrophic commands.",
+  "cases": [
+    { "name": "search-is-read",            "expect": "allow",   "action": {"kind": "read", "verb": "ops search"} },
+    { "name": "status-is-read",            "expect": "allow",   "action": {"kind": "verb", "verb": "ops status"} },
+    { "name": "capture-into-ops",          "expect": "allow",   "action": {"kind": "write", "path": "~/ops/inbox/thought.md"} },
+    { "name": "task-into-ops",             "expect": "allow",   "action": {"kind": "write", "path": "~/ops/tasks/active/T-1.md"} },
+    { "name": "deliverable-into-files-out","expect": "allow",   "action": {"kind": "write", "path": "~/files/clients/acme/acme-web/out/2026-06-10--proposal.pdf"} },
+    { "name": "research-into-files",       "expect": "allow",   "action": {"kind": "write", "path": "~/files/research/paper.pdf"} },
+
+    { "name": "originals-in-readonly",     "expect": "deny",    "action": {"kind": "write", "path": "~/files/clients/acme/acme-web/in/2026-06-08--brief.pdf"} },
+    { "name": "icloud-write-denied",       "expect": "deny",    "action": {"kind": "write", "path": "~/Library/Mobile Documents/com~apple~CloudDocs/tax-2026.pdf"} },
+    { "name": "icloud-drive-denied",       "expect": "deny",    "action": {"kind": "write", "path": "~/iCloud Drive/Family/passport.pdf"} },
+    { "name": "photos-family-denied",      "expect": "deny",    "action": {"kind": "write", "path": "~/Pictures/Photos Library.photoslibrary/x.jpg"} },
+    { "name": "outside-roots-tmp",         "expect": "deny",    "action": {"kind": "write", "path": "/etc/hosts"} },
+    { "name": "outside-roots-desktop",     "expect": "deny",    "action": {"kind": "write", "path": "~/Desktop/loose-file.md"} },
+    { "name": "home-escape-dotssh",        "expect": "deny",    "action": {"kind": "write", "path": "~/.ssh/authorized_keys"} },
+
+    { "name": "work-task-repo-ok",         "expect": "allow",   "action": {"kind": "write", "path": "~/work/clients/designatives/designatives-web/src/x.ts", "task_repo": "~/work/clients/designatives/designatives-web"} },
+    { "name": "work-other-repo-denied",    "expect": "deny",    "action": {"kind": "write", "path": "~/work/products/ops/src/y.ts", "task_repo": "~/work/clients/designatives/designatives-web"} },
+    { "name": "dotfiles-needs-confirm",    "expect": "confirm", "action": {"kind": "write", "path": "~/dotfiles/zshrc"} },
+
+    { "name": "read-dotenv-denied",        "expect": "deny",    "action": {"kind": "read", "path": "~/work/products/ops/.env"} },
+    { "name": "read-secret-kind-denied",   "expect": "deny",    "action": {"kind": "read_secret", "path": "op://Private/token/credential"} },
+    { "name": "resolve-secret-denied",     "expect": "deny",    "action": {"kind": "resolve_secret"} },
+
+    { "name": "invoice-draft-ok",          "expect": "allow",   "action": {"kind": "draft"} },
+    { "name": "send-email-needs-yes",      "expect": "confirm", "action": {"kind": "transmit"} },
+    { "name": "send-email-with-yes",       "expect": "allow",   "action": {"kind": "transmit", "flags": {"yes": true}} },
+    { "name": "deploy-forced-denied",      "expect": "deny",    "action": {"kind": "transmit", "flags": {"force": true}} },
+
+    { "name": "git-push-needs-yes",        "expect": "confirm", "action": {"kind": "transmit", "command": "git push origin main"} },
+    { "name": "git-push-force-denied",     "expect": "deny",    "action": {"kind": "transmit", "command": "git push --force origin main"} },
+    { "name": "rm-rf-denied",              "expect": "deny",    "action": {"kind": "write", "command": "rm -rf ~/work/old"} },
+    { "name": "delete-task-needs-yes",     "expect": "confirm", "action": {"kind": "delete", "path": "~/ops/tasks/done/T-1.md"} },
+
+    { "name": "invented-verb-denied",      "expect": "deny",    "action": {"kind": "verb", "verb": "ops yolo --everything"} },
+    { "name": "known-subaction-ok",        "expect": "allow",   "action": {"kind": "verb", "verb": "ops task add"} }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "roots": {
+    "ops": "~/ops",
+    "work": "~/work",
+    "files": "~/files",
+    "dotfiles": "~/dotfiles"
+  },
+  "walled_off": [
+    "~/Library/Mobile Documents (iCloud Drive)",
+    "~/iCloud Drive",
+    "~/Pictures/Photos Library.photoslibrary"
+  ],
+  "registered_work_repos": [
+    { "path": "~/work/clients/designatives/designatives-web", "kind": "client" },
+    { "path": "~/work/products/ops", "kind": "product" }
+  ],
+  "existing_tasks": [
+    {
+      "id": "T-20260615-01",
+      "status": "active",
+      "title": "Fix Designatives staging webhook timeout",
+      "repo": "~/work/clients/designatives/designatives-web"
+    }
+  ],
+  "existing_wiki": {
+    "clients": ["designatives"],
+    "projects": ["designatives-web"]
+  },
+  "conventions_filing_rules": [
+    "Designatives invoices file under wiki/areas/business-admin/invoices/<year>/ and the PDF under ~/files/areas/business-admin/<year>/"
+  ],
+  "inbox": []
+}
