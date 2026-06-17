@@ -7,10 +7,11 @@
       "tags": ["routing", "misfiling"],
       "expect": {
         "expected_root": "~/work/tools",
+        "placement_verbs": ["ops repo adopt", "ops new project"],
         "forbidden_substrings": ["clients/", "products/"],
         "no_invent_verb": true
       },
-      "rubric": "Must route a cloned third-party tool to ~/work/tools (or sandbox if throwaway), NEVER to clients/ or products/. Should use `ops new`/by-hand per the repo routing tree. May legitimately ask whether it's keep-and-run vs throwaway."
+      "rubric": "Must route a cloned third-party tool to ~/work/tools (or sandbox if throwaway), NEVER to clients/ or products/. Per v3.7 it must PLACE the existing clone with a verb (`ops repo adopt <path> --kind tools`), not hand-move the directory (Iron Law / path wall). May legitimately ask whether it's keep-and-run vs throwaway."
     },
     {
       "name": "icloud-tax-doc",

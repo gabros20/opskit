@@ -263,6 +263,8 @@ WORK
   ops new <type> "<name>"   # scaffold: project | client  (wiki note + templates; project
                             #   additionally scaffolds the repo in ~/work from template)
   ops repo <action>         # health (all ~/work repos: dirty/unpushed/stale) | clone <project> | clone --all
+                            #   | adopt <path> --kind <tools|labs|clients|products> (move an ALREADY-cloned
+                            #     repo into the routing-tree destination + write its wiki note/registry; §12.3 #4a)
   ops archive <project>     # strip artifacts, git-bundle a dead repo into ~/work/archive/<year>/
   ops files <action>        # open <slug> (reveal in Finder) | ingest (route inbox files into ~/files + shadow notes)
   ops sweep                 # manually trigger the Desktop/Downloads decay sweep (also a nightly job)
@@ -936,6 +938,21 @@ to bottom, FIRST hit wins — never skip to a lower one:
 
 If you cannot answer #1–#5 with confidence, STOP and ask. Misfiling a repo is worse than
 asking, because it pollutes the registry that drives backup and restore.
+
+Once the destination is decided, **place the repo with a verb, never by hand** (the Iron Law).
+For an already-cloned repo sitting outside `~/work`, that verb is `ops repo adopt <path>
+--kind <tools|labs|clients|products>`: it moves the clone to the routing-tree destination,
+computes the final path and slug, and writes the wiki note + `repo:`/`remote:` registry
+frontmatter. (`ops new project` scaffolds a *new blank* repo; `ops repo clone` pulls from a
+*registered remote*; `adopt` is the missing third case — an existing local clone.) Do NOT `mv`
+the directory yourself: a hand-composed `~/work/...` write hits the path wall, and an
+unregistered repo is invisible to `ops repo health` / `clone --all` and so silently drops out
+of backup and restore. If no verb yet covers the placement you need, STOP and propose adding
+one — never work around the surface.
+<!-- v3.7: the `adopt` verb + this note close a gap the agnosticism simulation found
+     (test/ cloned-tool-trap): two agents agreed WHERE a cloned tool goes but diverged on HOW
+     to place it — one hand-moved it (path-wall violation), one asked for a flag. -->
+
 
 ## 5. How to traverse and use the wiki (the LLM knowledge core)
 The wiki is Markdown + YAML frontmatter + `[[wikilinks]]`. Treat it like a graph of
