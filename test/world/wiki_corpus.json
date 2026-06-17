@@ -1,0 +1,36 @@
+{
+  "description": "A small fixture wiki for §10 integrity checks. Mostly well-formed, with a controlled set of defects the checker must detect (see expected_issues). 'today' anchors the stale check. Wikilinks use bare slugs ([[designatives]]) resolved against each note key's basename. orphan = valid-frontmatter note with NO inbound AND NO outbound links. expected_backlinks is checked as containment (subset).",
+  "today": "2026-06-18",
+  "stale_days": 365,
+  "expected_issues": {
+    "missing_frontmatter": ["notes/missing-frontmatter"],
+    "missing_keys": ["notes/no-updated-key"],
+    "bad_type": ["notes/weird-type"],
+    "broken_links": [["notes/broken-link-note", "nonexistent-thing"]],
+    "orphans": ["notes/orphan-idea"],
+    "stale": ["notes/stale-note"],
+    "hub_missing_timeline": ["projects/half-baked-hub"]
+  },
+  "expected_backlinks": {
+    "clients/designatives": ["people/andras-kovacs", "projects/designatives-web"],
+    "notes/stripe-webhook-retries": ["notes/webhook-timeout-incident", "projects/designatives-web"]
+  },
+  "notes": {
+    "clients/designatives": "---\ntype: client\ntitle: Designatives\nstatus: active\ncreated: 2026-01-10\nupdated: 2026-06-15\ntags: [client]\naliases: [designatives-studio]\n---\n# Designatives\nWeb design studio; primary ongoing client. Billing per [[tax-formula]].\n\n## Timeline\n- 2026-06-15 Kicked off webhook reliability work [[designatives-web]]\nContact: [[andras-kovacs]].",
+    "projects/designatives-web": "---\ntype: project\ntitle: Designatives Web\nstatus: active\ncreated: 2026-02-01\nupdated: 2026-06-16\ntags: [project, designatives]\nrepo: ~/work/clients/designatives/designatives-web\nremote: git@github.com:designatives/web.git\n---\n# Designatives Web\nClient: [[designatives]]. Tracking [[stripe-webhook-retries]] and the [[webhook-timeout-incident]].\n\n## Timeline\n- 2026-06-16 Investigating staging webhook timeout.",
+    "people/andras-kovacs": "---\ntype: person\ntitle: Andras Kovacs\nstatus: active\ncreated: 2026-01-10\nupdated: 2026-05-02\ntags: [person, designatives]\n---\n# Andras Kovacs\nLead at [[designatives]].",
+    "notes/stripe-webhook-retries": "---\ntype: note\ntitle: Stripe webhook retries\nstatus: evergreen\ncreated: 2026-03-01\nupdated: 2026-06-10\ntags: [stripe, webhooks]\n---\n# Stripe webhook retries\nStripe retries failed webhooks with [[exponential-backoff]] over up to 3 days.",
+    "notes/exponential-backoff": "---\ntype: note\ntitle: Exponential backoff\nstatus: evergreen\ncreated: 2026-03-01\nupdated: 2026-06-01\ntags: [reliability]\n---\n# Exponential backoff\nRetry delay doubles each attempt; add jitter to avoid thundering herd.",
+    "notes/webhook-timeout-incident": "---\ntype: note\ntitle: Webhook timeout incident\nstatus: resolved\ncreated: 2026-06-14\nupdated: 2026-06-16\ntags: [incident, designatives]\n---\n# Webhook timeout incident\nStaging endpoint timed out. Related: [[stripe-webhook-retries]] and [[designatives-web]].",
+    "areas/business-admin/tax-formula": "---\ntype: area\ntitle: Tax formula (atalanyado)\nstatus: active\ncreated: 2026-01-05\nupdated: 2026-06-01\ntags: [tax, business-admin]\n---\n# Tax formula\nHungarian atalanyado gross-up. Currency HUF. Never hardcode rates elsewhere.",
+    "runbooks/designatives-web-deploy": "---\ntype: runbook\ntitle: Deploy designatives-web\nstatus: active\ncreated: 2026-04-01\nupdated: 2026-06-05\ntags: [runbook, designatives]\n---\n# Deploy designatives-web\nOperates [[designatives-web]]. Steps: build, smoke, promote.",
+    "prediction/q3-pricing-bet": "---\ntype: prediction\ntitle: Q3 pricing change lifts MRR\nstatus: open\ncreated: 2026-06-18\nupdated: 2026-06-18\ntags: [prediction, pricing]\nconfidence: 0.6\nresolves: 2026-10-01\noutcome: null\n---\n# Q3 pricing change lifts MRR\nClaim: raising the studio retainer 15% nets higher MRR despite churn. Concerns [[designatives]].",
+    "notes/orphan-idea": "---\ntype: note\ntitle: Orphan idea\nstatus: draft\ncreated: 2026-06-01\nupdated: 2026-06-01\ntags: [idea]\n---\n# Orphan idea\nA thought with no links in or out yet.",
+    "notes/broken-link-note": "---\ntype: note\ntitle: Broken link note\nstatus: draft\ncreated: 2026-06-01\nupdated: 2026-06-02\ntags: [test]\n---\n# Broken link note\nReferences [[nonexistent-thing]] which does not exist.",
+    "notes/missing-frontmatter": "# Missing frontmatter\nThis note has no YAML frontmatter block at all. It mentions [[designatives]].",
+    "notes/no-updated-key": "---\ntype: note\ntitle: No updated key\nstatus: draft\ncreated: 2026-06-01\ntags: [test]\n---\n# No updated key\nFrontmatter is present but missing the required 'updated' key. See [[exponential-backoff]].",
+    "notes/weird-type": "---\ntype: gizmo\ntitle: Weird type\nstatus: draft\ncreated: 2026-06-01\nupdated: 2026-06-02\ntags: [test]\n---\n# Weird type\nThe 'type: gizmo' is not in the allowed taxonomy. Relates to [[designatives-web]].",
+    "notes/stale-note": "---\ntype: note\ntitle: Stale note\nstatus: evergreen\ncreated: 2024-12-01\nupdated: 2025-01-01\ntags: [old]\n---\n# Stale note\nNot touched since early 2025. See [[exponential-backoff]].",
+    "projects/half-baked-hub": "---\ntype: project\ntitle: Half-baked hub\nstatus: active\ncreated: 2026-06-01\nupdated: 2026-06-10\ntags: [project]\n---\n# Half-baked hub\nA project hub that links [[designatives]] but is MISSING its two-zone Timeline section."
+  }
+}

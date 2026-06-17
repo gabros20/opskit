@@ -10,7 +10,38 @@ filing rules, the cloned-tool trap, iCloud-wall leaks, transmit-without-confirm,
 skipped brain-first lookups, invented verbs, and "the manual reads two ways" divergence between
 agents.
 
-## Two halves
+## Quick start
+```sh
+python3 test/run_all.py                 # every OFFLINE suite (guardrail, jobs, sweep, wiki, search)
+python3 test/run_simulation.py --model sonnet   # the LLM-operator half (needs the claude CLI)
+```
+
+## Offline suites (no LLM, no cost) — `run_all.py`
+
+| Suite | Script | What it models | Status |
+|---|---|---|---|
+| Guardrail (§5) | `run_deterministic.py` | path-wall + risk classes vs 29 adversarial actions | 29/29 |
+| Jobs registry (§15) | `run_jobs.py` | only read/safe_write scheduled, verbs-not-logic, risk-matches-effect, writes-inside-roots | 25/25 |
+| Sweep decay (§9.4) | `run_sweep.py` | the 7d→`_swept`→60d→trash machine on a virtual clock | 15/15 |
+| Wiki integrity (§10) | `run_wiki.py` | frontmatter, link resolution, backlinks, orphans, stale, hub two-zone | 9/9 |
+| Searchability (§10.2) | `run_search.py` | keyword vs keyword+graph vs semantic-proxy → the **vector decision** | report |
+
+Each is pure TDD on the spec: a FAIL is a defect in the design as written. Three real spec gaps
+were found and fixed this way — `ops repo adopt` (no verb to place a cloned repo), the `ops sweep`
+Desktop/Downloads write-zone carve-out (path wall would deny it), and the `files_backup`
+read-vs-transmit risk distinction.
+
+### The vector decision (`run_search.py`)
+Runs three retrievers over the corpus + a labeled query set, auto-bucketing each query as
+**lexical** (relevant note shares vocabulary) or **semantic** (zero shared terms — only meaning
+matches). Keyword/keyword+graph score perfectly on lexical and **zero on semantic** (by
+construction — that's the point); a conservative trigram "semantic proxy" recovers most of the
+semantic misses, marking a floor on what real embeddings would add. The verdict applies the
+design's own stage-2 trigger ("add vectors only when FTS5 demonstrably misses"). It is an
+*estimate* on a synthetic corpus — set `OPS_EMBED_CMD` and feed your real query log before a
+final call.
+
+## The LLM-operator half — `run_simulation.py`
 
 ### 1. Deterministic — the guardrail model (no LLM, no cost)
 `lib/guardrail.py` implements the §5 path-wall + risk classes **exactly as the design specifies**.
@@ -59,14 +90,27 @@ manual, not the model.
 ```
 test/
 ├── README.md                     # this file
+├── run_all.py                    # all offline suites + summary
 ├── run_deterministic.py          # guardrail suite (offline)
-├── run_simulation.py             # LLM-operator suite (+ --compare drift mode)
-├── world/seed.json               # the simulated four-root machine state
+├── run_jobs.py                   # jobs-registry invariants (offline)
+├── run_sweep.py                  # sweep decay-machine simulation (offline)
+├── run_wiki.py                   # wiki integrity checks (offline)
+├── run_search.py                 # searchability analysis + vector decision (offline)
+├── run_simulation.py             # LLM-operator suite (+ --compare drift mode, --replay)
+├── world/
+│   ├── seed.json                 # the simulated four-root machine state (operator sim)
+│   ├── jobs.json                 # model of the §15 jobs registry
+│   ├── wiki_corpus.json          # fixture wiki (with controlled defects)
+│   └── search_qrels.json         # retrieval gold labels (queries → relevant note)
 ├── cases/
 │   ├── guardrail_cases.json      # 29 deterministic adversarial cases
 │   └── scenarios.json            # 10 probabilistic operator scenarios
 └── lib/
     ├── guardrail.py              # the §5 decision model (single source of truth for "allowed?")
+    ├── jobsmodel.py              # §15 job-rule checks
+    ├── sweepsim.py               # §9.4 decay state machine + virtual clock
+    ├── wiki.py                   # §10 note parser + integrity checks
+    ├── retrieval.py              # BM25 / keyword+graph / semantic-proxy + metrics
     ├── spec.py                   # extract contract/manual from the design doc; build the prompt
     ├── op_runner.py              # call the LLM operator, parse its JSON plan
     └── judge.py                  # score the plan; cross-check every action against the guardrail

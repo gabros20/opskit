@@ -1,0 +1,13 @@
+{
+  "description": "Model of the §15 jobs registry (jobs/registry.yaml). The simulator checks the design's own job rules: only read/safe_write may be scheduled; jobs call verbs (no inline logic); declared risk matches what the command actually does; commands reference real verbs; mutating jobs are safe to run mid-work.",
+  "external_allowlist": ["restic"],
+  "jobs": {
+    "index":        { "command": "ops index",                          "schedule": { "interval_minutes": 60 }, "risk": "read",       "writes": ["~/ops/.index"] },
+    "close_nudge":  { "command": "ops close --automated",              "schedule": { "daily": "18:30" },        "risk": "safe_write", "writes": ["~/ops/journal"] },
+    "backup_check": { "command": "ops backup",                          "schedule": { "weekly": "Fri 17:00" },   "risk": "read",       "writes": [] },
+    "files_backup": { "command": "restic backup ~/files",              "schedule": { "daily": "03:00" },        "risk": "read",       "writes": ["(remote bucket only)"], "transmits": true, "sanctioned_transmit": "pre-configured restic bucket (key in 1Password)" },
+    "sweep":        { "command": "ops sweep",                           "schedule": { "daily": "02:00" },        "risk": "safe_write", "writes": ["~/Desktop/_swept", "~/Downloads/_swept"] },
+    "nuke_modules": { "command": "ops repo nuke-modules --stale 30",   "schedule": { "monthly": "1 04:00" },    "risk": "safe_write", "writes": ["~/work/**/node_modules"] },
+    "consolidate":  { "command": "ops consolidate",                     "schedule": { "daily": "02:30" },        "risk": "safe_write", "writes": ["~/ops/.index", "~/ops/journal"] }
+  }
+}

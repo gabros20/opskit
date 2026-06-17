@@ -265,6 +265,7 @@ WORK
   ops repo <action>         # health (all ~/work repos: dirty/unpushed/stale) | clone <project> | clone --all
                             #   | adopt <path> --kind <tools|labs|clients|products> (move an ALREADY-cloned
                             #     repo into the routing-tree destination + write its wiki note/registry; §12.3 #4a)
+                            #   | nuke-modules --stale <days> (delete node_modules untouched N+ days; §15 job)
   ops archive <project>     # strip artifacts, git-bundle a dead repo into ~/work/archive/<year>/
   ops files <action>        # open <slug> (reveal in Finder) | ingest (route inbox files into ~/files + shadow notes)
   ops sweep                 # manually trigger the Desktop/Downloads decay sweep (also a nightly job)
@@ -355,8 +356,20 @@ Enforcement principles:
   iCloud/family tree — hits `deny` regardless of who asked. Within `~/files`, the
   `in/` folders (client-provided originals) are read-only for every verb: originals are
   evidence, never edited.
-- **Nothing transmits without a human `--yes`.** Email, push, deploy, payment: the verb
-  produces a draft and stops.
+- **The sweep zone is the one sanctioned write area outside the roots.** `ops sweep`
+  (§9.4) operates on the macOS inboxes `~/Desktop` and `~/Downloads` in **move-only** mode —
+  it relocates stale items *within* those dirs into `_swept/`, never into the three roots, and
+  never deletes on the 7-day pass (trashing is the separate 60-day pass). This is `safe_write`,
+  not a wall breach: it only shuffles already-non-secret user files in place and writes nothing
+  into `~/ops`/`~/work`/`~/files`. No other verb may write outside the roots. (Found by the
+  `test/` jobs suite: without this carve-out the path wall would `deny` the sweep job itself.)
+- **Nothing transmits without a human `--yes` — except the pre-authorized backup.** Email,
+  push, deploy, payment: the verb produces a draft and stops (`confirm`). The lone exception is
+  a scheduled `restic backup` to the **pre-configured** encrypted bucket (key in 1Password): it
+  makes no *per-run* external decision and sends nothing you chose, so it is `read`-class, not
+  `confirm`. A transmit is `confirm` precisely when a human is choosing *what* leaves and *to
+  whom*; an unattended dedup-backup to a fixed destination is not that. (Also surfaced by the
+  jobs suite: `files_backup` was flagged `read`-but-transmits until this distinction was made explicit.)
 - **Everything logs; failure is loud.** Append-only `.logs/`, non-zero exits, macOS
   notification on failure.
 - **New verbs default to `confirm`** until deliberately classified lower. Safe by default.

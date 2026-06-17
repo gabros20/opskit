@@ -1,0 +1,18 @@
+{
+  "description": "Retrieval gold labels (qrels) over the wiki_corpus. Each query names the one relevant note. Queries are NOT pre-bucketed — run_search auto-classifies each as 'lexical' (the relevant note shares vocabulary with the query) or 'semantic' (zero shared content terms, so only meaning-based matching can find it). The semantic bucket is exactly what vector embeddings would help with; its size + the keyword recall on it drive the vector decision.",
+  "queries": [
+    { "q": "stripe webhook retry behavior",                         "relevant": "notes/stripe-webhook-retries",        "intent": "lexical" },
+    { "q": "designatives web project current status",               "relevant": "projects/designatives-web",            "intent": "lexical" },
+    { "q": "who leads designatives",                                "relevant": "people/andras-kovacs",                 "intent": "lexical" },
+    { "q": "deploy the designatives site steps",                    "relevant": "runbooks/designatives-web-deploy",     "intent": "lexical" },
+    { "q": "hungarian atalanyado tax gross up formula",            "relevant": "areas/business-admin/tax-formula",     "intent": "lexical" },
+    { "q": "staging endpoint timed out incident",                  "relevant": "notes/webhook-timeout-incident",       "intent": "lexical" },
+    { "q": "exponential backoff jitter retry delay",               "relevant": "notes/exponential-backoff",            "intent": "lexical" },
+    { "q": "q3 pricing retainer bet on mrr",                       "relevant": "prediction/q3-pricing-bet",            "intent": "lexical" },
+
+    { "q": "avoid overwhelming a server with simultaneous reconnect storms", "relevant": "notes/exponential-backoff",  "intent": "semantic" },
+    { "q": "biggest revenue account we work with",                 "relevant": "clients/designatives",                 "intent": "semantic" },
+    { "q": "callbacks that are not getting through and keep being attempted again", "relevant": "notes/stripe-webhook-retries", "intent": "semantic" },
+    { "q": "self-employment levy calculation for a freelancer",    "relevant": "areas/business-admin/tax-formula",     "intent": "semantic" }
+  ]
+}
