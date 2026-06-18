@@ -11,6 +11,7 @@ misses things you ask for."
 Usage:  python3 test/run_search.py
 """
 from __future__ import annotations
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -43,9 +44,46 @@ def avg(rows, key):
     return sum(r[key] for r in rows) / len(rows) if rows else 0.0
 
 
+def load_corpus_dir(d: Path) -> dict:
+    """Load a real content tree: {relpath-without-.md: text} for every markdown file."""
+    return {str(p.relative_to(d).with_suffix("")): p.read_text(encoding="utf-8")
+            for p in sorted(Path(d).rglob("*.md"))}
+
+
+def load_qrels_file(p: Path) -> list[dict]:
+    """Load a real query log / qrels: JSONL of {"q":..., "relevant": "slug-path"}.
+    Lines with relevant null/missing are skipped (unlabeled — mark which note answered first)."""
+    out = []
+    for line in Path(p).read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        rec = json.loads(line)
+        if rec.get("relevant"):
+            out.append({"q": rec["q"], "relevant": rec["relevant"], "intent": rec.get("intent", "?")})
+    return out
+
+
 def main() -> int:
-    notes = json.loads(WIKI.read_text(encoding="utf-8"))["notes"]
-    qrels = json.loads(QRELS.read_text(encoding="utf-8"))["queries"]
+    ap = argparse.ArgumentParser(description="Searchability analysis + vector decision (ADR-002)")
+    ap.add_argument("--corpus", help="a real content directory (default: the fixture wiki)")
+    ap.add_argument("--qrels", help="a real labeled query log JSONL (default: the fixture qrels)")
+    args = ap.parse_args()
+
+    if args.corpus:
+        notes = load_corpus_dir(Path(args.corpus))
+        print(f"{DIM}corpus: {args.corpus} ({len(notes)} notes){RESET}")
+    else:
+        notes = json.loads(WIKI.read_text(encoding="utf-8"))["notes"]
+    if args.qrels:
+        qrels = load_qrels_file(Path(args.qrels))
+        print(f"{DIM}qrels: {args.qrels} ({len(qrels)} labeled queries){RESET}")
+        if not qrels:
+            print(f"{RED}No labeled queries (every line needs a non-null \"relevant\"). "
+                  f"Mark which note answered each logged query first.{RESET}")
+            return 2
+    else:
+        qrels = json.loads(QRELS.read_text(encoding="utf-8"))["queries"]
     idx = Index(notes, build_link_map(notes))
 
     methods = {

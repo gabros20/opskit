@@ -8,3 +8,6 @@ test/last-run-*.json
 
 # Search index — disposable, rebuilt from content (rm -rf .index && ops index)
 .index/
+
+# Run logs — append-only, regenerable
+.logs/

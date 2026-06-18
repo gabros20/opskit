@@ -12,9 +12,11 @@ shows FTS5+graph missing (ADR-002). Pure stdlib (sqlite3); FTS5 ships with SQLit
 """
 from __future__ import annotations
 import hashlib
+import json
 import os
 import re
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 OPS_HOME = Path(os.environ.get("OPS_HOME", Path(__file__).resolve().parents[2]))
@@ -100,7 +102,26 @@ def _fts_query(q: str) -> str:
     return " OR ".join(f'"{t}"' for t in toks) or '""'
 
 
-def search(query: str, k: int = 10, graph: bool = True) -> list[tuple[str, str, float]]:
+LOG_DIR = OPS_HOME / ".logs"
+QUERY_LOG = LOG_DIR / "queries.jsonl"
+
+
+def log_query(query: str, hits: list[tuple[str, str, float]]) -> None:
+    """Append a search to .logs/queries.jsonl — the real query log that settles the vector
+    question over time (ADR-002). Add the slug that actually answered as `relevant` later to
+    turn a logged query into a labeled benchmark case (`ops search --mark`, future)."""
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    rec = {
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "q": query,
+        "hits": [p for p, _h, _s in hits[:5]],
+        "relevant": None,
+    }
+    with open(QUERY_LOG, "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def search(query: str, k: int = 10, graph: bool = True, log: bool = False) -> list[tuple[str, str, float]]:
     """Return [(path, heading, score)] — FTS5 keyword + one-hop wikilink-graph, fused by RRF."""
     con = connect()
     try:
@@ -125,4 +146,7 @@ def search(query: str, k: int = 10, graph: bool = True) -> list[tuple[str, str, 
                     scores[fp] = scores.get(fp, 0.0) + 0.5 / (60 + i)  # RRF: graph arm (discounted)
     con.close()
     ranked = sorted(scores.items(), key=lambda x: -x[1])[:k]
-    return [(p, best.get(p, "(top)"), sc) for p, sc in ranked]
+    hits = [(p, best.get(p, "(top)"), sc) for p, sc in ranked]
+    if log:
+        log_query(query, hits)
+    return hits

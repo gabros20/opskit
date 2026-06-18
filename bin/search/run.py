@@ -11,7 +11,7 @@ if __name__ == "__main__":
     if not query:
         print('usage: ops search "<query>"', file=sys.stderr)
         sys.exit(2)
-    hits = search(query)
+    hits = search(query, log=True)  # every real search is logged to .logs/queries.jsonl (ADR-002)
     if not hits:
         print("(no hits — try `ops index` first, or broaden the query)")
         sys.exit(0)
