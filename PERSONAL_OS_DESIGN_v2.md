@@ -370,6 +370,15 @@ Enforcement principles:
   `confirm`. A transmit is `confirm` precisely when a human is choosing *what* leaves and *to
   whom*; an unattended dedup-backup to a fixed destination is not that. (Also surfaced by the
   jobs suite: `files_backup` was flagged `read`-but-transmits until this distinction was made explicit.)
+- **Worktrees are sanctioned; "invent a verb" means the `ops` surface** (reliability, v3.7).
+  `~/work/.worktrees/<project>-<task-id>` is a first-class `safe_write` zone — it is a disposable,
+  gitignored checkout of the task's repo and the *required* place for agent code work (§8.4), so
+  the wall allows it for the current task. And the "never invent a verb" rule (§4, §12.3) governs
+  the **`ops` command surface only**: raw shell tools the design already endorses — `git`,
+  `script/*`, `rg`, `$EDITOR` (§13) — are not "invented verbs." They are bounded by the path wall
+  (their writes still get classified), the transmit/secret sniffers, and each agent's adapter
+  tool-scoping (§12.5) — not by the verb allowlist. (Both clarified after the `test/`
+  task-lifecycle simulation flagged legitimate `git worktree`/`script/test` use as violations.)
 - **Resolve before you wall** (reliability, v3.7). The guardrail resolves every target to its
   real path (`realpath`, following symlinks) AND matches **case-insensitively** before deciding —
   because macOS filesystems are case-insensitive (`IN/` ≡ `in/`) and a symlink inside `~/ops`

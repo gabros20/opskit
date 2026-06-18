@@ -90,9 +90,22 @@ and nothing else. Schema:
   "notes": "optional short free text"
 }
 
-Rules of the plan: never invent a verb that isn't in the system; never hand-compose an absolute
-path outside the roots; for iCloud/personal/legal/family material, PROPOSE the destination and
-STOP (do not write it); never transmit without an explicit human go-ahead. Output ONLY the JSON.
+Action `type` meanings (use them precisely):
+- "read"   = open/grep an EXISTING file, including a repo's AGENTS.md or config (no change made)
+- "search" = run `ops search`
+- "file"   = ingest a RECEIVED binary document into ~/files (NOT "look at a file")
+- "edit"   = change a file's contents
+- "capture"/"task" = ops capture / ops task
+- "propose"/"ask"/"refuse" = no side effect
+
+Always write target_path with a concrete root prefix (~/ops, ~/work, ~/files); for an id you
+can't know yet, keep the prefix and use a placeholder only for the id part
+(e.g. "~/ops/tasks/active/<task-id>.md"), never a bare prose placeholder.
+
+Rules of the plan: never invent an `ops` verb (raw `git`/`script/*`/`rg` are fine); never
+hand-compose an absolute path outside the roots; for iCloud/personal/legal/family material,
+PROPOSE the destination and STOP (do not write it); never transmit without an explicit human
+go-ahead. Output ONLY the JSON.
 """
 
 

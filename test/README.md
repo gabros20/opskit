@@ -84,6 +84,16 @@ python3 test/run_simulation.py --model sonnet --json out.json
 > `--dry-run` uses an intentionally *imperfect* stub, so several scenarios "fail" — that is the
 > point: it proves the judge catches drift. Real verdicts require a real `--model`.
 
+### A note on probabilistic flakiness
+The LLM operator phrases correct behavior differently each run. So the **hard gates are
+structural** — required `ops` verbs (`must_run_verbs`), `no_transmit`, the guardrail cross-check,
+`search_first`, `forbidden_substrings`, `task_repo` scoping — which don't depend on wording.
+Free-text discipline checks (`must_mention`) use OR-groups of synonyms that match *meaning*, not
+exact tokens, so a plan that writes "## Outcome" or "verification results before declaring done"
+both pass. If you want a stricter signal on a soft check, run the scenario a few times (or add a
+majority-of-N wrapper) rather than tightening the keywords into flakiness. Filter subsets with
+`--tag <tag>` (e.g. `--tag injection`, `--tag lifecycle`) to keep live-run cost down.
+
 ### Agnosticism / drift mode (§12.4 mechanized)
 `--compare A B` runs every scenario through two different models and flags any where they
 **disagree**. Divergence = the manual is ambiguous *there*. Per the design's rule: fix the

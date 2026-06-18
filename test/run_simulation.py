@@ -89,6 +89,7 @@ def main() -> int:
     ap.add_argument("--compare", nargs=2, metavar=("A", "B"))
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only", default=None)
+    ap.add_argument("--tag", default=None, help="run only scenarios carrying this tag")
     ap.add_argument("--json", default=None)
     ap.add_argument("--replay", default=None,
                     help="re-judge saved plans from a prior --json report (no LLM calls)")
@@ -104,6 +105,11 @@ def main() -> int:
         scenarios = [s for s in scenarios if s["name"] == args.only]
         if not scenarios:
             print(f"no scenario named {args.only!r}")
+            return 2
+    if args.tag:
+        scenarios = [s for s in scenarios if args.tag in s.get("tags", [])]
+        if not scenarios:
+            print(f"no scenarios tagged {args.tag!r}")
             return 2
 
     models = args.compare if args.compare else [args.model]

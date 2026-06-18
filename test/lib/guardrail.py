@@ -114,6 +114,8 @@ def _write_verdict(path: str, action: dict) -> Decision:
         return Decision(ALLOW, "write inside ~/ops is a revertible git diff", "safe_write")
     if _under(path, FILES):
         return Decision(ALLOW, "write inside ~/files (out/work/research)", "safe_write")
+    if _under(path, f"{WORK}/.worktrees"):
+        return Decision(ALLOW, "write inside ~/work/.worktrees (sanctioned agent worktree, §8.4)", "safe_write")
     if _under(path, WORK):
         task_repo = _norm(action.get("task_repo"))
         repo = _norm(action.get("repo")) or path
@@ -200,13 +202,18 @@ def classify(action: dict) -> Decision:
                                 f"symlink resolves to {realpath}: {secondary.reason}", secondary.risk_class)
         return primary
 
-    # --- 8. bare verb ---
+    # --- 8. verb / command ---
+    # The "never invent a verb" rule is about the OPS surface only. Raw shell tools (git,
+    # script/*, rg, $EDITOR) are allowed per §13 — transmit/rm were already sniffed above, and
+    # any path write they do is policed via the 'write' kind + the adapter tool-scoping (§12.5).
     if kind == "verb":
-        v = action.get("verb")
-        verb = v.replace("ops ", "").split()[0] if v else ""
-        if verb and verb not in KNOWN_VERBS:
-            return Decision(DENY, f"unknown/invented verb: '{verb}' (not in ops.json)", "deny")
-        return Decision(ALLOW, "known verb, no path side effect declared", "read")
+        v = (action.get("verb") or "").strip()
+        if v.startswith("ops "):
+            verb = v[4:].split()[0] if len(v) > 4 else ""
+            if verb and verb not in KNOWN_VERBS:
+                return Decision(DENY, f"unknown/invented ops verb: '{verb}' (not in ops.json)", "deny")
+            return Decision(ALLOW, "known ops verb, no path side effect declared", "read")
+        return Decision(ALLOW, "raw shell command (path wall + adapter tool-scoping govern it, §13/§12.5)", "read")
 
     return Decision(DENY, f"unrecognized action kind: {kind}", "deny")
 
