@@ -856,6 +856,19 @@ against your **actual query log** (it auto-buckets lexical vs semantic and uses 
 via Ollama or `OPS_EMBED_CMD`). The mechanism is proven and philosophy-safe; the only open question
 is how often *your* queries are semantic, which only your log answers.
 
+**Engine choice for stage 2: plain SQLite + `sqlite-vec`, not libSQL.** libSQL (Turso's MIT fork
+of SQLite) was evaluated. It is file-format-compatible, runs fully embedded, and has *native*
+vector search (`F32_BLOB`, `vector_distance_cos`, DiskANN `vector_top_k`) — nicer than loading an
+extension. But principle 6 decides against it: plain SQLite is already present (Python `sqlite3`
+stdlib, the `sqlite3` CLI, public domain, outlives any company), whereas libSQL is a one-company
+fork whose reason-for-being — embedded replicas / sync / cloud — is the very server gravity this
+design walls off. Since `.index` is a disposable, rebuilt-from-markdown cache, native-vs-extension
+vectors is mere ergonomics, and DiskANN's ANN only matters past ~100k vectors (brute-force cosine
+is instant at this scale). **libSQL is kept as the documented drop-in fallback** — same file format,
+zero migration — should `sqlite-vec`'s extension-loading (macOS system Python sometimes disables
+`enable_load_extension`; use Homebrew Python / `apsw`) ever become painful. Its sync/cloud features
+remain off-limits (they cross the server line).
+
 ---
 
 ## 11. Skills = SOPs (merged concept)
