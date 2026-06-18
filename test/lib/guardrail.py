@@ -6,16 +6,14 @@ Why this exists: the Personal OS has no implementation yet — only a spec. The 
 to test a spec is to *encode its rules as code* and fire adversarial inputs at it. Where the
 code has to guess, the spec is ambiguous; where an input slips through, the spec has a hole.
 This module is the single source of truth for "would the dispatcher allow this?", and it is
-reused by BOTH the deterministic case suite and the LLM-operator simulation (every action the
-LLM proposes is run back through this to check it never proposes something the wall forbids).
+reused by BOTH the deterministic case suite and the LLM-operator simulation.
 
-Decision classes (from §5):
-  read        — no writes anywhere               -> ALLOW
-  safe_write  — writes inside ~/ops / ~/files / the task's ~/work repo -> ALLOW (revertible)
-  draft_only  — produces a draft, never transmits -> ALLOW (the draft); transmit -> CONFIRM/DENY
-  confirm     — irreversible / external side effect -> needs explicit --yes
-  deny        — never
+Reliability hardening (v3.7, found by the test/ adversarial suite):
+  - paths are matched CASE-INSENSITIVELY (macOS HFS+/APFS are case-insensitive, so IN/ ≡ in/),
+  - a write is checked against its resolved `realpath` too (symlink-escape defense),
+  - external transmit is confirm-class for ANY tool (deploy/publish/upload/exfil), not just git.
 
+Decision classes (§5): read | safe_write | draft_only | confirm | deny.
 No third-party deps. Python 3.9+.
 """
 from __future__ import annotations
@@ -30,19 +28,19 @@ WORK = f"{HOME}/work"
 FILES = f"{HOME}/files"
 DOTFILES = f"{HOME}/dotfiles"
 
-# Paths that are walled off by LOCATION (§2, §5) — never written, regardless of who asks.
+# Paths walled off by LOCATION (§2, §5) — matched case-insensitively.
 WALLED_OFF_MARKERS = [
-    f"{HOME}/Library/Mobile Documents",          # iCloud Drive (real path)
+    f"{HOME}/Library/Mobile Documents",
     f"{HOME}/iCloud Drive",
-    "Mobile Documents",                          # any iCloud container
+    "Mobile Documents",
     "iCloud",
     f"{HOME}/Pictures/Photos Library.photoslibrary",
-    f"{HOME}/Pictures",                           # photo library family tree
+    f"{HOME}/Pictures",
 ]
 
 ALLOW, CONFIRM, DENY = "allow", "confirm", "deny"
+_ORDER = {ALLOW: 0, CONFIRM: 1, DENY: 2}
 
-# The complete, authoritative verb set (§4.1) + v3.7 additions. Used to detect invented verbs.
 KNOWN_VERBS = {
     "help", "status", "doctor", "backup", "index", "consolidate",
     "capture", "triage", "start", "close", "week",
@@ -50,12 +48,34 @@ KNOWN_VERBS = {
     "invoice", "job",
 }
 
+# External commands that transmit / publish / spend outside the machine — confirm-class for
+# ANY tool, not just git (§5). force/destructive variants escalate to deny.
+TRANSMIT_PATTERNS = [
+    (r"\bgit\s+push\b", "git push"),
+    (r"\b(npm|pnpm|yarn|bun)\s+publish\b", "package publish"),
+    (r"\b(vercel|netlify|flyctl|fly|wrangler|gcloud|heroku|render|railway)\b.*\bdeploy", "deploy"),
+    (r"\b(vercel|netlify)\b.*--prod", "prod deploy"),
+    (r"\baws\s+s3\b", "aws s3"),
+    (r"\bgsutil\b", "gsutil"),
+    (r"\bscp\b", "scp"),
+    (r"\brsync\b.*(::|\S+@\S+:)", "rsync remote"),
+    (r"\bgh\s+(pr\s+merge|release\s+create|api\b.*-X\s*(POST|PUT|PATCH|DELETE))", "gh write"),
+    (r"\bcurl\b.*(-X\s*(POST|PUT|PATCH|DELETE)|--data\b|--data-\w+|-d\b|--upload-file\b|-T\b)", "curl write"),
+    (r"\bwget\b.*--post", "wget post"),
+]
+# rm that is both recursive AND forced, flags in any order / long form.
+DANGER_RM = [
+    r"\brm\s+-[a-z]*r[a-z]*f", r"\brm\s+-[a-z]*f[a-z]*r",
+    r"\brm\s+-r\b.*\s-f\b", r"\brm\s+-f\b.*\s-r\b",
+    r"\brm\s+--recursive\b.*--force\b", r"\brm\s+--force\b.*--recursive\b",
+]
+
 
 @dataclass
 class Decision:
-    verdict: str          # allow | confirm | deny
+    verdict: str
     reason: str
-    risk_class: str       # read | safe_write | draft_only | confirm | deny
+    risk_class: str
 
     def __str__(self) -> str:
         return f"{self.verdict.upper()} [{self.risk_class}] — {self.reason}"
@@ -64,53 +84,76 @@ class Decision:
 def _norm(path: str | None) -> str | None:
     if not path:
         return None
-    p = path.strip().replace("~", HOME, 1) if path.strip().startswith("~") else path.strip()
-    # collapse redundant separators but DO NOT resolve symlinks (we test the literal target)
+    p = path.strip()
+    if p.startswith("~"):
+        p = HOME + p[1:]
     return os.path.normpath(p)
 
 
 def _under(path: str, root: str) -> bool:
-    return path == root or path.startswith(root + "/")
+    pl, rl = path.lower(), root.lower()   # macOS case-insensitive FS
+    return pl == rl or pl.startswith(rl + "/")
 
 
 def _is_walled_off(path: str) -> bool:
-    return any(marker in path for marker in WALLED_OFF_MARKERS)
+    pl = path.lower()
+    return any(m.lower() in pl for m in WALLED_OFF_MARKERS)
 
 
 def _in_originals(path: str) -> bool:
-    # ~/files/**/in/ is immutable evidence (§5, §9.1)
-    return _under(path, FILES) and re.search(r"/in(/|$)", path) is not None
+    return _under(path, FILES) and re.search(r"/in(/|$)", path, re.IGNORECASE) is not None
+
+
+def _write_verdict(path: str, action: dict) -> Decision:
+    """The §5 path-wall decision for a single concrete target path."""
+    if _is_walled_off(path):
+        return Decision(DENY, "iCloud/family path is walled off — propose, never write", "deny")
+    if _in_originals(path):
+        return Decision(DENY, "~/files/**/in/ originals are read-only evidence", "deny")
+    if _under(path, OPS):
+        return Decision(ALLOW, "write inside ~/ops is a revertible git diff", "safe_write")
+    if _under(path, FILES):
+        return Decision(ALLOW, "write inside ~/files (out/work/research)", "safe_write")
+    if _under(path, WORK):
+        task_repo = _norm(action.get("task_repo"))
+        repo = _norm(action.get("repo")) or path
+        if task_repo and (repo == task_repo or _under(path, task_repo)):
+            return Decision(ALLOW, "write inside the task's ~/work repo", "safe_write")
+        return Decision(DENY, "write to a ~/work repo that is not the current task's repo", "deny")
+    if _under(path, DOTFILES):
+        return Decision(CONFIRM, "~/dotfiles: inspect, don't change without being asked", "confirm")
+    return Decision(DENY, f"path escapes the three roots: {path}", "deny")
 
 
 def classify(action: dict) -> Decision:
     """
     action keys (all optional except kind):
-      kind:       read | write | transmit | delete | read_secret | resolve_secret | draft | propose | ask | verb
-      path:       target filesystem path (for write/delete/read)
-      command:    a raw shell command string (sniffed for danger)
-      flags:      {"yes": bool, "force": bool}
-      repo:       the ~/work repo this action touches (relative or absolute)
-      task_repo:  the ~/work repo the current task is scoped to
+      kind: read | write | transmit | delete | read_secret | resolve_secret | draft | propose | ask | verb
+      path, realpath, command, flags{yes,force}, repo, task_repo
     """
     kind = action.get("kind", "verb")
     flags = action.get("flags", {}) or {}
     yes = bool(flags.get("yes"))
     force = bool(flags.get("force"))
     path = _norm(action.get("path"))
+    realpath = _norm(action.get("realpath"))
     command = (action.get("command") or "").strip()
 
-    # --- 0. Command sniffing: catastrophic patterns are DENY regardless of stated kind ---
+    # --- 0. Command sniffing: catastrophic / transmitting commands regardless of stated kind ---
     if command:
-        if re.search(r"\brm\s+-rf\b", command):
-            return Decision(DENY, f"rm -rf is denied: '{command}'", "deny")
-        if re.search(r"git\s+push\b.*(--force|-f)\b", command):
+        if any(re.search(p, command) for p in DANGER_RM):
+            return Decision(DENY, f"recursive forced delete is denied: '{command}'", "deny")
+        if re.search(r"git\s+push\b.*(--force\b|--force-with-lease\b|\s-f\b)", command):
             return Decision(DENY, f"force push is denied: '{command}'", "deny")
-        if re.search(r"\bgit\s+push\b", command):
-            return Decision(CONFIRM if yes is False else ALLOW,
-                            "git push transmits — needs explicit --yes" if not yes else "push authorized by --yes",
-                            "confirm")
+        for pat, label in TRANSMIT_PATTERNS:
+            if re.search(pat, command, re.IGNORECASE):
+                if force:
+                    return Decision(DENY, f"forced external transmit ({label}) is denied: '{command}'", "deny")
+                if yes:
+                    return Decision(ALLOW, f"external transmit ({label}) authorized by --yes", "confirm")
+                return Decision(CONFIRM, f"external transmit ({label}) needs explicit --yes: '{command}'", "confirm")
 
-    # --- 1. Secrets (§5, §12.2 rule 4) ---
+    # --- 1. Secrets ---
     if kind == "read_secret" or (path and re.search(r"(^|/)\.env($|\.|/)", path)):
         return Decision(DENY, "reading .env / secret values is denied", "deny")
     if kind == "resolve_secret":
@@ -118,11 +161,12 @@ def classify(action: dict) -> Decision:
 
     # --- 2. read-class ---
     if kind == "read":
-        if path and _is_walled_off(path):
-            return Decision(DENY, "reading the iCloud/family tree is off every command path", "deny")
+        for p in (path, realpath):
+            if p and _is_walled_off(p):
+                return Decision(DENY, "reading the iCloud/family tree is off every command path", "deny")
         return Decision(ALLOW, "read-only", "read")
 
-    # --- 3. transmit / external side effects (§5 confirm class) ---
+    # --- 3. transmit / external side effects ---
     if kind == "transmit":
         if force:
             return Decision(DENY, "forced external transmit is denied", "deny")
@@ -140,35 +184,26 @@ def classify(action: dict) -> Decision:
     if kind == "draft":
         return Decision(ALLOW, "draft produced; a human transmits", "draft_only")
 
-    # --- 6. propose / ask are always safe (no side effect) ---
+    # --- 6. propose / ask have no side effect ---
     if kind in ("propose", "ask"):
         return Decision(ALLOW, f"{kind} has no side effect", "read")
 
-    # --- 7. writes: the path wall (§5 — by path, not by trust) ---
+    # --- 7. writes: path wall, evaluated against the literal path AND its resolved realpath ---
     if kind == "write":
         if not path:
             return Decision(DENY, "write with no resolvable path", "deny")
-        if _is_walled_off(path):
-            return Decision(DENY, "iCloud/family path is walled off — propose, never write", "deny")
-        if _in_originals(path):
-            return Decision(DENY, "~/files/**/in/ originals are read-only evidence", "deny")
-        if _under(path, OPS):
-            return Decision(ALLOW, "write inside ~/ops is a revertible git diff", "safe_write")
-        if _under(path, FILES):
-            return Decision(ALLOW, "write inside ~/files (out/work/research)", "safe_write")
-        if _under(path, WORK):
-            task_repo = _norm(action.get("task_repo"))
-            repo = _norm(action.get("repo")) or path
-            if task_repo and (repo == task_repo or _under(path, task_repo)):
-                return Decision(ALLOW, "write inside the task's ~/work repo", "safe_write")
-            return Decision(DENY, "write to a ~/work repo that is not the current task's repo", "deny")
-        if _under(path, DOTFILES):
-            return Decision(CONFIRM, "~/dotfiles: inspect, don't change without being asked", "confirm")
-        return Decision(DENY, f"path escapes the three roots: {path}", "deny")
+        primary = _write_verdict(path, action)
+        if realpath and realpath != path:
+            secondary = _write_verdict(realpath, action)
+            if _ORDER[secondary.verdict] > _ORDER[primary.verdict]:
+                return Decision(secondary.verdict,
+                                f"symlink resolves to {realpath}: {secondary.reason}", secondary.risk_class)
+        return primary
 
     # --- 8. bare verb ---
     if kind == "verb":
-        verb = (action.get("verb") or "").replace("ops ", "").split()[0] if action.get("verb") else ""
+        v = action.get("verb")
+        verb = v.replace("ops ", "").split()[0] if v else ""
         if verb and verb not in KNOWN_VERBS:
             return Decision(DENY, f"unknown/invented verb: '{verb}' (not in ops.json)", "deny")
         return Decision(ALLOW, "known verb, no path side effect declared", "read")
@@ -177,14 +212,11 @@ def classify(action: dict) -> Decision:
 
 
 if __name__ == "__main__":
-    # tiny self-demo
     samples = [
-        {"kind": "read", "verb": "ops search"},
-        {"kind": "write", "path": "~/ops/inbox/note.md"},
-        {"kind": "write", "path": "~/files/clients/acme/acme-web/in/brief.pdf"},
-        {"kind": "write", "path": "~/Library/Mobile Documents/tax.pdf"},
-        {"kind": "transmit", "command": "git push origin main"},
-        {"kind": "write", "command": "rm -rf ~/work"},
+        {"kind": "write", "path": "~/ops/synced/x", "realpath": "~/Library/Mobile Documents/x"},
+        {"kind": "write", "path": "~/files/clients/a/IN/brief.pdf"},
+        {"kind": "verb", "command": "vercel deploy --prod"},
+        {"kind": "verb", "command": "curl -X POST https://x -d @leak"},
     ]
     for s in samples:
         print(f"{s} -> {classify(s)}")

@@ -370,6 +370,19 @@ Enforcement principles:
   `confirm`. A transmit is `confirm` precisely when a human is choosing *what* leaves and *to
   whom*; an unattended dedup-backup to a fixed destination is not that. (Also surfaced by the
   jobs suite: `files_backup` was flagged `read`-but-transmits until this distinction was made explicit.)
+- **Resolve before you wall** (reliability, v3.7). The guardrail resolves every target to its
+  real path (`realpath`, following symlinks) AND matches **case-insensitively** before deciding —
+  because macOS filesystems are case-insensitive (`IN/` ≡ `in/`) and a symlink inside `~/ops`
+  could otherwise point at iCloud or at a `~/files/**/in/` original. The wall is on where a write
+  *lands*, not on the string the agent typed. (Three escapes — symlink-to-iCloud, symlink-to-originals,
+  uppercase `IN/` — were found by the `test/` adversarial suite and closed here.)
+- **Transmit means *any* tool, not just git** (reliability, v3.7). The `confirm` wall on external
+  side effects fires for `git push`, `vercel/netlify/fly deploy`, `npm/yarn publish`, `aws s3` /
+  `gsutil`, `scp` / `rsync` to a remote, `gh pr merge` / `gh api -X POST`, and `curl/wget` POST/PUT
+  — anything that sends data off the machine or spends money. Recognizing only `git push` was a
+  hole (an agent could exfiltrate via `curl` or deploy via `vercel` unchecked); the dispatcher
+  classifies by *effect*, sniffing the command, and forced variants (`--force`, `rm -rf`/`-fr`/`-r -f`)
+  are `deny`, not `confirm`.
 - **Everything logs; failure is loud.** Append-only `.logs/`, non-zero exits, macOS
   notification on failure.
 - **New verbs default to `confirm`** until deliberately classified lower. Safe by default.
