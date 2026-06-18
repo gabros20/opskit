@@ -5,3 +5,6 @@ ref/
 __pycache__/
 *.pyc
 test/last-run-*.json
+
+# Search index — disposable, rebuilt from content (rm -rf .index && ops index)
+.index/

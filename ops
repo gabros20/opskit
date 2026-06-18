@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# ops — the single entrypoint dispatcher (§4.2). Stage-1 slice: help | index | search.
+# Verbs live in bin/<verb>/run.py; OPS_HOME defaults to this repo.
+set -euo pipefail
+OPS="${OPS_HOME:-$(cd "$(dirname "$0")" && pwd)}"
+export OPS_HOME="$OPS"
+VERB="${1:-help}"; shift || true
+
+case "$VERB" in
+  help|-h|--help)
+    cat <<'EOF'
+ops — stage-1 search slice (validated against PERSONAL_OS_DESIGN_v2.md §10.2)
+  ops index               rebuild the search index from the content tree
+  ops search "<query>"    ranked file#heading hits (FTS5 keyword + wikilink graph)
+  ops help                this message
+Rebuild rule: rm -rf .index && ops index   (the index is a disposable, rebuildable cache)
+EOF
+    ;;
+  *)
+    CMD="$OPS/bin/$VERB/run.py"
+    [ -f "$CMD" ] || { echo "unknown verb: $VERB (try: ops help)" >&2; exit 1; }
+    exec python3 "$CMD" "$@"
+    ;;
+esac

@@ -23,7 +23,8 @@ SUITES = [
     ("wiki integrity (§10)", "run_wiki.py"),
     ("wiki link edges (§10)", "run_wiki_edges.py"),
     ("state & consistency (§7/§8/§10/§14)", "run_state.py"),
-    ("searchability (§10.2)", "run_search.py"),
+    ("searchability model (§10.2)", "run_search.py"),
+    ("stage-1 search impl (§10.2)", "run_search_impl.py"),
 ]
 
 

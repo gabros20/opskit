@@ -26,7 +26,8 @@ python3 test/run_simulation.py --model sonnet   # the LLM-operator half (needs t
 | Wiki integrity (§10) | `run_wiki.py` | frontmatter, link resolution, backlinks, orphans, stale, hub two-zone | 12/12 |
 | Wiki link edges (§10) | `run_wiki_edges.py` | slug collisions, ambiguous links, `#`/`|` link syntax, self-links, cycles | 6/6 |
 | State & consistency | `run_state.py` | folder-wins task status, index-rebuild=files, journal atomic-append, restore order | 12/12 |
-| Searchability (§10.2) | `run_search.py` | keyword vs keyword+graph vs semantic-proxy → the **vector decision** | report |
+| Searchability (§10.2) | `run_search.py` | keyword vs keyword+graph vs semantic-proxy/real-vectors → the **vector decision** | report |
+| Stage-1 search impl (§10.2) | `run_search_impl.py` | the REAL `ops index`/`ops search` (FTS5 + wikilink graph): lexical recall@5, incremental, rebuild rule, CLI | 6/6 |
 
 Each is pure TDD on the spec: a FAIL is a defect in the design as written. Real spec gaps found
 and fixed this way: `ops repo adopt` (no verb to place a cloned repo); the `ops sweep`
@@ -156,6 +157,12 @@ test/
   `no_invent_verb`, plus the automatic guardrail cross-check.
 - Skill routing → the design's `skills/<name>/routing-eval.jsonl` (§11) is the same idea scoped
   to trigger→skill; a future `run_routing.py` can consume those once skills exist.
+
+## The first real implementation
+Stage-1 search now exists for real (not just modeled): `../ops` (dispatcher) + `../bin/index/`,
+`../bin/search/`, `../bin/lib/indexlib.py` (FTS5 + wikilink-graph engine), over `../content/`.
+Try it: `./ops index` then `./ops search "webhook retry"`. `run_search_impl.py` is its test.
+Rebuild rule: `rm -rf .index && ./ops index`.
 
 ## Requirements
 Python 3.9+ (stdlib only). For the simulation: the `claude` CLI on `PATH` (or pass your own
