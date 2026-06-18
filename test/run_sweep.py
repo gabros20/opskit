@@ -85,9 +85,44 @@ def t_nothing_lost_silently():
         check(f"{f.name} accounted for", ok, f"zone={f.zone}")
 
 
+def t_touched_day6_not_moved():
+    m = Machine([FileState("late.pdf", "downloads", last_touched_day=0)])
+    m.advance_to(13, actions={6: [("touch", "late.pdf")]})  # touched day6 -> sweeps day13
+    f = m.files["late.pdf"]
+    check("touched day6 not swept at day7", f.swept_on_day == 13, f"swept_on_day={f.swept_on_day}")
+
+
+def t_touch_in_swept_no_rescue():
+    # EDGE: re-touching a file already in _swept does NOT rescue it (only ingest does, per §9.4).
+    m = Machine([FileState("doc.pdf", "desktop", last_touched_day=0)])
+    m.advance_to(67, actions={30: [("touch", "doc.pdf")]})  # touch while in _swept
+    f = m.files["doc.pdf"]
+    check("touch in _swept does NOT rescue (spec: only ingest does)", f.zone == "trash",
+          f"zone={f.zone}  [DESIGN NOTE: a user who reopens a swept file may expect rescue — clarify in §9.4]")
+
+
+def t_rescue_via_ingest_from_swept():
+    m = Machine([FileState("save.pdf", "downloads", last_touched_day=0)])
+    m.advance_to(67, actions={40: [("ingest", "save.pdf")]})  # ingest while in _swept
+    f = m.files["save.pdf"]
+    check("ingest rescues a file from _swept before trash", f.zone == "ingested", f"zone={f.zone}")
+
+
+def t_month_boundary_bucket():
+    # keep it fresh (touch every 6 days) until day 28, then let it go stale -> swept day 35
+    m = Machine([FileState("m.pdf", "downloads", last_touched_day=0)])
+    touches = {d: [("touch", "m.pdf")] for d in (6, 12, 18, 24, 28)}
+    m.advance_to(40, actions=touches)
+    f = m.files["m.pdf"]
+    check("dated bucket rolls to next month", getattr(f, "bucket", None) == "2026-07",
+          f"swept_on_day={f.swept_on_day}, bucket={getattr(f, 'bucket', None)}")
+
+
 def main() -> int:
     for t in (t_stays_within_7, t_moves_at_7, t_touch_resets_timer, t_trashed_at_67,
-              t_ingest_removes_from_decay, t_idempotent_same_day, t_nothing_lost_silently):
+              t_ingest_removes_from_decay, t_idempotent_same_day, t_nothing_lost_silently,
+              t_touched_day6_not_moved, t_touch_in_swept_no_rescue, t_rescue_via_ingest_from_swept,
+              t_month_boundary_bucket):
         t()
     print(f"{BOLD}Sweep decay-machine simulation{RESET} — {len(results)} assertions "
           f"(SWEEP_DAYS={SWEEP_DAYS}, TRASH_DAYS={TRASH_DAYS})\n")

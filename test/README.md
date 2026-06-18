@@ -22,14 +22,17 @@ python3 test/run_simulation.py --model sonnet   # the LLM-operator half (needs t
 |---|---|---|---|
 | Guardrail (§5) | `run_deterministic.py` | path-wall + risk classes vs 29 adversarial actions | 29/29 |
 | Jobs registry (§15) | `run_jobs.py` | only read/safe_write scheduled, verbs-not-logic, risk-matches-effect, writes-inside-roots | 25/25 |
-| Sweep decay (§9.4) | `run_sweep.py` | the 7d→`_swept`→60d→trash machine on a virtual clock | 15/15 |
-| Wiki integrity (§10) | `run_wiki.py` | frontmatter, link resolution, backlinks, orphans, stale, hub two-zone | 9/9 |
+| Sweep decay (§9.4) | `run_sweep.py` | the 7d→`_swept`→60d→trash machine on a virtual clock (+ boundary, rescue, month-roll) | 19/19 |
+| Wiki integrity (§10) | `run_wiki.py` | frontmatter, link resolution, backlinks, orphans, stale, hub two-zone | 12/12 |
+| Wiki link edges (§10) | `run_wiki_edges.py` | slug collisions, ambiguous links, `#`/`|` link syntax, self-links, cycles | 6/6 |
+| State & consistency | `run_state.py` | folder-wins task status, index-rebuild=files, journal atomic-append, restore order | 12/12 |
 | Searchability (§10.2) | `run_search.py` | keyword vs keyword+graph vs semantic-proxy → the **vector decision** | report |
 
-Each is pure TDD on the spec: a FAIL is a defect in the design as written. Three real spec gaps
-were found and fixed this way — `ops repo adopt` (no verb to place a cloned repo), the `ops sweep`
-Desktop/Downloads write-zone carve-out (path wall would deny it), and the `files_backup`
-read-vs-transmit risk distinction.
+Each is pure TDD on the spec: a FAIL is a defect in the design as written. Real spec gaps found
+and fixed this way: `ops repo adopt` (no verb to place a cloned repo); the `ops sweep`
+Desktop/Downloads write-zone carve-out; the `files_backup` read-vs-transmit distinction; the §5
+reliability hardening (symlink-realpath resolution, case-insensitive wall, transmit-by-any-tool);
+global slug uniqueness (§10.1); and the touch-in-`_swept`-doesn't-rescue rule (§9.4).
 
 ### The vector decision (`run_search.py`)
 Runs three retrievers over the corpus + a labeled query set, auto-bucketing each query as
@@ -95,12 +98,15 @@ test/
 ├── run_jobs.py                   # jobs-registry invariants (offline)
 ├── run_sweep.py                  # sweep decay-machine simulation (offline)
 ├── run_wiki.py                   # wiki integrity checks (offline)
+├── run_wiki_edges.py             # wiki link-reliability edges (offline)
+├── run_state.py                  # state/consistency invariants (offline)
 ├── run_search.py                 # searchability analysis + vector decision (offline)
 ├── run_simulation.py             # LLM-operator suite (+ --compare drift mode, --replay)
 ├── world/
 │   ├── seed.json                 # the simulated four-root machine state (operator sim)
 │   ├── jobs.json                 # model of the §15 jobs registry
 │   ├── wiki_corpus.json          # fixture wiki (with controlled defects)
+│   ├── wiki_reliability.json     # edge-case wiki (collisions, anchors, cycles)
 │   └── search_qrels.json         # retrieval gold labels (queries → relevant note)
 ├── cases/
 │   ├── guardrail_cases.json      # 29 deterministic adversarial cases
@@ -109,7 +115,8 @@ test/
     ├── guardrail.py              # the §5 decision model (single source of truth for "allowed?")
     ├── jobsmodel.py              # §15 job-rule checks
     ├── sweepsim.py               # §9.4 decay state machine + virtual clock
-    ├── wiki.py                   # §10 note parser + integrity checks
+    ├── statemodel.py             # task status, index rebuild, journal append, restore order
+    ├── wiki.py                   # §10 note parser + integrity checks (collisions, aliases)
     ├── retrieval.py              # BM25 / keyword+graph / semantic-proxy + metrics
     ├── spec.py                   # extract contract/manual from the design doc; build the prompt
     ├── op_runner.py              # call the LLM operator, parse its JSON plan

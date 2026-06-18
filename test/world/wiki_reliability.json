@@ -1,0 +1,22 @@
+{
+  "description": "Edge-case wiki for link reliability. Probes hazards a flat-slug wiki invites: duplicate basenames (slug collision) making [[bare]] links ambiguous; [[slug#heading]] / [[slug|Display]] link syntax that must still resolve; self-links; and cycles (must not loop or crash). run_wiki_edges asserts ONLY the categories listed here (it is edge-focused, unlike run_wiki which requires a clean corpus).",
+  "today": "2026-06-18",
+  "stale_days": 365,
+  "assert_categories": {
+    "slug_collision": ["acme"],
+    "ambiguous_links": [["notes/linker", "acme"]],
+    "self_links": ["notes/self-ref"],
+    "broken_links": [["notes/ghost-linker", "ghost"]]
+  },
+  "notes": {
+    "clients/acme": "---\ntype: client\ntitle: Acme (the company)\nstatus: active\ncreated: 2026-06-01\nupdated: 2026-06-10\ntags: [client]\n---\n# Acme\nThe client company.\n\n## Timeline\n- 2026-06-10 onboarded",
+    "notes/acme": "---\ntype: note\ntitle: ACME protocol notes\nstatus: evergreen\ncreated: 2026-06-01\nupdated: 2026-06-10\ntags: [note]\n---\n# ACME protocol\nThe ACME TLS certificate protocol — unrelated to the client.",
+    "notes/linker": "---\ntype: note\ntitle: Linker\nstatus: draft\ncreated: 2026-06-02\nupdated: 2026-06-11\ntags: [note]\n---\n# Linker\nReferences [[acme]] (ambiguous!), the [[exponential-backoff#jitter]] section, and [[designatives|the studio]].",
+    "clients/designatives": "---\ntype: client\ntitle: Designatives\nstatus: active\ncreated: 2026-01-10\nupdated: 2026-06-15\ntags: [client]\n---\n# Designatives\nStudio client.\n\n## Timeline\n- 2026-06-15 active",
+    "notes/exponential-backoff": "---\ntype: note\ntitle: Exponential backoff\nstatus: evergreen\ncreated: 2026-03-01\nupdated: 2026-06-01\ntags: [reliability]\n---\n# Exponential backoff\n## jitter\nAdd jitter to avoid thundering herd.",
+    "notes/self-ref": "---\ntype: note\ntitle: Self ref\nstatus: draft\ncreated: 2026-06-02\nupdated: 2026-06-11\ntags: [note]\n---\n# Self ref\nThis note links to [[self-ref]] (itself).",
+    "notes/cycle-a": "---\ntype: note\ntitle: Cycle A\nstatus: draft\ncreated: 2026-06-02\nupdated: 2026-06-11\ntags: [note]\n---\n# Cycle A\nLinks [[cycle-b]].",
+    "notes/cycle-b": "---\ntype: note\ntitle: Cycle B\nstatus: draft\ncreated: 2026-06-02\nupdated: 2026-06-11\ntags: [note]\n---\n# Cycle B\nLinks [[cycle-a]].",
+    "notes/ghost-linker": "---\ntype: note\ntitle: Ghost linker\nstatus: draft\ncreated: 2026-06-02\nupdated: 2026-06-11\ntags: [note]\n---\n# Ghost linker\nReferences [[ghost]] which does not exist."
+  }
+}

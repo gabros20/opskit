@@ -717,6 +717,14 @@ important is lost because ingesting *is* the act of saying "this matters." This 
 hygiene layer the rest of the design assumed but never specified — the machine stays
 clean without you tidying it.
 
+**Rescue is by ingest, not by reopening** (reliability, v3.7). Once a file is in `_swept/`,
+merely *touching* it (opening/previewing) does **not** reset the 60-day trash timer — only
+`ops files ingest` pulls it back out of the decay path. This keeps the timer predictable (a
+re-touch can't silently keep junk alive forever), but it means a file you reopen from `_swept`
+and forget to ingest will still be trashed on schedule. The 60-day window and the `_swept`
+folder being in plain sight are the safety net. (Surfaced by `test/run_sweep.py`, which models
+this explicitly so it's a deliberate choice, not an accident.)
+
 **The iCloud line, made operational.** A real ingest run finds two kinds of file: work
 material (a client brief, a generated invoice) and irreplaceable personal/family/legal
 docs (a tax return, a signed master contract, a baby medical record). The wall (§5) says
@@ -743,8 +751,13 @@ Conventions (normative copy lives in `wiki/conventions.md`):
   `aliases`. Types: `client | project | area | person | tool | note | runbook | skill |
   decision | meeting | research | prediction`.
 - One idea per knowledge note (`wiki/notes/`); link generously; filenames are stable,
-  human-readable slugs (`stripe-webhook-retries.md`). Renames go through
-  `ops wiki rename` (later) so backlinks update.
+  human-readable slugs (`stripe-webhook-retries.md`). **Slugs are globally unique** across all
+  folders — because `[[bare-slug]]` links resolve by basename, two notes sharing a basename
+  (`clients/acme` and `notes/acme`) make every `[[acme]]` ambiguous. `ops doctor`/`consolidate`
+  flag slug collisions; `ops new`/`ops wiki rename` refuse to create one. Link syntax allows
+  `[[slug#heading]]` and `[[slug|Display text]]` — the resolver strips the `#`/`|` part.
+  Renames go through `ops wiki rename` (later) so backlinks update. (Collision + alias handling
+  verified by `test/run_wiki_edges.py`.)
 - **Entity notes (client/project) are *hubs* with two zones** (from gbrain): a *compiled
   truth* top — short, current, rewritten as facts change — over a `## Timeline` section that
   is append-only evidence. The hub IS the context: read the top to know the current state,

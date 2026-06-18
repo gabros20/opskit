@@ -21,6 +21,8 @@ SUITES = [
     ("jobs registry (§15)", "run_jobs.py"),
     ("sweep decay (§9.4)", "run_sweep.py"),
     ("wiki integrity (§10)", "run_wiki.py"),
+    ("wiki link edges (§10)", "run_wiki_edges.py"),
+    ("state & consistency (§7/§8/§10/§14)", "run_state.py"),
     ("searchability (§10.2)", "run_search.py"),
 ]
 

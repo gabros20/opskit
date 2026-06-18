@@ -57,7 +57,8 @@ def check_wiki(corpus: dict) -> dict:
 
     parsed: dict[str, dict] = {}
     issues = {"missing_frontmatter": [], "missing_keys": [], "bad_type": [],
-              "broken_links": [], "orphans": [], "stale": [], "hub_missing_timeline": []}
+              "broken_links": [], "orphans": [], "stale": [], "hub_missing_timeline": [],
+              "slug_collision": [], "ambiguous_links": [], "self_links": []}
 
     for key, text in notes.items():
         p = parse_note(text)
@@ -66,8 +67,23 @@ def check_wiki(corpus: dict) -> dict:
             continue
         parsed[key] = p
 
-    # basename -> key resolution map (only for notes that exist)
-    base_to_key: dict[str, str] = {_basename(k): k for k in notes}
+    # basename -> key(s). A basename mapping to >1 key is a slug collision: any [[bare]] link
+    # to it is ambiguous (which note did you mean?). This is a real reliability hazard for a
+    # flat-slug wiki, so it is surfaced rather than silently resolved to "last write wins".
+    base_to_keys: dict[str, list[str]] = {}
+    for k in notes:
+        base_to_keys.setdefault(_basename(k), []).append(k)
+    collisions = {b for b, ks in base_to_keys.items() if len(ks) > 1}
+    issues["slug_collision"] = sorted(collisions)
+
+    def _resolve(target: str) -> str | None:
+        # strip [[slug#heading]] and [[slug|Display]] forms before resolving
+        base = target.split("#", 1)[0].split("|", 1)[0].strip()
+        base = _basename(base)
+        ks = base_to_keys.get(base)
+        if not ks:
+            return None
+        return ks[0] if len(ks) == 1 else "__AMBIGUOUS__"
 
     # forward + inbound link graph (broken links counted as outbound attempts)
     outbound: dict[str, list[str]] = {}
@@ -76,11 +92,16 @@ def check_wiki(corpus: dict) -> dict:
         outs = []
         for target in p["links"]:
             outs.append(target)
-            tk = base_to_key.get(target)
+            tk = _resolve(target)
             if tk is None:
                 issues["broken_links"].append([key, target])
+            elif tk == "__AMBIGUOUS__":
+                issues["ambiguous_links"].append([key, target.split("#")[0].split("|")[0].strip()])
             else:
-                inbound[tk].add(key)
+                if tk == key:
+                    issues["self_links"].append(key)
+                else:
+                    inbound[tk].add(key)
         outbound[key] = outs
 
     for key, p in parsed.items():
