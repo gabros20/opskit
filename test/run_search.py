@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from lib.retrieval import Index, metrics, lexical_overlap, rank_of  # noqa: E402
+from lib.retrieval import Index, metrics, lexical_overlap, rank_of, get_embedder  # noqa: E402
 from lib.wiki import parse_note  # noqa: E402
 
 WIKI = Path(__file__).resolve().parent / "world" / "wiki_corpus.json"
@@ -51,8 +51,18 @@ def main() -> int:
     methods = {
         "keyword (BM25)": idx.bm25,
         "keyword+graph": idx.keyword_graph,
-        "semantic-proxy": idx.semantic_proxy,
     }
+    emb_name, emb_fn = get_embedder()
+    real_vectors = emb_fn is not None
+    if real_vectors:
+        print(f"{DIM}real embedder: {emb_name} — embedding {len(notes)} notes (local, offline)...{RESET}")
+        idx.build_vectors(emb_fn)
+        methods[f"vector [{emb_name}]"] = lambda q: idx.vector(q, emb_fn)
+        methods["hybrid (BM25+vec)"] = lambda q: idx.hybrid_rrf(q, emb_fn)
+        methods["hybrid (graph+vec)"] = lambda q: idx.hybrid_graph_vec(q, emb_fn)
+    else:
+        print(f"{DIM}no local embedder reachable — using trigram semantic-proxy (conservative estimate){RESET}")
+        methods["semantic-proxy"] = idx.semantic_proxy
 
     # auto-bucket each query
     for entry in qrels:
@@ -101,16 +111,22 @@ def main() -> int:
     if not misses:
         print(f"  {GREEN}none — keyword+graph found every relevant note in top-5{RESET}")
 
-    # verdict
+    # verdict — compare keyword+graph against the best semantic/hybrid method available
     kg = summary["keyword+graph"]
-    sp = summary["semantic-proxy"]
+    if real_vectors:
+        cmp_key = "hybrid (graph+vec)"
+        cmp_label = f"hybrid graph+vec (real {emb_name})"
+    else:
+        cmp_key = "semantic-proxy"
+        cmp_label = "semantic-proxy (trigram floor)"
+    sp = summary[cmp_key]
     sem_recall_kg = kg["semantic"]["recall@5"]
     sem_lift = sp["semantic"]["recall@5"] - kg["semantic"]["recall@5"]
     print(f"\n{BOLD}Vector decision (design's stage-2 trigger: add ONLY when FTS5 demonstrably misses):{RESET}")
     print(f"  keyword+graph recall@5: overall {kg['overall']['recall@5']:.2f}, "
           f"lexical {kg['lexical']['recall@5']:.2f}, semantic {sem_recall_kg:.2f}")
-    print(f"  semantic-proxy recovers {sem_lift:+.2f} recall@5 on the semantic bucket "
-          f"(conservative floor for real embeddings)")
+    print(f"  {cmp_label} recovers {sem_lift:+.2f} recall@5 on the semantic bucket"
+          + ("" if real_vectors else " (conservative floor for real embeddings)"))
     sem_share = n_sem / len(qrels)
     if sem_recall_kg >= 0.8 or sem_share < 0.25:
         verdict = ("NOT YET. keyword+graph covers the lexical bulk and the semantic gap is small. "
@@ -124,8 +140,13 @@ def main() -> int:
         verdict = ("BORDERLINE. Gather real query logs before committing; the synthetic signal is mixed.")
         color = YEL
     print(f"  {color}{BOLD}VERDICT: {verdict}{RESET}")
-    print(f"{DIM}  NOTE: synthetic corpus + conservative proxy. Re-run with OPS_EMBED_CMD (real embedder)\n"
-          f"  and your actual query log before a final call — this estimates the gap, it doesn't settle it.{RESET}")
+    caveat = ("real local embeddings used; remaining unknown is the SHARE of YOUR real queries that\n"
+              "  are semantic — re-run on your actual query log to settle the magnitude."
+              if real_vectors else
+              "synthetic corpus + conservative proxy; set OPS_EMBED_CMD or run ollama for real vectors.")
+    print(f"{DIM}  NOTE: {caveat}\n"
+          f"  Mechanism is philosophy-safe: vectors live in .index (gitignored, rebuildable from md),\n"
+          f"  embedded local model (offline, free) — 'one SQLite file over a server', not a new source of truth.{RESET}")
     return 0
 
 

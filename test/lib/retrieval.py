@@ -16,9 +16,54 @@ note, else 'semantic'. Keyword search structurally cannot win the semantic bucke
 size and the keyword miss-rate on it are the empirical basis for the vector decision.
 """
 from __future__ import annotations
+import json
 import math
+import os
 import re
+import subprocess
+import urllib.request
 from collections import Counter
+
+
+# --- real local embedder (philosophy-compatible: offline, no server-of-record, file-cacheable) ---
+def ollama_embed(text: str, model: str | None = None, host: str = "http://localhost:11434") -> list[float]:
+    model = model or os.environ.get("OPS_EMBED_MODEL", "mxbai-embed-large")
+    req = urllib.request.Request(
+        host + "/api/embeddings",
+        data=json.dumps({"model": model, "prompt": text}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.loads(r.read())["embedding"]
+
+
+def cmd_embed(text: str) -> list[float]:
+    """Generic escape hatch: OPS_EMBED_CMD reads text on stdin, prints a JSON float array."""
+    cmd = os.environ["OPS_EMBED_CMD"]
+    out = subprocess.run(cmd, shell=True, input=text, capture_output=True, text=True, timeout=120)
+    return json.loads(out.stdout)
+
+
+def get_embedder():
+    """Return (name, fn) for the best available real embedder, or (None, None)."""
+    if os.environ.get("OPS_EMBED_CMD"):
+        try:
+            cmd_embed("ping")
+            return ("OPS_EMBED_CMD", cmd_embed)
+        except Exception:
+            pass
+    try:
+        ollama_embed("ping")
+        return (f"ollama:{os.environ.get('OPS_EMBED_MODEL', 'mxbai-embed-large')}", ollama_embed)
+    except Exception:
+        return (None, None)
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    return dot / (na * nb + 1e-9)
 
 STOP = set("a an the of for to with and or in on at is are be how who what our we work "
            "that this it its keep keeps not no into over up again been being as by from".split())
@@ -90,6 +135,31 @@ class Index:
     def _trigrams(text: str) -> Counter:
         s = re.sub(r"\s+", " ", text.lower())
         return Counter(s[i:i + 3] for i in range(len(s) - 2))
+
+    # ---- real vector retrieval (local embeddings) ----
+    def build_vectors(self, embed_fn) -> None:
+        self.vecs = {k: embed_fn(self.raw[k]) for k in self.keys}
+
+    def vector(self, query: str, embed_fn) -> list[tuple[str, float]]:
+        q = embed_fn(query)
+        out = {k: _cosine(q, v) for k, v in self.vecs.items()}
+        return sorted(out.items(), key=lambda x: -x[1])
+
+    @staticmethod
+    def _rrf(rankings: list[list[tuple[str, float]]], k: int = 60) -> list[tuple[str, float]]:
+        scores: dict[str, float] = {}
+        for ranking in rankings:
+            for rank, (key, _) in enumerate(ranking, 1):
+                scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank)
+        return sorted(scores.items(), key=lambda x: -x[1])
+
+    def hybrid_rrf(self, query: str, embed_fn) -> list[tuple[str, float]]:
+        """BM25 + vector fused with reciprocal-rank fusion (the §10.2 stage-2 hybrid)."""
+        return self._rrf([self.bm25(query), self.vector(query, embed_fn)])
+
+    def hybrid_graph_vec(self, query: str, embed_fn) -> list[tuple[str, float]]:
+        """keyword + wikilink-graph + vector — the full local hybrid."""
+        return self._rrf([self.keyword_graph(query), self.vector(query, embed_fn)])
 
     def semantic_proxy(self, query: str) -> list[tuple[str, float]]:
         qg = self._trigrams(query)

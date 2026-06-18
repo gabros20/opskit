@@ -813,7 +813,7 @@ plaintext-with-explicit-links, adding `sqlite-vec` or Kùzu later is additive, n
 | 0 | `rg` / `fd` / `fzf` raw | day one; always works |
 | 1 | **SQLite FTS5** over wiki+tasks+journal, chunked by heading, incremental by file hash → `ops search` | build week one; covers most queries |
 | 2 | + `sqlite-vec` vectors, local Ollama `nomic-embed-text` embeddings (offline, free), hybrid ranking with FTS5 | add ONLY when FTS5 demonstrably misses things you ask for |
-| 3 | LanceDB / graph layer | not before ~100k chunks / a real multi-hop need. Probably never. |
+| 3 | graph/vector *server* tier (Postgres+pgvector, FalkorDB, LightRAG, Kùzu-as-server, RDF) | **rejected** — server or 2nd source of truth; not before ~100k chunks / real multi-hop. Probably never (§10.2.1) |
 
 One SQLite file at `.index/ops.sqlite`. Gitignored. **The rebuild rule:** if the index
 is ever wrong or corrupt — `rm -rf .index && ops index`. An index that can't be rebuilt
@@ -821,6 +821,40 @@ from files is a bug.
 
 `ops index` also regenerates `ops.json` (the manifest) so one command refreshes
 everything derived.
+
+#### 10.2.1 The retrieval add-on test, and why this staging is right (v3.7)
+
+The 2026 landscape (surveyed on X) converged on a clear pattern, and it is *this* one. The
+dominant approach — **Karpathy's LLM Wiki** (compile knowledge into interlinked markdown at
+ingestion, maintain index files + backlinks, let the agent navigate the filesystem; **no vector
+DB** at ~100 articles / ~400K words) — is exactly the substrate this design already is (§3, §10.1,
+the `consolidate` job). Vector and graph layers are the documented *scale-up*, not the foundation.
+So the staging above is not under-built; it matches the validated consensus.
+
+**The one test for any retrieval add-on** (a corollary of principle 6): *is it a file-based,
+locally-computed, rebuilt-from-plaintext cache, or is it a server / a second source of truth?*
+The first is allowed; the second is rejected.
+
+- **Allowed — stage 2 as specified:** `sqlite-vec` vectors in the *same* `.index/ops.sqlite`,
+  embeddings from a **local** model (Ollama `mxbai-embed-large`/`nomic-embed-text`, offline, free),
+  fused with FTS5 via reciprocal-rank fusion. This is literally "one SQLite file over a server":
+  gitignored, disposable, `rm -rf .index && ops index` rebuilds it from the markdown. It adds no
+  new source of truth. **Measured** (`test/run_search.py`, real local embeddings): on queries whose
+  wording shares no vocabulary with the target note, keyword+graph scores 0.00 recall@5 and local
+  vectors recover **1.00** — vectors recover exactly the queries keyword structurally cannot.
+- **Rejected — the server/graph-DB tier:** gbrain's Postgres + pgvector, and the X-surfaced
+  Tier-3 stacks (FalkorDB and LightRAG graph+vector, Kwipu's property-graph, an RDF/semantic-web
+  layer). Each is either a *server* or an *LLM-extracted second graph that goes stale* — both
+  violate principle 6 ("one SQLite file over a server; wikilinks over a graph DB"). The graph you
+  need you already have for free: `[[wikilinks]]` + auto-backlinks (§10.1) *are* the graph, queried
+  with `rg`. A graph DB is unearned until a real multi-hop, 100k-chunk need appears — gbrain's
+  146k-page scale, not a one-person practice. Probably never.
+
+**The trigger stays empirical, not aspirational** (principle 7). Stage 2 ships only when `ops
+search` (FTS5 + wikilink graph) *demonstrably* misses real queries — re-run `test/run_search.py`
+against your **actual query log** (it auto-buckets lexical vs semantic and uses your local embedder
+via Ollama or `OPS_EMBED_CMD`). The mechanism is proven and philosophy-safe; the only open question
+is how often *your* queries are semantic, which only your log answers.
 
 ---
 
@@ -1540,6 +1574,7 @@ phase N is in daily use.
 | `prediction` note type → future calibration ("how often was I right?") | gbrain (takes-grading) | **Adopted, minimal** — one optional note type, no DB (§10.1) |
 | `ops consolidate` dream-lite nightly job (deterministic phases only) | gbrain ("dream" cycle) | **Adopted, stripped** — backlinks/stale/orphan/digest; LLM-judgment phases stay manual (§15) |
 | Postgres + pgvector + HNSW + cross-encoder reranker retrieval stack | gbrain | **Rejected as core** — violates reversibility (principle 6); FTS5→vectors staging unchanged (§10.2) |
+| Retrieval add-on test (file-based+local+rebuildable = OK; server/2nd-source = reject); stage-2 = sqlite-vec + local Ollama + RRF; graph stays wikilinks | X research (Karpathy LLM Wiki) + real-embedder measurement (`test/run_search.py`) | **Added (§10.2.1)** — settles the vector question: local file-based vectors fit the philosophy and recover 100% of semantic-bucket misses; server/graph-DB tiers (pgvector, FalkorDB, LightRAG, RDF) rejected |
 | Skillopt self-optimizing skills + 3-model judge panels + eval gates on every change | gbrain | **Rejected** — real ops/$$ cost for ~4 skills; routing-eval is the right-sized substitute |
 | Schema-packs / lens-packs / skillpack registry (versioned, distributable brain shape) | gbrain | **Rejected** — `wiki/conventions.md` "Filing rules" is the lightweight learning loop already (§10) |
 | Minions job queue / autopilot daemon / push-"volunteer"-context / MCP-HTTP server | gbrain | **Rejected / deferred** — agent supervisor was already out of scope; keep the four planes (§13) |
