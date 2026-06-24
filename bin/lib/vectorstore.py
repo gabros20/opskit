@@ -58,6 +58,25 @@ def delete_path(path: str) -> None:
     db.open_table(TABLE).delete(f"path = {_q(path)}")
 
 
+def delete_paths(paths: list[str]) -> None:
+    """Bulk delete (chunked predicates) — used by the batched backfill for idempotent resume."""
+    db = connect()
+    if TABLE not in db.table_names() or not paths:
+        return
+    tbl = db.open_table(TABLE)
+    for i in range(0, len(paths), 500):
+        pred = " OR ".join(f"path = {_q(p)}" for p in paths[i:i + 500])
+        tbl.delete(pred)
+
+
+def add_batch(records: list[dict], dim: int) -> None:
+    """Add many vectors in one call (batched backfill throughput)."""
+    if not records:
+        return
+    db = connect()
+    _table(db, dim).add(records)
+
+
 def count() -> int:
     db = connect()
     if TABLE not in db.table_names():

@@ -108,6 +108,13 @@ def _embed_text(content: str, limit: int = 2000) -> str:
 
 
 def index(root: Path | str = CONTENT, verbose: bool = True) -> int:
+    """Build/refresh the index. Resumable + batched so a large vault's multi-hour embedding
+    backfill survives interruption (each FTS commit and each embed batch is durable; a re-run
+    skips already-done files by hash + embedded-model, and continues where it left off).
+
+    Sharding is transparent: it recurses the tree, so `notes/<aa>/<slug>.md` filesystem fanout
+    (and per-area sub-repos pointed at via the content root) index without special handling.
+    """
     root = Path(root)
     con = connect()
     vec_on = _vectors_on()
@@ -117,7 +124,11 @@ def index(root: Path | str = CONTENT, verbose: bool = True) -> int:
               "indexing keyword-only.")
         vec_on = False
     model = emb.model_name() if vec_on else None
-    seen, changed, embedded = set(), 0, 0
+    BATCH = int(os.environ.get("OPS_EMBED_BATCH", "32"))
+    COMMIT_EVERY = 200
+
+    # --- pass 1: keyword/graph (fast), collect the embed worklist ---
+    seen, changed, worklist = set(), 0, []
     for p in sorted(root.rglob("*.md")):
         rel = str(p.relative_to(root))
         seen.add(rel)
@@ -127,27 +138,22 @@ def index(root: Path | str = CONTENT, verbose: bool = True) -> int:
         changed_file = not (row and row[0] == h)
         need_embed = vec_on and (changed_file or _embed_stale(con, rel, model))
         if not changed_file and not need_embed:
-            continue  # unchanged AND already embedded with this model — skip
-        ch = _chunks(content)
+            continue  # unchanged AND already embedded with this model — skip (resume fast-path)
         if changed_file:
             con.execute("DELETE FROM chunks WHERE path=?", (rel,))
             con.execute("DELETE FROM links WHERE src=?", (rel,))
             slug = Path(rel).stem
-            for head, body in ch:
+            for head, body in _chunks(content):
                 con.execute("INSERT INTO chunks(path, heading, body, slug) VALUES(?,?,?,?)",
                             (rel, head, body, slug))
             for tgt in {_norm_link(t) for t in LINK_RE.findall(content)}:
                 con.execute("INSERT INTO links(src, dst) VALUES(?,?)", (rel, tgt))
             con.execute("INSERT OR REPLACE INTO files(path, hash) VALUES(?,?)", (rel, h))
             changed += 1
-        if need_embed:  # embed on change, on first-enable, or on model switch (ADR-005/006)
-            # ONE vector per note (note-level), not per tiny chunk: a fixed doc-prompt over short
-            # boilerplate chunks collapses them to near-identical vectors (prefix domination). FTS
-            # stays chunk-level for keyword precision; vectors rank notes. (Validated in run_search_live.)
-            vec = emb.embed_docs([_embed_text(content)])[0]
-            vs.upsert_path(rel, [{"id": rel, "path": rel, "heading": "(note)", "vector": vec}], emb.dim())
-            con.execute("INSERT OR REPLACE INTO embedded(path, model) VALUES(?,?)", (rel, model))
-            embedded += 1
+            if changed % COMMIT_EVERY == 0:
+                con.commit()  # durable progress for the keyword pass
+        if need_embed:
+            worklist.append((rel, _embed_text(content)))
     for (rel,) in con.execute("SELECT path FROM files").fetchall():  # prune deleted
         if rel not in seen:
             con.execute("DELETE FROM chunks WHERE path=?", (rel,))
@@ -157,10 +163,28 @@ def index(root: Path | str = CONTENT, verbose: bool = True) -> int:
             if vec_on:
                 vs.delete_path(rel)
     con.commit()
+
+    # --- pass 2: embed the worklist in batches (one Ollama call per batch; durable per batch) ---
+    embedded = 0
+    if vec_on and worklist:
+        vs.delete_paths([rel for rel, _ in worklist])  # clear any partial/old vectors (idempotent resume)
+        dim = emb.dim()
+        for i in range(0, len(worklist), BATCH):
+            batch = worklist[i:i + BATCH]
+            vecs = emb.embed_docs([t for _, t in batch])
+            recs = [{"id": rel, "path": rel, "heading": "(note)", "vector": vec}
+                    for (rel, _), vec in zip(batch, vecs)]
+            vs.add_batch(recs, dim)
+            con.executemany("INSERT OR REPLACE INTO embedded(path, model) VALUES(?,?)",
+                            [(rel, model) for rel, _ in batch])
+            con.commit()  # durable: a crash after this batch resumes from here, not from zero
+            embedded += len(batch)
+            if verbose and (embedded % (BATCH * 5) == 0 or embedded == len(worklist)):
+                print(f"  embedded {embedded}/{len(worklist)} notes")
+        vs.maybe_build_ann()
+
     n = con.execute("SELECT COUNT(*) FROM files").fetchone()[0]
     con.close()
-    if vec_on:
-        vs.maybe_build_ann()
     if verbose:
         extra = f", {embedded} notes embedded ({model}) -> vectors.lance" if vec_on else ""
         print(f"indexed {n} files ({changed} (re)indexed){extra} -> {DB}")
@@ -224,10 +248,12 @@ def search(query: str, k: int = 10, graph: bool = True, log: bool = False) -> li
                     qv = emb.embed_query(query)
                     # per-NOTE max-pool: collapse chunk hits to the best chunk per note, so a
                     # multi-chunk note contributes ONE RRF term (at its best rank), not several.
-                    # Limit to the vector top-k: only genuinely-similar notes get dense mass, so a
-                    # keyword-only note (paraphrase noise) does NOT also collect vector RRF.
+                    # Limit dense mass to the vector top-k (keeps fusion clean), but when rerank is
+                    # on, pull a WIDER candidate set so the reranker has the right note to reorder
+                    # (recall widening — a precise note keyword+vector ranked low can still win).
+                    vcount = 40 if _rerank_on() else k
                     seen, vrank = set(), 0
-                    for path, head, _s in vs.search(qv, k):
+                    for path, head, _s in vs.search(qv, vcount):
                         if path in seen:
                             continue
                         seen.add(path)
@@ -244,7 +270,7 @@ def search(query: str, k: int = 10, graph: bool = True, log: bool = False) -> li
         try:
             import rerank as _rr
             if _rr.available():
-                n = min(len(pool), max(k, 20))
+                n = min(len(pool), max(k, 30))  # rerank a wide pool (recall widening)
                 cand = [p for p, _ in pool[:n]]
                 texts = _candidate_texts(cand)
                 rs = _rr.rerank(query, [texts.get(p, "") for p in cand])
