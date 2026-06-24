@@ -83,8 +83,10 @@ document glossed over: **your code projects are their own git repos and must nev
 inside the system repo.**
 
 ```
-~/ops          # THE SYSTEM. One git repo. Knowledge, tasks, journal, verbs, skills,
-               # templates, jobs. Private remote. Never contains code repos.
+~/ops          # THE SYSTEM. Knowledge, tasks, journal, verbs, skills, templates, jobs.
+               # Private remote. Never contains code repos. ONE git repo at small scale;
+               # at 100k+ notes the *knowledge plane* (wiki/) shards into per-area/year
+               # sub-repos + notes/<aa>/ filesystem fanout so git stays usable (ADR-006, §10.2).
 
 ~/work         # YOUR CODE. A plain directory tree (NOT a git repo itself). Every
                # project inside is its own independent git repo with its own remote.
@@ -201,7 +203,9 @@ ops/
 │   ├── registry.yaml          # scheduler-neutral job definitions
 │   └── launchd/               # rendered .plist files (generated; macOS adapter only)
 │
-├── .index/                    # search DB (SQLite FTS5; later +vectors). GITIGNORED, rebuildable
+├── .index/                    # search indices, GITIGNORED, rebuildable from markdown:
+│                              #   ops.sqlite (FTS5 keyword + wikilink/edge graph) +
+│                              #   vectors.lance/ (LanceDB ANN, stage-2, OPS_VECTORS=1; ADR-006)
 └── .logs/                     # append-only run logs per verb/job. GITIGNORED
 #   .gitignore also excludes agent-written cruft: skills/**/.system/, .claude/**/cache, etc.
 #   The adapter files themselves (CLAUDE.md, .claude/settings.json, .codex/config.toml, the
@@ -804,7 +808,7 @@ wrapped as `ops wiki backlinks`), generated for free on every write (§10.1). So
 includes backlink traversal, and stage 2 (vectors) is deferred further** — chase link
 coverage before embeddings. Vector+keyword hybrid still covers most retrieval; a graph DB
 adds extraction cost and a second source of truth that goes stale. Because everything is
-plaintext-with-explicit-links, adding `sqlite-vec` or Kùzu later is additive, never a migration.
+plaintext-with-explicit-links, adding the **LanceDB** vector layer (ADR-006) is additive, never a migration.
 
 ### 10.2 Search — scale-ready from day one (target: 100k–500k+ notes), each stage rebuildable
 
@@ -1529,7 +1533,16 @@ phase N is in daily use.
    2–3 active clients' material in, extend `ops new` to scaffold the files folder, add
    `ops files ingest` with shadow notes. (Can run in parallel with 6–8; folders + restic
    alone are already most of the value.)
-9. **(Only if earned) stage-2 search.** Ollama + sqlite-vec hybrid.
+9. **Stage-2 hybrid search (core at scale, ADR-006).** Local Ollama **EmbeddingGemma** (per-model
+   prompts) + **LanceDB** ANN, fused with FTS5+graph via weighted RRF (`OPS_VECTORS=1`). Built on
+   LanceDB from the first note so there is no re-platforming at 100k. Then **stage-3**: a local
+   cross-encoder reranker (`bge-reranker-v2-m3`) over the fused candidates for precision.
+10. **Scale-out plumbing (when the corpus grows).** Shard the wiki into per-area/year git repos +
+   `notes/<aa>/` filesystem fanout + git large-repo tuning (`feature.manyFiles`, `commit-graph`,
+   FSMonitor, sparse-checkout); make `ops index` a **resumable, checkpointed, batched** backfill
+   with a file-watcher for live incremental. Brought up small, these are no-ops; they earn their
+   keep as the vault approaches 100k+ notes. The architecture (embedded FTS + LanceDB, markdown
+   truth) does not change — only the storage sharding and indexing throughput do.
 
 ---
 
@@ -1607,7 +1620,8 @@ phase N is in daily use.
 | `prediction` note type → future calibration ("how often was I right?") | gbrain (takes-grading) | **Adopted, minimal** — one optional note type, no DB (§10.1) |
 | `ops consolidate` dream-lite nightly job (deterministic phases only) | gbrain ("dream" cycle) | **Adopted, stripped** — backlinks/stale/orphan/digest; LLM-judgment phases stay manual (§15) |
 | Postgres + pgvector + HNSW + cross-encoder reranker retrieval stack | gbrain | **Rejected as core** — violates reversibility (principle 6); FTS5→vectors staging unchanged (§10.2) |
-| Retrieval add-on test (file-based+local+rebuildable = OK; server/2nd-source = reject); stage-2 = sqlite-vec + local Ollama + RRF; graph stays wikilinks | X research (Karpathy LLM Wiki) + real-embedder measurement (`test/run_search.py`) | **Added (§10.2.1)** — settles the vector question: local file-based vectors fit the philosophy and recover 100% of semantic-bucket misses; server/graph-DB tiers (pgvector, FalkorDB, LightRAG, RDF) rejected |
+| Retrieval add-on test (file-based+local+rebuildable = OK; server/2nd-source = reject); stage-2 = **LanceDB** ANN + local Ollama embeddings + RRF; graph stays wikilinks | X research (Karpathy LLM Wiki) + real-embedder measurement (`test/run_search.py`) | **Added (§10.2.1)** — settles the vector question: local file-based vectors fit the philosophy and recover the semantic-bucket misses; server/graph-DB tiers (pgvector, FalkorDB, LightRAG, RDF) rejected |
+| Scale to 100k–500k+ notes, single-machine, no server: LanceDB ANN + sharded plaintext + resumable backfill + local rerank | owner's ambition + research (sqlite-vec brute-force limit, git file-count limit, LanceDB scale) | **Added (ADR-006, §10.2/§17)** — reverses the small-scale framing; reaches gbrain capability via embedded engines, no Postgres |
 | Skillopt self-optimizing skills + 3-model judge panels + eval gates on every change | gbrain | **Rejected** — real ops/$$ cost for ~4 skills; routing-eval is the right-sized substitute |
 | Schema-packs / lens-packs / skillpack registry (versioned, distributable brain shape) | gbrain | **Rejected** — `wiki/conventions.md` "Filing rules" is the lightweight learning loop already (§10) |
 | Minions job queue / autopilot daemon / push-"volunteer"-context / MCP-HTTP server | gbrain | **Rejected / deferred** — agent supervisor was already out of scope; keep the four planes (§13) |
