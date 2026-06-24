@@ -85,8 +85,8 @@ inside the system repo.**
 ```
 ~/ops          # THE SYSTEM. Knowledge, tasks, journal, verbs, skills, templates, jobs.
                # Private remote. Never contains code repos. ONE git repo at small scale;
-               # at 100k+ notes the *knowledge plane* (wiki/) shards into per-area/year
-               # sub-repos + notes/<aa>/ filesystem fanout so git stays usable (ADR-006, §10.2).
+               # ONE git repo even at 100k+ notes: keep it fast with notes/<aa>/ subdirectory
+               # fanout + git large-repo tuning; binaries already live in ~/files (ADR-006, §10.2).
 
 ~/work         # YOUR CODE. A plain directory tree (NOT a git repo itself). Every
                # project inside is its own independent git repo with its own remote.
@@ -832,13 +832,18 @@ Postgres+pgvector, FalkorDB, LightRAG, Qdrant-as-service, RDF — see §10.2.1.
 **Storage at scale.** Indices live under `.index/` — `.index/ops.sqlite` (FTS5 + graph) and
 `.index/vectors.lance/` (LanceDB) — all gitignored and **rebuildable from markdown**
 (`rm -rf .index && ops index`; an index that can't be rebuilt from files is a bug). The markdown
-**system of record is sharded** so git stays usable at 100k+ files: the knowledge plane splits into
-per-area/per-year git repos (the four-root sharding applied to the wiki) + filesystem sharding
-(`notes/<aa>/<slug>.md`) + git large-repo tuning (`feature.manyFiles`, `commit-graph`, FSMonitor,
-sparse-checkout). **"Git is the spine" becomes "git versions *sharded* plaintext"** — the one
-principle that bends at scale, and it bends by sharding, never by moving truth into a database.
-Initial indexing of a large vault is a **resumable, checkpointed, batched** backfill (incremental by
-file-hash thereafter). `ops index` also regenerates `ops.json` (the manifest).
+**system of record stays ONE git repo, even at 100k+ notes — "git is the spine" holds, unbent.**
+A single repo of *plaintext* is fine at this scale; what keeps it fast is (1) **subdirectory fanout**
+(`notes/<aa>/<slug>.md`) so no folder holds 100k entries, and (2) **git large-repo tuning**
+(`feature.manyFiles`, `core.fsmonitor`, `core.untrackedCache`, `commit-graph`) — `git status` stays
+near-constant-time regardless of file count (Microsoft runs the 3.5M-file Windows repo on git).
+The thing that actually chokes git is **binary size**, not text file count — and the
+plaintext→git / binary→`~/files` rule (§2) already keeps binaries out of the repo (this is exactly
+what gbrain hit: its "2.3GB wiki" was ~300KB/file of embedded media, not 7k text files). **Multiple
+repos are an optional, much-later lever** (millions of files, or separating a noisy auto-ingest
+feed's cadence, or per-machine selective sync) — never a day-one requirement, and truth never moves
+into a DB. Initial indexing of a large vault is a **resumable, checkpointed, batched** backfill
+(incremental by file-hash thereafter). `ops index` also regenerates `ops.json` (the manifest).
 
 #### 10.2.1 The retrieval add-on test — embedded scales, servers don't (ADR-006)
 
@@ -869,9 +874,10 @@ source of truth?* Embedded is allowed (and now scales to billions of vectors); a
 
 **Empirical, even at scale** (principle 7). The stages bring up on the same architecture; the query
 log (`.logs/queries.jsonl`) + `test/run_search.py` keep tuning honest (which mode, which model, where
-rerank helps). And the storage-spine bend is explicit: 100k+ plaintext files exceed what one git repo
-handles, so the markdown is **sharded** (per-area/year repos + `notes/<aa>/` fanout + git large-repo
-tuning) — git still versions plaintext truth, just not all in one repo.
+rerank helps). And the storage spine does **not** bend: one git repo of plaintext, kept fast with
+`notes/<aa>/` subdirectory fanout + git large-repo tuning, carries 100k–500k notes — because the
+plaintext→git / binary→`~/files` rule already keeps the size-and-binary cause of git slowness out of
+the repo. Sharding into multiple repos is an optional much-later lever, not a requirement.
 
 **Measured on a fair vault (2026-06-19).** A real ops-shaped vault (58 notes, 13 area hubs, 435
 wikilinks, built from an LLM/agents KB; `vault/`) was queried with 25 realistic queries (11
@@ -1537,12 +1543,15 @@ phase N is in daily use.
    prompts) + **LanceDB** ANN, fused with FTS5+graph via weighted RRF (`OPS_VECTORS=1`). Built on
    LanceDB from the first note so there is no re-platforming at 100k. Then **stage-3**: a local
    cross-encoder reranker (`bge-reranker-v2-m3`) over the fused candidates for precision.
-10. **Scale-out plumbing (when the corpus grows).** Shard the wiki into per-area/year git repos +
-   `notes/<aa>/` filesystem fanout + git large-repo tuning (`feature.manyFiles`, `commit-graph`,
-   FSMonitor, sparse-checkout); make `ops index` a **resumable, checkpointed, batched** backfill
-   with a file-watcher for live incremental. Brought up small, these are no-ops; they earn their
-   keep as the vault approaches 100k+ notes. The architecture (embedded FTS + LanceDB, markdown
-   truth) does not change — only the storage sharding and indexing throughput do.
+10. **Scale-out plumbing (when the corpus grows).** Keep the ONE repo fast: `notes/<aa>/`
+   subdirectory fanout + git large-repo tuning (`feature.manyFiles`, `core.fsmonitor`,
+   `core.untrackedCache`, `commit-graph`); make `ops index` a **resumable, checkpointed, batched**
+   backfill (done) with a file-watcher for live incremental (or the hourly `ops index` job, §15).
+   Binaries already live in `~/files`, so the repo stays plaintext and git stays fast. *Optional,
+   much later:* split into multiple git repos only if you hit millions of files or want to separate a
+   noisy auto-ingest feed's cadence / per-machine selective sync. The architecture (embedded FTS +
+   LanceDB, markdown truth, one repo) does not change — only indexing throughput and (optionally) repo
+   layout do.
 
 ---
 
@@ -1621,7 +1630,7 @@ phase N is in daily use.
 | `ops consolidate` dream-lite nightly job (deterministic phases only) | gbrain ("dream" cycle) | **Adopted, stripped** — backlinks/stale/orphan/digest; LLM-judgment phases stay manual (§15) |
 | Postgres + pgvector + HNSW + cross-encoder reranker retrieval stack | gbrain | **Rejected as core** — violates reversibility (principle 6); FTS5→vectors staging unchanged (§10.2) |
 | Retrieval add-on test (file-based+local+rebuildable = OK; server/2nd-source = reject); stage-2 = **LanceDB** ANN + local Ollama embeddings + RRF; graph stays wikilinks | X research (Karpathy LLM Wiki) + real-embedder measurement (`test/run_search.py`) | **Added (§10.2.1)** — settles the vector question: local file-based vectors fit the philosophy and recover the semantic-bucket misses; server/graph-DB tiers (pgvector, FalkorDB, LightRAG, RDF) rejected |
-| Scale to 100k–500k+ notes, single-machine, no server: LanceDB ANN + sharded plaintext + resumable backfill + local rerank | owner's ambition + research (sqlite-vec brute-force limit, git file-count limit, LanceDB scale) | **Added (ADR-006, §10.2/§17)** — reverses the small-scale framing; reaches gbrain capability via embedded engines, no Postgres |
+| Scale to 100k–500k+ notes, single-machine, no server: LanceDB ANN + ONE git repo (fanout + tuning) + resumable backfill + local rerank | owner's ambition + research (sqlite-vec brute-force limit, LanceDB scale, real git scaling facts) | **Added (ADR-006, §10.2/§17)** — reaches gbrain capability via embedded engines, no Postgres; git-spine stays one repo (gbrain's git pain was binary *size*, excluded here by plaintext→git/binary→files) |
 | Skillopt self-optimizing skills + 3-model judge panels + eval gates on every change | gbrain | **Rejected** — real ops/$$ cost for ~4 skills; routing-eval is the right-sized substitute |
 | Schema-packs / lens-packs / skillpack registry (versioned, distributable brain shape) | gbrain | **Rejected** — `wiki/conventions.md` "Filing rules" is the lightweight learning loop already (§10) |
 | Minions job queue / autopilot daemon / push-"volunteer"-context / MCP-HTTP server | gbrain | **Rejected / deferred** — agent supervisor was already out of scope; keep the four planes (§13) |

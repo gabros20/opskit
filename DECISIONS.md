@@ -107,13 +107,23 @@ brute-force (fails >~1M vectors); git degrades badly past ~10k files (gbrain aba
 ~5k); LanceDB is embedded/file-based with disk IVF-PQ ANN, <20ms @1M, larger-than-RAM, billions-scale
 single-node; SQLite FTS5 scales to millions of rows.
 **Decision — the scale-ready stack (all embedded, no server, rebuildable from markdown):**
-1. **System of record stays plaintext markdown** (principle 1 intact), but **sharded** so git stays
-   usable: the wiki splits into multiple git repos by area/year (the four-root topology already
-   shards `~/work`; apply the same to the knowledge plane), plus filesystem sharding
-   (`notes/<aa>/<slug>.md`) to avoid 100k entries in one dir. Git is tuned (`feature.manyFiles`,
-   `commit-graph`, FSMonitor, sparse-checkout). **"Git is the spine" → "git versions sharded
-   plaintext," not "one 100k-file repo."** This is the one principle that bends; it bends by
-   sharding, not by moving truth into a DB.
+1. **System of record stays plaintext markdown in ONE git repo** (principle 1–2 intact, unbent).
+   Correction to an earlier overstatement: a single repo IS enough at 100k–500k *text* notes.
+   Git slows from three independent causes — (a) working-tree file count, (b) repo size / binary
+   blobs, (c) a single flat directory — and only the ones this design already neutralizes bite:
+   - **(a) file count** is solved by git's large-repo features (`feature.manyFiles`, `core.fsmonitor`,
+     `core.untrackedCache`, `commit-graph`) — near-constant `git status` regardless of count
+     (Microsoft runs the 3.5M-file Windows repo on git; 100k–500k is far below any wall);
+   - **(b) size/binaries** is the cause that actually choked gbrain (its "7,471-file/2.3GB wiki" was
+     ~300KB/file = embedded media, NOT 7k text files). This design **structurally excludes it**:
+     the sorting rule is plaintext→git, binary→`~/files`. 500k notes × ~5KB ≈ 2.5GB of well-delta-
+     compressed text — fine;
+   - **(c) flat directory** is solved by **subdirectory fanout** (`notes/<aa>/<slug>.md`) *within the
+     one repo* — a filesystem hygiene step, not a reason to split repos.
+   So **"git is the spine" holds unbent** — one repo, fanned out + tuned, binaries already elsewhere.
+   **Multiple repos are an OPTIONAL, much-later lever**, not a day-one requirement — justified only by
+   millions of files, or a desire to separate cadence/backup (e.g. a noisy auto-ingest feed) or do
+   per-machine selective sync. Truth never moves into a DB.
 2. **Keyword + metadata + graph:** SQLite **FTS5** (+ a `links`/typed-`edges` table, recursive-CTE
    multi-hop). Scales to millions of rows; stays one file.
 3. **Vectors:** **LanceDB** (embedded, file-based, IVF-PQ disk ANN) — NOT sqlite-vec. Flat index at
@@ -131,10 +141,11 @@ single-node; SQLite FTS5 scales to millions of rows.
 100k–1M notes are served **single-machine with no server**, preserving principle 6. Markdown stays
 truth and every index rebuilds from it (`rm -rf .index && ops index`), preserving principles 1–2 and
 reversibility. We reach gbrain *capability* without gbrain's Postgres server — the embedded-ANN era
-(LanceDB) is what makes that newly possible. Only git-as-one-repo genuinely doesn't scale, and we
-answer that by sharding plaintext, not by surrendering plaintext.
+(LanceDB) is what makes that newly possible. And the storage spine does NOT bend: one git repo of
+plaintext, fanned out and tuned, carries the whole scale (point 1) — gbrain's git pain was binary
+*size*, which the plaintext→git / binary→`~/files` rule already prevents.
 **What this explicitly reverses.** No more "at your scale you don't need it." ANN, two-stage
-rerank, sharded storage, and resumable bulk indexing are CORE from day one, brought up small on the
+rerank, subdirectory fanout, and resumable bulk indexing are CORE from day one, brought up small on the
 same architecture so there is never a re-platforming. **Status.** Architecture set; supersedes the
 small-scale framing in ADR-002/003 and §10.2. **Stages 1–3 IMPLEMENTED** (`bin/lib/indexlib.py`,
 `embed.py`, `vectorstore.py`, `rerank.py`; `ops index`/`search`): FTS5+graph → LanceDB ANN +
