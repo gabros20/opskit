@@ -31,9 +31,19 @@ plaintext = allowed (it's "one SQLite file over a server"); a server or an LLM-e
 graph that goes stale = rejected (principle 6). Measurement: on queries sharing no vocabulary with
 the target note, keyword+graph = 0.00 recall@5, local vectors = 1.00 — vectors recover exactly what
 keyword structurally cannot. The graph need is already met for free by `[[wikilinks]]` + backlinks.
-**Status.** Decided. Stage-2 ships only when `test/run_search.py` on a *real query log* shows
-`ops search` (FTS5+graph) missing enough semantic queries (principle 7). Mechanism proven; magnitude
-pending the log.
+**Status.** Decided; magnitude now MEASURED. A fair, ops-shaped vault was built from a real
+58-note LLM/agents KB (13 area hubs, 435 wikilinks, frontmatter; `vault/`, built by a 14-agent
+workflow) and queried with 25 realistic queries (`test/vault_queries.txt`: 11 exact-term, 14
+natural-language) via `run_search_live.py` with real local embeddings (ollama mxbai-embed-large):
+- All 11 exact-term queries: keyword+graph == vector (keyword suffices).
+- Of 14 natural-language queries: **~8 clear vector wins** (keyword put the wrong note #1),
+  and on **5 of them keyword+graph missed the right note entirely even at rank 3**; vectors got
+  them at #1. Net: ~32% clear vector wins, 40% divergence — **above the ~25% threshold**.
+- Verdict: **stage-2 vectors are EARNED for natural-language / conceptual retrieval.**
+- Caveat: this corpus is conceptual (curriculum); an entity/proper-noun-heavy vault (clients,
+  people, dates) skews more lexical. `ops search` query-logging (`.logs/queries.jsonl`) is live,
+  so the production log confirms the per-domain mix over time. Engine when built: `sqlite-vec` +
+  local Ollama, per ADR-003 (NOT a server).
 
 ## ADR-003 — Vector engine: SQLite + `sqlite-vec`, not libSQL (2026-06-18)
 **Context.** Evaluated libSQL (Turso's MIT SQLite fork): file-format-compatible, embedded single-file,

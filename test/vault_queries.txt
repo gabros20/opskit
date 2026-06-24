@@ -1,0 +1,27 @@
+# --- lexical (terms likely present) ---
+reciprocal rank fusion RRF
+chunking strategies for RAG
+ReAct reasoning and acting pattern
+cross-encoder reranking
+HNSW vector index
+temperature top-p sampling parameters
+tree of thoughts exploration
+tool calling schema definition
+approval gates human in the loop
+circuit breaker resilience pattern
+embedding models vector space
+# --- semantic / paraphrase (wording differs from the notes) ---
+how do I stop my agent from looping forever
+make the model's output less random and more deterministic
+pick the cheapest model that is still good enough
+make the bot remember things between conversations
+combine keyword and semantic search into one ranking
+keep the agent from leaking secrets through its tools
+have the agent double-check and critique its own work
+split a long document into pieces for embedding
+let a person sign off before the agent does anything risky
+an agent that writes and runs its own code
+coordinate several agents working together on a task
+shrink the prompt to save money on tokens
+why does my agent forget the beginning of a long chat
+recover gracefully when an external API call fails

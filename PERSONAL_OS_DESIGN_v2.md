@@ -856,6 +856,17 @@ against your **actual query log** (it auto-buckets lexical vs semantic and uses 
 via Ollama or `OPS_EMBED_CMD`). The mechanism is proven and philosophy-safe; the only open question
 is how often *your* queries are semantic, which only your log answers.
 
+**Measured on a fair vault (2026-06-19).** A real ops-shaped vault (58 notes, 13 area hubs, 435
+wikilinks, built from an LLM/agents KB; `vault/`) was queried with 25 realistic queries (11
+exact-term, 14 natural-language) via real local embeddings. Exact-term queries: keyword+graph and
+vectors agree (keyword suffices). Natural-language queries: ~8 clear vector wins, and on 5 of them
+**keyword+graph missed the right note entirely even at rank 3** while vectors got it at #1 (~32%
+clear wins, 40% divergence). So for **conceptual/natural-language** retrieval, stage-2 vectors are
+*earned*; for **entity/proper-noun** lookups, keyword+graph already suffices. Conclusion: build
+stage 1 now, keep query-logging on (`.logs/queries.jsonl`), and turn on stage 2 (sqlite-vec +
+local Ollama) once your production log confirms the natural-language share — which on this evidence
+it likely will. (See `DECISIONS.md` ADR-002 and `test/vault_queries.txt`.)
+
 **Engine choice for stage 2: plain SQLite + `sqlite-vec`, not libSQL.** libSQL (Turso's MIT fork
 of SQLite) was evaluated. It is file-format-compatible, runs fully embedded, and has *native*
 vector search (`F32_BLOB`, `vector_distance_cos`, DiskANN `vector_top_k`) — nicer than loading an
