@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 OPS_HOME = Path(os.environ.get("OPS_HOME", Path(__file__).resolve().parents[2]))
-CONTENT = Path(os.environ.get("OPS_CONTENT", OPS_HOME / "content"))
+CONTENT = Path(os.environ.get("OPS_CONTENT", OPS_HOME / "wiki"))
 INDEX_DIR = OPS_HOME / ".index"
 DB = INDEX_DIR / "ops.sqlite"
 

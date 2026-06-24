@@ -9,7 +9,7 @@ VERB="${1:-help}"; shift || true
 case "$VERB" in
   help|-h|--help)
     cat <<'EOF'
-ops — search slice (validated against PERSONAL_OS_DESIGN_v2.md §10.2)
+ops — search slice (validated against docs/design/PERSONAL_OS_DESIGN_v2.md §10.2)
   ops index               rebuild the search index from the content tree
   ops search "<query>"    ranked file#heading hits (FTS5 keyword + wikilink graph [+ vectors])
   ops help                this message

@@ -1,9 +1,11 @@
 # `test/` — a simulation harness for testing a *design*
 
-This system has **no implementation yet** — only the spec in `../PERSONAL_OS_DESIGN_v2.md`.
-You cannot run unit tests against code that doesn't exist. So this harness tests the **design
-itself**: it encodes the rules as a model, fires adversarial inputs at them, and plugs a real
-LLM in as the *operator* to see where the contract + manual let it drift, overreach, or misfile.
+This harness began before any code existed — to test the **design** in `../docs/design/
+PERSONAL_OS_DESIGN_v2.md`. It still does that (encode the rules as a model, fire adversarial
+inputs, plug a real LLM in as the *operator* to find drift/overreach/misfiling) — and now it
+**also tests the real implementation** (the `ops` retrieval engine: stages 1–3). The deterministic
+suites need only Python stdlib; the operator sim needs the `claude` CLI; the vector/rerank tests
+skip cleanly without Ollama/lancedb/fastembed.
 
 It catches the failure modes a design review misses by eye: guardrail bypass paths, ambiguous
 filing rules, the cloned-tool trap, iCloud-wall leaks, transmit-without-confirm, secret access,
@@ -63,7 +65,7 @@ first and watch it fail, then make the model (and the design) agree.
 ### 2. Probabilistic — the LLM operator simulation
 For each scenario in `cases/scenarios.json`, the harness:
 1. **extracts the actual contract from the design doc** — `lib/spec.py` parses the `AGENTS.md`
-   (§12.2) and `operate-ops/SKILL.md` (§12.3) fenced blocks out of `PERSONAL_OS_DESIGN_v2.md`,
+   (§12.2) and `operate-ops/SKILL.md` (§12.3) fenced blocks out of `docs/design/PERSONAL_OS_DESIGN_v2.md`,
    so the test can never drift from the spec. Edit the doc → the test updates.
 2. builds the operator prompt: contract + manual + a simulated four-root world (`world/seed.json`)
    + the scenario, demanding a strict-JSON **plan of actions** (the model plans, it never touches

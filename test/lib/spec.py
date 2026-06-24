@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]            # repo root
-DESIGN = ROOT / "PERSONAL_OS_DESIGN_v2.md"
+DESIGN = ROOT / "docs" / "design" / "PERSONAL_OS_DESIGN_v2.md"
 WORLD = ROOT / "test" / "world" / "seed.json"
 
 
