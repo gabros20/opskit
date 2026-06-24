@@ -9,10 +9,16 @@ VERB="${1:-help}"; shift || true
 case "$VERB" in
   help|-h|--help)
     cat <<'EOF'
-ops — stage-1 search slice (validated against PERSONAL_OS_DESIGN_v2.md §10.2)
+ops — search slice (validated against PERSONAL_OS_DESIGN_v2.md §10.2)
   ops index               rebuild the search index from the content tree
-  ops search "<query>"    ranked file#heading hits (FTS5 keyword + wikilink graph)
+  ops search "<query>"    ranked file#heading hits (FTS5 keyword + wikilink graph [+ vectors])
   ops help                this message
+
+Stage 1 (default): SQLite FTS5 keyword + wikilink-graph, fused by RRF.
+Stage 2 (opt-in):  OPS_VECTORS=1 adds LanceDB ANN over local embeddings (ADR-006).
+  e.g.  OPS_VECTORS=1 OPS_EMBED_MODEL=embeddinggemma ops index
+        OPS_VECTORS=1 ops search "how do I stop an agent looping forever"
+  Needs: a running Ollama with the embed model pulled, and `pip install lancedb`.
 Rebuild rule: rm -rf .index && ops index   (the index is a disposable, rebuildable cache)
 EOF
     ;;
