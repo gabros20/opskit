@@ -16,9 +16,9 @@ engine* is implemented; most other verbs are still designed-but-not-built.
 |---|---|
 | **Design + decisions** | ✅ complete — `docs/design/` (v3.6 baseline + v3.7 active), `docs/DECISIONS.md` (ADR-001…006) |
 | **Retrieval engine** | ✅ built & tested — `ops index` / `ops search` (stage 1 FTS5+graph → stage 2 LanceDB vectors → stage 3 rerank) |
-| **Daily-driver verbs** | ✅ built & tested — `ops help` (manifest-rendered), `status`, `capture`, `task` (list/add/show/move/done) |
+| **Daily-driver verbs** | ✅ built & tested — `help` (manifest-rendered), `status`, `capture`, `task` (list/add/show/move/done), `triage` (inbox→tasks/wiki, propose-and-confirm, with a filing-rule learning loop). **The capture → triage → task → done loop works end-to-end.** |
 | **Agent entry point** | ✅ files exist — `AGENTS.md`, `CLAUDE.md`, `skills/operate-ops/SKILL.md` |
-| **Other verbs** | ⬜ designed, NOT built — `triage`, `start`, `close`, `week`, `new`, `invoice`, `wiki`, `doctor`, `backup`, … |
+| **Other verbs** | ⬜ designed, NOT built — `start`, `close`, `week`, `new`, `invoice`, `wiki`, `doctor`, `backup`, jobs |
 | **Guardrail enforcement** | ✅ wired — `bin/lib/guardrail.py` gates every verb by risk class (deny refused, confirm needs `--yes`, new verbs default confirm) + logs to `.logs/ops.log`; mirrors the validated §5 model (parity-tested) |
 | **Validation harness** | ✅ `test/` — design simulation + retrieval tests (see `test/README.md`) |
 
@@ -44,6 +44,7 @@ design §2; this repo is `~/ops`.
 ```sh
 ./ops help                          # the command surface (rendered from cmd.json)
 ./ops capture "a passing thought"   # → inbox/
+./ops triage                        # propose filing each inbox item → task or wiki note (you approve)
 ./ops task add "Fix the webhook"    # → tasks/active/ ;  ops task list | move <id> waiting | done <id>
 ./ops status                        # tasks, inbox, last index, repo state
 ./ops index                         # build the search index over wiki/  (stage 1: keyword + graph)
@@ -64,6 +65,6 @@ python3 test/run_simulation.py --model sonnet   # LLM-operator agnosticism/drift
 ```
 
 ## What's next
-Grow the flow verbs (`triage`, `start`, `close`, `week`) and the knowledge/work verbs (`wiki`,
-`new`, `doctor`, `backup`) — each as `bin/<verb>/{run.py,cmd.json}`, automatically gated by the
-guardrail and surfaced in `ops help`. See the build order in the design §17.
+The daily/weekly rhythm — `start` (today's journal + carry-forward), `close` (summarize the day),
+`week` (review) — then knowledge/work verbs (`wiki`, `new`, `doctor`, `backup`). Each is a
+`bin/<verb>/{run.py,cmd.json}`, automatically guardrail-gated and surfaced in `ops help`. See §16–17.
