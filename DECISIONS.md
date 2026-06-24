@@ -69,3 +69,29 @@ guardrail escapes, global slug uniqueness, worktree sanctioning, the swept-rescu
 in the spec then re-validated. Prompt-injection (6 attacks) and the agnosticism diff both pass clean.
 **Status.** Ongoing. Hard gates are structural; free-text checks match meaning to avoid LLM-phrasing
 flakiness (see `test/README.md`).
+
+## ADR-005 — Stage-2 embedding model: EmbeddingGemma-300m (default, configurable) (2026-06-19)
+**Context.** ADR-002 earned stage-2 vectors; ADR-003 fixed the store (sqlite-vec + local Ollama).
+Open: which local, multilingual (EN + HU + DE + common), efficient, mid-sized, frontier embedder?
+Researched MTEB multilingual standings (HF Hub + web) and A/B'd on the vault with real local models.
+**Decision.** Default **`embeddinggemma` (google/embeddinggemma-300m)**: 303M, 768-dim Matryoshka
+(→256/128), Gemma license, 100+ langs incl. Hungarian/German, #1 under 500M on MTEB multi/en/code,
+Ollama-native. Keep the model a one-line config (`OPS_EMBED_MODEL`) with **per-model prompt
+profiles**, so `bge-m3` (MIT, proven low-resource/Hungarian) and `qwen3-embedding:0.6b` (Apache-2.0,
+modern, ~2×) are drop-in alternatives. Engine per ADR-003 (local file, no server).
+**Why (measured `test/run_search_live.py`, vault):**
+- **Prompt prefixes are MANDATORY, not optional.** Run *without* them, EmbeddingGemma collapsed
+  (80% divergence, degenerate repeated top-1, Hungarian unusable). *With* the doc/query prompts
+  (`title: none | text:` / `task: search result | query:`) it behaved correctly (48% divergence on
+  English, comparable to mxbai's 40%). The implementation MUST encode per-model prompts.
+- **No English regression:** with prompts, EmbeddingGemma ≈ mxbai-embed-large on the English vault,
+  so switching from English-only mxbai to multilingual Gemma costs nothing on English and adds
+  multilingual headroom.
+- **Multilingual is vectors-only:** on Hungarian queries vs the English vault, keyword+graph scored
+  ~0 (no cross-language token overlap) while EmbeddingGemma bridged several correctly (e.g.
+  "token költség"→token-optimization, "több ágens koordinálása"→coordination-strategies). Cross-
+  lingual is a stress case; mono-lingual HU→HU will be stronger. For any non-English content,
+  keyword cannot work and a multilingual embedder is the only path.
+**Caveat.** A/B corpus is English; Hungarian tested cross-lingually (no HU notes yet). Confirm with
+real HU content + the production query log before final lock. `bge-m3` is the fallback if Hungarian
+quality disappoints (longest low-resource track record). **Status.** Default chosen; implement on go-ahead.

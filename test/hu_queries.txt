@@ -1,0 +1,8 @@
+hogyan akadályozzam meg hogy az ágens végtelen ciklusba kerüljön
+kulcsszavas és szemantikus keresés kombinálása egy rangsorba
+hogyan emlékezzen a chatbot a beszélgetések között
+dokumentum darabolása beágyazáshoz
+hogyan csökkentsem a token költséget a promptban
+emberi jóváhagyás mielőtt az ágens kockázatos műveletet végez
+több ágens koordinálása egy feladaton
+hibák kezelése amikor egy külső API hívás sikertelen

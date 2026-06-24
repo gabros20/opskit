@@ -84,15 +84,28 @@ def main() -> int:
         print(f"{RED}no local embedder reachable (start ollama, or set OPS_EMBED_CMD).{RESET}")
         return 2
 
+    # Per-model asymmetric prompt prefixes (doc, query). Required by embeddinggemma/e5/mxbai;
+    # omitting them collapses quality. No-prefix models map to ("","").
+    PREFIX = {
+        "embeddinggemma": ("title: none | text: ", "task: search result | query: "),
+        "multilingual-e5-large": ("passage: ", "query: "),
+        "mxbai-embed-large": ("", "Represent this sentence for searching relevant passages: "),
+    }
+    model = (emb_name or "").split(":")[-1]
+    doc_pref, query_pref = PREFIX.get(model, ("", ""))
+    base_embed = emb_fn
+    def doc_embed(t): return base_embed(doc_pref + t)
+    def query_embed(t): return base_embed(query_pref + t)
+
     idx = Index(notes, build_link_map(notes))
     # truncate to lead for speed; embed via the same fn over a trimmed Index.raw
     for k in idx.raw:
         idx.raw[k] = idx.raw[k][:LEAD_CHARS]
-    print(f"{DIM}corpus: {args.corpus} ({len(notes)} notes) | embedder: {emb_name} | embedding...{RESET}")
+    print(f"{DIM}corpus: {args.corpus} ({len(notes)} notes) | embedder: {emb_name} | prompts: {'yes' if (doc_pref or query_pref) else 'none'} | embedding...{RESET}")
     done = 0
     vecs = {}
     for k in idx.keys:
-        vecs[k] = emb_fn(idx.raw[k])
+        vecs[k] = doc_embed(idx.raw[k])
         done += 1
         if done % 100 == 0:
             print(f"{DIM}  embedded {done}/{len(idx.keys)}{RESET}")
@@ -102,7 +115,7 @@ def main() -> int:
     print(f"\n{BOLD}{'query':<46} {'flag':<14} keyword+graph top1  |  vector top1{RESET}\n")
     for q in queries:
         kg = idx.keyword_graph(q)
-        ve = idx.vector(q, emb_fn)
+        ve = idx.vector(q, query_embed)
         kg_t, ve_t = top3(kg), top3(ve)
         if not kg_t:
             flag, color = "KEYWORD-EMPTY", YEL
