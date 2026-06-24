@@ -136,5 +136,9 @@ answer that by sharding plaintext, not by surrendering plaintext.
 **What this explicitly reverses.** No more "at your scale you don't need it." ANN, two-stage
 rerank, sharded storage, and resumable bulk indexing are CORE from day one, brought up small on the
 same architecture so there is never a re-platforming. **Status.** Architecture set; supersedes the
-small-scale framing in ADR-002/003 and §10.2. Implement stage-1 (FTS) → stage-2 (LanceDB ANN +
-embeddings) → stage-3 (rerank) on this foundation.
+small-scale framing in ADR-002/003 and §10.2. **Stages 1–3 IMPLEMENTED** (`bin/lib/indexlib.py`,
+`embed.py`, `vectorstore.py`, `rerank.py`; `ops index`/`search`): FTS5+graph → LanceDB ANN +
+EmbeddingGemma (OPS_VECTORS=1) → fastembed cross-encoder rerank (OPS_RERANK=1), all embedded /
+local / no-server, opt-in, rebuildable. Remaining: scale-out *plumbing* (repo sharding + resumable
+batched backfill + file-watcher), which earns its keep only as the vault approaches 100k — the
+architecture itself does not change.
