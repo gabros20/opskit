@@ -19,6 +19,9 @@ Stage 2 (opt-in):  OPS_VECTORS=1 adds LanceDB ANN over local embeddings (ADR-006
   e.g.  OPS_VECTORS=1 OPS_EMBED_MODEL=embeddinggemma ops index
         OPS_VECTORS=1 ops search "how do I stop an agent looping forever"
   Needs: a running Ollama with the embed model pulled, and `pip install lancedb`.
+Stage 3 (opt-in):  OPS_RERANK=1 reorders the top candidates with a local cross-encoder.
+  e.g.  OPS_VECTORS=1 OPS_RERANK=1 ops search "let a person sign off before risky actions"
+  Needs: `pip install fastembed` (ONNX, no torch; multilingual jina reranker auto-picked).
 Rebuild rule: rm -rf .index && ops index   (the index is a disposable, rebuildable cache)
 EOF
     ;;

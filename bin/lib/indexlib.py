@@ -51,6 +51,21 @@ def _embed_stale(con, rel: str, model: str) -> bool:
     return (r is None) or (r[0] != model)
 
 
+def _rerank_on() -> bool:
+    return os.environ.get("OPS_RERANK", "").lower() in ("1", "true", "yes", "on")
+
+
+def _candidate_texts(paths: list[str], limit: int = 1200) -> dict:
+    """Reconstruct each candidate note's text (from its FTS chunks) for the cross-encoder."""
+    con = connect()
+    out = {}
+    for p in paths:
+        rows = con.execute("SELECT heading, body FROM chunks WHERE path=?", (p,)).fetchall()
+        out[p] = (" ".join(f"{h} {b}" for h, b in rows))[:limit]
+    con.close()
+    return out
+
+
 def connect() -> sqlite3.Connection:
     INDEX_DIR.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB)
@@ -223,8 +238,22 @@ def search(query: str, k: int = 10, graph: bool = True, log: bool = False) -> li
                         best.setdefault(path, head)
             except Exception:
                 pass  # vectors are an accelerator; never let them break keyword search
-    ranked = sorted(scores.items(), key=lambda x: -x[1])[:k]
-    hits = [(p, best.get(p, "(top)"), sc) for p, sc in ranked]
+    pool = sorted(scores.items(), key=lambda x: -x[1])
+    # --- stage 3: local cross-encoder rerank of the top candidates (precision layer) ---
+    if _rerank_on() and len(pool) > 1:
+        try:
+            import rerank as _rr
+            if _rr.available():
+                n = min(len(pool), max(k, 20))
+                cand = [p for p, _ in pool[:n]]
+                texts = _candidate_texts(cand)
+                rs = _rr.rerank(query, [texts.get(p, "") for p in cand])
+                order = sorted(range(len(cand)), key=lambda i: -rs[i])
+                pool = [(cand[i], rs[i]) for i in order] + pool[n:]
+        except Exception:
+            pass  # reranker is a precision layer; never let it break search
+    ranked = pool[:k]
+    hits = [(p, best.get(p, "(top)"), float(sc)) for p, sc in ranked]
     if log:
         log_query(query, hits)
     return hits

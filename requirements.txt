@@ -6,6 +6,9 @@
 # Stage-2 vectors (OPS_VECTORS=1) — the scale-grade semantic layer (ADR-006) — needs:
 lancedb>=0.33          # embedded, file-based ANN vector store (no server). pip install lancedb
 #
+# Stage-3 rerank (OPS_RERANK=1) — local cross-encoder precision layer (ADR-006):
+fastembed>=0.4         # ONNX runtime, no torch; auto-picks jina-reranker-v2-base-multilingual
+#
 # ...plus a local embedder, NOT a pip dep: a running Ollama with the model pulled —
 #   ollama pull embeddinggemma         # default (ADR-005); or bge-m3 / qwen3-embedding:0.6b
 # Override the model with OPS_EMBED_MODEL. Everything stays local/offline; no cloud, no server.

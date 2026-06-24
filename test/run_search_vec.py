@@ -98,6 +98,18 @@ def main() -> int:
         results.append(("incremental re-index skips unchanged", "0 notes embedded" in buf.getvalue()
                         or "(0 (re)indexed)" in buf.getvalue(), buf.getvalue().strip()))
 
+        # 6) stage-3: cross-encoder rerank (if a backend is installed) doesn't break the answers
+        import rerank
+        if rerank.available():
+            os.environ["OPS_RERANK"] = "1"
+            rr_sem, rr_lex = topk(SEMANTIC_Q), topk(LEXICAL_Q)
+            os.environ["OPS_RERANK"] = "0"
+            results.append((f"rerank [{rerank.backend()}] keeps semantic (top-3)", SEMANTIC_TARGET in rr_sem,
+                            f"top3={rr_sem}"))
+            results.append(("rerank keeps lexical (top-1)", rr_lex[:1] == [LEXICAL_TARGET], f"top3={rr_lex}"))
+        else:
+            print(f"{YEL}note{RESET} stage-3 rerank backend unavailable — `pip install fastembed` to enable it")
+
     print(f"{BOLD}Stage-2 hybrid (LanceDB + EmbeddingGemma) — {len(results)} checks{RESET}\n")
     passed = 0
     for name, ok, detail in results:
