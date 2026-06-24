@@ -19,7 +19,7 @@ engine* is implemented; most other verbs are still designed-but-not-built.
 | **Daily-driver verbs** | ✅ built & tested — `ops help` (manifest-rendered), `status`, `capture`, `task` (list/add/show/move/done) |
 | **Agent entry point** | ✅ files exist — `AGENTS.md`, `CLAUDE.md`, `skills/operate-ops/SKILL.md` |
 | **Other verbs** | ⬜ designed, NOT built — `triage`, `start`, `close`, `week`, `new`, `invoice`, `wiki`, `doctor`, `backup`, … |
-| **Guardrail enforcement** | ⬜ modeled & validated in `test/`, NOT yet wired into the dispatcher (next) |
+| **Guardrail enforcement** | ✅ wired — `bin/lib/guardrail.py` gates every verb by risk class (deny refused, confirm needs `--yes`, new verbs default confirm) + logs to `.logs/ops.log`; mirrors the validated §5 model (parity-tested) |
 | **Validation harness** | ✅ `test/` — design simulation + retrieval tests (see `test/README.md`) |
 
 ## Layout (the four roots + this repo)
@@ -64,6 +64,6 @@ python3 test/run_simulation.py --model sonnet   # LLM-operator agnosticism/drift
 ```
 
 ## What's next
-Wire the validated guardrail (`test/lib/guardrail.py`) into real dispatcher enforcement (so write
-verbs are policed by the §5 path-wall + risk classes), then grow the flow verbs (`triage`, `start`,
-`close`, `week`) — see the build order in the design §17.
+Grow the flow verbs (`triage`, `start`, `close`, `week`) and the knowledge/work verbs (`wiki`,
+`new`, `doctor`, `backup`) — each as `bin/<verb>/{run.py,cmd.json}`, automatically gated by the
+guardrail and surfaced in `ops help`. See the build order in the design §17.

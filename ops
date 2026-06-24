@@ -10,5 +10,6 @@ case "$VERB" in -h|--help) VERB=help;; esac
 
 CMD="$OPS/bin/$VERB/run.py"
 [ -f "$CMD" ] || { echo "unknown verb: $VERB (try: ops help)" >&2; exit 1; }
-# (guardrail enforcement — bin/lib/guardrail — wires in here next, before exec)
+# guardrail (§5): enforce the verb's risk class + log the invocation, before anything runs.
+python3 "$OPS/bin/lib/guardrail.py" "$VERB" "$@" || exit 1
 exec python3 "$CMD" "$@"

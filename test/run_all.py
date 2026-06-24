@@ -17,7 +17,8 @@ HERE = Path(__file__).resolve().parent
 GREEN, RED, BOLD, DIM, RESET = "\033[32m", "\033[31m", "\033[1m", "\033[2m", "\033[1m\033[0m"
 
 SUITES = [
-    ("guardrail (§5)", "run_deterministic.py"),
+    ("guardrail model (§5)", "run_deterministic.py"),
+    ("guardrail enforcement (§5)", "run_guardrail.py"),
     ("jobs registry (§15)", "run_jobs.py"),
     ("sweep decay (§9.4)", "run_sweep.py"),
     ("wiki integrity (§10)", "run_wiki.py"),
