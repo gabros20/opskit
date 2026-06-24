@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""
+ops week — weekly review (§16): shipped vs stalled, repo health, the compounding question, and
+sweep done/ tasks into done/<year>/. Writes a review block into today's journal.
+"""
+import sys
+from datetime import date, datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths  # noqa: E402
+
+
+def _d(s: str):
+    try:
+        return date.fromisoformat(s[:10])
+    except Exception:
+        return None
+
+
+def main(argv):
+    today = date.today()
+    week_ago = today.toordinal() - 7
+    donedir = paths.TASKS / "done"
+    activedir = paths.TASKS / "active"
+
+    done_all = sorted(donedir.glob("T-*.md")) if donedir.exists() else []   # top-level (unswept)
+    shipped = [f for f in done_all if (_d(paths.fm_field(f, "updated")) or date.min).toordinal() >= week_ago]
+    active = sorted(activedir.glob("T-*.md")) if activedir.exists() else []
+    stalled = [f for f in active if (_d(paths.fm_field(f, "updated")) or date.min).toordinal() < week_ago]
+    dirty = len([ln for ln in paths.git("status", "--porcelain").splitlines() if ln.strip()])
+
+    # sweep done/*.md -> done/<year>/
+    swept = 0
+    for f in done_all:
+        yr = (paths.fm_field(f, "created")[:4]) or str(today.year)
+        dest = donedir / yr
+        dest.mkdir(parents=True, exist_ok=True)
+        f.rename(dest / f.name)
+        swept += 1
+
+    block = [f"\n## Weekly review — {today.isoformat()}",
+             f"- shipped (last 7d): {len(shipped)}"]
+    block += [f"    ✓ {f.stem} {paths.title_of(f)}" for f in shipped]
+    if stalled:
+        block.append(f"- stalled (active, untouched 7d+): {len(stalled)}")
+        block += [f"    … {f.stem} {paths.title_of(f)}" for f in stalled]
+    block.append(f"- repo: {'clean' if dirty == 0 else str(dirty) + ' uncommitted'}")
+    block.append(f"- swept {swept} done task(s) into done/<year>/")
+    block.append("- ? what did you do by hand twice this week → a skill/verb candidate (§11)")
+    note, _ = paths.ensure_journal()
+    with open(note, "a", encoding="utf-8") as fh:
+        fh.write("\n".join(block) + "\n")
+    paths.append_journal("weekly review")
+
+    print(f"weekly review -> {note.relative_to(paths.OPS_HOME)}")
+    print(f"  shipped: {len(shipped)} | stalled: {len(stalled)} | repo: "
+          f"{'clean' if dirty == 0 else str(dirty)+' dirty'} | swept: {swept}")
+    print("  ask: what did you do by hand twice this week? → skill/verb candidate")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

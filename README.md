@@ -16,9 +16,9 @@ engine* is implemented; most other verbs are still designed-but-not-built.
 |---|---|
 | **Design + decisions** | ✅ complete — `docs/design/` (v3.6 baseline + v3.7 active), `docs/DECISIONS.md` (ADR-001…006) |
 | **Retrieval engine** | ✅ built & tested — `ops index` / `ops search` (stage 1 FTS5+graph → stage 2 LanceDB vectors → stage 3 rerank) |
-| **Daily-driver verbs** | ✅ built & tested — `help` (manifest-rendered), `status`, `capture`, `task` (list/add/show/move/done), `triage` (inbox→tasks/wiki, propose-and-confirm, with a filing-rule learning loop). **The capture → triage → task → done loop works end-to-end.** |
+| **Daily-driver verbs** | ✅ built & tested — `help`, `status`, `capture`, `task`, `triage`, and the rhythm `start` / `close` / `week`. **The capture → triage → task → done spine and the daily/weekly loop work end-to-end.** |
 | **Agent entry point** | ✅ files exist — `AGENTS.md`, `CLAUDE.md`, `skills/operate-ops/SKILL.md` |
-| **Other verbs** | ⬜ designed, NOT built — `start`, `close`, `week`, `new`, `invoice`, `wiki`, `doctor`, `backup`, jobs |
+| **Other verbs** | ⬜ designed, NOT built — `wiki`, `new`, `doctor`, `backup`, `consolidate`, `invoice`, `repo`, `files`, jobs |
 | **Guardrail enforcement** | ✅ wired — `bin/lib/guardrail.py` gates every verb by risk class (deny refused, confirm needs `--yes`, new verbs default confirm) + logs to `.logs/ops.log`; mirrors the validated §5 model (parity-tested) |
 | **Validation harness** | ✅ `test/` — design simulation + retrieval tests (see `test/README.md`) |
 
@@ -47,6 +47,7 @@ design §2; this repo is `~/ops`.
 ./ops triage                        # propose filing each inbox item → task or wiki note (you approve)
 ./ops task add "Fix the webhook"    # → tasks/active/ ;  ops task list | move <id> waiting | done <id>
 ./ops status                        # tasks, inbox, last index, repo state
+./ops start  /  ./ops close  /  ./ops week   # daily start · daily close · weekly review (§16)
 ./ops index                         # build the search index over wiki/  (stage 1: keyword + graph)
 ./ops search "your query"           # ranked file#heading hits
 
@@ -65,6 +66,6 @@ python3 test/run_simulation.py --model sonnet   # LLM-operator agnosticism/drift
 ```
 
 ## What's next
-The daily/weekly rhythm — `start` (today's journal + carry-forward), `close` (summarize the day),
-`week` (review) — then knowledge/work verbs (`wiki`, `new`, `doctor`, `backup`). Each is a
-`bin/<verb>/{run.py,cmd.json}`, automatically guardrail-gated and surfaced in `ops help`. See §16–17.
+Knowledge/work verbs: `wiki` (open/new/backlinks/stale/orphans), `new` (scaffold project/client),
+and the health verbs `doctor` / `backup`. Each is a `bin/<verb>/{run.py,cmd.json}`, automatically
+guardrail-gated and surfaced in `ops help`. See the build order in the design §17.

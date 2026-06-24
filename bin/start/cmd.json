@@ -1,0 +1,8 @@
+{
+  "verb": "start",
+  "summary": "daily start: today's journal, carry-forward open tasks, dashboard",
+  "usage": "ops start",
+  "risk": "safe_write",
+  "reads": ["tasks/", "inbox/", "journal/"],
+  "writes": ["journal/"]
+}

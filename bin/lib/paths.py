@@ -23,16 +23,47 @@ def now_stamp() -> str:
     return n.strftime("%Y%m%d-%H%M%S-") + f"{n.microsecond // 1000:03d}"
 
 
+def journal_path(d: date | None = None) -> Path:
+    d = d or date.today()
+    return JOURNAL / f"{d.year:04d}" / f"{d.month:02d}" / f"{d.isoformat()}.md"
+
+
+def ensure_journal(d: date | None = None) -> tuple[Path, bool]:
+    """Return (path, created). Creates today's journal note with a header if missing."""
+    d = d or date.today()
+    note = journal_path(d)
+    created = not note.exists()
+    if created:
+        note.parent.mkdir(parents=True, exist_ok=True)
+        note.write_text(f"---\ntype: journal\ndate: {d.isoformat()}\n---\n# {d.isoformat()}\n\n", encoding="utf-8")
+    return note, created
+
+
 def append_journal(line: str) -> Path:
     """Append one timestamped line to today's journal note (the shared activity record, §8)."""
-    d = date.today()
-    note = JOURNAL / f"{d.year:04d}" / f"{d.month:02d}" / f"{d.isoformat()}.md"
-    note.parent.mkdir(parents=True, exist_ok=True)
-    if not note.exists():
-        note.write_text(f"---\ntype: journal\ndate: {d.isoformat()}\n---\n# {d.isoformat()}\n\n")
+    note, _ = ensure_journal()
     with open(note, "a", encoding="utf-8") as f:
         f.write(f"- {datetime.now().strftime('%H:%M')} {line}\n")
     return note
+
+
+def git(*args) -> str:
+    import subprocess
+    try:
+        return subprocess.run(["git", "-C", str(OPS_HOME), *args],
+                              capture_output=True, text=True, timeout=10).stdout
+    except Exception:
+        return ""
+
+
+def fm_field(path: Path, key: str) -> str:
+    """Read a single frontmatter `key:` value from a markdown file ('' if absent)."""
+    import re
+    try:
+        m = re.search(rf"(?m)^{re.escape(key)}:\s*(.+)$", path.read_text(encoding="utf-8"))
+        return m.group(1).strip() if m else ""
+    except Exception:
+        return ""
 
 
 def title_of(path: Path) -> str:

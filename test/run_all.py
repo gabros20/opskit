@@ -29,6 +29,7 @@ SUITES = [
     ("stage-2 hybrid LanceDB (§10.2)", "run_search_vec.py"),
     ("daily-driver verbs (§4/§7)", "run_verbs.py"),
     ("triage flow (§4/§10)", "run_triage.py"),
+    ("daily/weekly rhythm (§16)", "run_loops.py"),
 ]
 
 

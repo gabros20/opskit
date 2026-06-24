@@ -19,6 +19,20 @@
       ]
     },
     {
+      "verb": "close",
+      "summary": "daily close: summarize the day into the journal, flag loose ends",
+      "usage": "ops close [--automated]",
+      "risk": "safe_write",
+      "reads": [
+        "tasks/",
+        "journal/",
+        ".git"
+      ],
+      "writes": [
+        "journal/"
+      ]
+    },
+    {
       "verb": "help",
       "summary": "list verbs / usage for one (rendered from ops.json)",
       "usage": "ops help [verb]",
@@ -59,6 +73,20 @@
       ],
       "writes": [
         ".logs/queries.jsonl"
+      ]
+    },
+    {
+      "verb": "start",
+      "summary": "daily start: today's journal, carry-forward open tasks, dashboard",
+      "usage": "ops start",
+      "risk": "safe_write",
+      "reads": [
+        "tasks/",
+        "inbox/",
+        "journal/"
+      ],
+      "writes": [
+        "journal/"
       ]
     },
     {
@@ -115,6 +143,20 @@
         "wiki/notes/",
         "journal/",
         "wiki/conventions.md"
+      ]
+    },
+    {
+      "verb": "week",
+      "summary": "weekly review: shipped/stalled, repo health, sweep done/ -> done/<year>/",
+      "usage": "ops week",
+      "risk": "safe_write",
+      "reads": [
+        "tasks/",
+        ".git"
+      ],
+      "writes": [
+        "tasks/done/",
+        "journal/"
       ]
     }
   ]

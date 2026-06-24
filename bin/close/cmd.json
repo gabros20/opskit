@@ -1,0 +1,8 @@
+{
+  "verb": "close",
+  "summary": "daily close: summarize the day into the journal, flag loose ends",
+  "usage": "ops close [--automated]",
+  "risk": "safe_write",
+  "reads": ["tasks/", "journal/", ".git"],
+  "writes": ["journal/"]
+}
