@@ -43,7 +43,7 @@ natural-language) via `run_search_live.py` with real local embeddings (ollama mx
 - Caveat: this corpus is conceptual (curriculum); an entity/proper-noun-heavy vault (clients,
   people, dates) skews more lexical. `ops search` query-logging (`.logs/queries.jsonl`) is live,
   so the production log confirms the per-domain mix over time. Engine when built: `sqlite-vec` +
-  local Ollama, per ADR-003 (NOT a server).
+  local Ollama, per ADR-003 — **revised by ADR-006 for scale: vectors in LanceDB, not sqlite-vec.**
 
 ## ADR-003 — Vector engine: SQLite + `sqlite-vec`, not libSQL (2026-06-18)
 **Context.** Evaluated libSQL (Turso's MIT SQLite fork): file-format-compatible, embedded single-file,
@@ -55,7 +55,10 @@ CLI, public domain, outlives any company); libSQL is a one-company fork whose re
 embedded replicas / sync / cloud — is the server gravity this design walls off. The index is a
 disposable rebuilt-from-markdown cache, so native-vs-extension vectors is mere ergonomics, and
 DiskANN's ANN only matters past ~100k vectors (brute-force cosine is instant at this scale).
-**Status.** Decided.
+**Status.** Decided for the *keyword/metadata/graph* store (SQLite FTS5 stays). **Revised in part by
+ADR-006:** at the target scale (100k–500k+ notes → ~1M+ chunks) sqlite-vec's brute-force does NOT
+hold, so VECTORS live in LanceDB (embedded, file-based ANN), not sqlite-vec. SQLite remains the
+keyword/metadata/graph engine.
 
 ## ADR-004 — Validate the design by simulation, not just review (2026-06-16 → ongoing)
 **Context.** The system has no implementation yet — only a spec. A spec can't be unit-tested, but it
@@ -95,3 +98,43 @@ modern, ~2×) are drop-in alternatives. Engine per ADR-003 (local file, no serve
 **Caveat.** A/B corpus is English; Hungarian tested cross-lingually (no HU notes yet). Confirm with
 real HU content + the production query log before final lock. `bge-m3` is the fallback if Hungarian
 quality disappoints (longest low-resource track record). **Status.** Default chosen; implement on go-ahead.
+
+## ADR-006 — Scale to 100k–500k+ notes from day one, single-machine, no server (2026-06-19)
+**Context.** Owner's ambition is gbrain-scale (hundreds of thousands of notes), not a small personal
+KB. Prior ADRs sized some choices for small scale. Re-architect for volume *without* abandoning the
+first principles (plaintext truth, reversibility, no server). Grounded in research: sqlite-vec is
+brute-force (fails >~1M vectors); git degrades badly past ~10k files (gbrain abandoned git-wiki at
+~5k); LanceDB is embedded/file-based with disk IVF-PQ ANN, <20ms @1M, larger-than-RAM, billions-scale
+single-node; SQLite FTS5 scales to millions of rows.
+**Decision — the scale-ready stack (all embedded, no server, rebuildable from markdown):**
+1. **System of record stays plaintext markdown** (principle 1 intact), but **sharded** so git stays
+   usable: the wiki splits into multiple git repos by area/year (the four-root topology already
+   shards `~/work`; apply the same to the knowledge plane), plus filesystem sharding
+   (`notes/<aa>/<slug>.md`) to avoid 100k entries in one dir. Git is tuned (`feature.manyFiles`,
+   `commit-graph`, FSMonitor, sparse-checkout). **"Git is the spine" → "git versions sharded
+   plaintext," not "one 100k-file repo."** This is the one principle that bends; it bends by
+   sharding, not by moving truth into a DB.
+2. **Keyword + metadata + graph:** SQLite **FTS5** (+ a `links`/typed-`edges` table, recursive-CTE
+   multi-hop). Scales to millions of rows; stays one file.
+3. **Vectors:** **LanceDB** (embedded, file-based, IVF-PQ disk ANN) — NOT sqlite-vec. Flat index at
+   small N, auto/again to IVF-PQ as the table grows, so there is **no migration** between small and
+   large — we build on LanceDB from day one. Embeddings via local EmbeddingGemma (ADR-005).
+4. **Two-stage retrieval:** ANN candidate-gen (LanceDB) + BM25 (FTS5) → RRF → **local cross-encoder
+   rerank** (e.g. `bge-reranker-v2-m3` via Ollama/llama.cpp) for precision at scale. The reranker
+   is gbrain's zerank role, run locally.
+5. **Indexing at volume:** batched + parallel + **resumable/checkpointed** embedding (initial 100k
+   backfill is a multi-hour job — `op_checkpoint` pattern, incremental by file-hash already in
+   `indexlib`); a file-watcher for live incremental; QAT-quantized embedder (~200MB) for throughput.
+6. **Background work:** a resumable indexing/consolidate worker under launchd (single-node);
+   escalate to a job queue only if multi-source/multi-machine (still out of scope).
+**Why this keeps the philosophy at scale.** LanceDB + SQLite are BOTH embedded and file-based — so
+100k–1M notes are served **single-machine with no server**, preserving principle 6. Markdown stays
+truth and every index rebuilds from it (`rm -rf .index && ops index`), preserving principles 1–2 and
+reversibility. We reach gbrain *capability* without gbrain's Postgres server — the embedded-ANN era
+(LanceDB) is what makes that newly possible. Only git-as-one-repo genuinely doesn't scale, and we
+answer that by sharding plaintext, not by surrendering plaintext.
+**What this explicitly reverses.** No more "at your scale you don't need it." ANN, two-stage
+rerank, sharded storage, and resumable bulk indexing are CORE from day one, brought up small on the
+same architecture so there is never a re-platforming. **Status.** Architecture set; supersedes the
+small-scale framing in ADR-002/003 and §10.2. Implement stage-1 (FTS) → stage-2 (LanceDB ANN +
+embeddings) → stage-3 (rerank) on this foundation.

@@ -806,55 +806,68 @@ coverage before embeddings. Vector+keyword hybrid still covers most retrieval; a
 adds extraction cost and a second source of truth that goes stale. Because everything is
 plaintext-with-explicit-links, adding `sqlite-vec` or Kùzu later is additive, never a migration.
 
-### 10.2 Search — staged, each stage rebuildable
+### 10.2 Search — scale-ready from day one (target: 100k–500k+ notes), each stage rebuildable
 
-| Stage | What | When |
+**Scale target (ADR-006).** This system is built for **hundreds of thousands of notes** — single
+machine, **no server**, because the embedded-ANN era makes that possible. The stages below are a
+*bring-up path on one scale-ready architecture*, not "add it if you ever need it": each stage is
+built small but on the components that hold at 1M+ chunks, so there is **never a re-platforming**.
+
+| Stage | What | Role |
 |---|---|---|
-| 0 | `rg` / `fd` / `fzf` raw | day one; always works |
-| 1 | **SQLite FTS5** over wiki+tasks+journal, chunked by heading, incremental by file hash → `ops search` | build week one; covers most queries |
-| 2 | + `sqlite-vec` vectors, local Ollama `nomic-embed-text` embeddings (offline, free), hybrid ranking with FTS5 | add ONLY when FTS5 demonstrably misses things you ask for |
-| 3 | graph/vector *server* tier (Postgres+pgvector, FalkorDB, LightRAG, Kùzu-as-server, RDF) | **rejected** — server or 2nd source of truth; not before ~100k chunks / real multi-hop. Probably never (§10.2.1) |
+| 0 | `rg` / `fd` / `fzf` raw | bootstrap; always works |
+| 1 | **SQLite FTS5** (keyword) + **wikilink/edge graph**, chunked by heading, incremental by file hash → `ops search`. FTS5 scales to millions of rows. | the lexical + graph spine |
+| 2 | **LanceDB** vectors (embedded, file-based, disk **IVF-PQ ANN**, larger-than-RAM, billions-scale) + local **EmbeddingGemma** embeddings (ADR-005), fused with FTS5+graph via RRF | semantic, **scale-grade from the start** — flat index small, IVF-PQ as it grows, no migration |
+| 3 | local **cross-encoder rerank** (`bge-reranker-v2-m3` via Ollama/llama.cpp) over the fused candidates | precision layer (gbrain's zerank role, run locally) |
 
-One SQLite file at `.index/ops.sqlite`. Gitignored. **The rebuild rule:** if the index
-is ever wrong or corrupt — `rm -rf .index && ops index`. An index that can't be rebuilt
-from files is a bug.
+**NOT `sqlite-vec` for vectors** — it is brute-force and fails past ~1M vectors; at our target that's
+a non-starter, so vectors live in **LanceDB** from day one (still embedded/file-based/no-server).
+SQLite stays the keyword/metadata/graph engine. **Rejected outright (servers / 2nd source of truth):**
+Postgres+pgvector, FalkorDB, LightRAG, Qdrant-as-service, RDF — see §10.2.1.
 
-`ops index` also regenerates `ops.json` (the manifest) so one command refreshes
-everything derived.
+**Storage at scale.** Indices live under `.index/` — `.index/ops.sqlite` (FTS5 + graph) and
+`.index/vectors.lance/` (LanceDB) — all gitignored and **rebuildable from markdown**
+(`rm -rf .index && ops index`; an index that can't be rebuilt from files is a bug). The markdown
+**system of record is sharded** so git stays usable at 100k+ files: the knowledge plane splits into
+per-area/per-year git repos (the four-root sharding applied to the wiki) + filesystem sharding
+(`notes/<aa>/<slug>.md`) + git large-repo tuning (`feature.manyFiles`, `commit-graph`, FSMonitor,
+sparse-checkout). **"Git is the spine" becomes "git versions *sharded* plaintext"** — the one
+principle that bends at scale, and it bends by sharding, never by moving truth into a database.
+Initial indexing of a large vault is a **resumable, checkpointed, batched** backfill (incremental by
+file-hash thereafter). `ops index` also regenerates `ops.json` (the manifest).
 
-#### 10.2.1 The retrieval add-on test, and why this staging is right (v3.7)
+#### 10.2.1 The retrieval add-on test — embedded scales, servers don't (ADR-006)
 
-The 2026 landscape (surveyed on X) converged on a clear pattern, and it is *this* one. The
-dominant approach — **Karpathy's LLM Wiki** (compile knowledge into interlinked markdown at
-ingestion, maintain index files + backlinks, let the agent navigate the filesystem; **no vector
-DB** at ~100 articles / ~400K words) — is exactly the substrate this design already is (§3, §10.1,
-the `consolidate` job). Vector and graph layers are the documented *scale-up*, not the foundation.
-So the staging above is not under-built; it matches the validated consensus.
+The foundation is **Karpathy's LLM Wiki** pattern (compile knowledge into interlinked markdown,
+maintain index files + backlinks, let the agent navigate the filesystem) — which is what this design
+already is (§3, §10.1). At **gbrain scale (100k–500k+ notes)** that foundation is *kept*, and the
+vector + graph + rerank layers are built **from day one** on top of it, on components that hold at
+1M+ chunks. The point is no longer "add vectors if earned" — it's "scale the right way."
 
-**The one test for any retrieval add-on** (a corollary of principle 6): *is it a file-based,
-locally-computed, rebuilt-from-plaintext cache, or is it a server / a second source of truth?*
-The first is allowed; the second is rejected.
+**The one test for any retrieval component** (a corollary of principle 6): *is it embedded —
+file-based, locally-computed, rebuilt-from-plaintext, no daemon — or is it a server / a second
+source of truth?* Embedded is allowed (and now scales to billions of vectors); a server is rejected.
 
-- **Allowed — stage 2 as specified:** `sqlite-vec` vectors in the *same* `.index/ops.sqlite`,
-  embeddings from a **local** model (Ollama `mxbai-embed-large`/`nomic-embed-text`, offline, free),
-  fused with FTS5 via reciprocal-rank fusion. This is literally "one SQLite file over a server":
-  gitignored, disposable, `rm -rf .index && ops index` rebuilds it from the markdown. It adds no
-  new source of truth. **Measured** (`test/run_search.py`, real local embeddings): on queries whose
-  wording shares no vocabulary with the target note, keyword+graph scores 0.00 recall@5 and local
-  vectors recover **1.00** — vectors recover exactly the queries keyword structurally cannot.
-- **Rejected — the server/graph-DB tier:** gbrain's Postgres + pgvector, and the X-surfaced
-  Tier-3 stacks (FalkorDB and LightRAG graph+vector, Kwipu's property-graph, an RDF/semantic-web
-  layer). Each is either a *server* or an *LLM-extracted second graph that goes stale* — both
-  violate principle 6 ("one SQLite file over a server; wikilinks over a graph DB"). The graph you
-  need you already have for free: `[[wikilinks]]` + auto-backlinks (§10.1) *are* the graph, queried
-  with `rg`. A graph DB is unearned until a real multi-hop, 100k-chunk need appears — gbrain's
-  146k-page scale, not a one-person practice. Probably never.
+- **Allowed — embedded, scale-grade:** SQLite **FTS5** (keyword/graph, millions of rows) +
+  **LanceDB** (vectors; disk IVF-PQ ANN, larger-than-RAM, <20ms @1M, billions single-node) + local
+  **EmbeddingGemma** embeddings + a local cross-encoder reranker. All file-based under `.index/`,
+  gitignored, rebuilt from markdown — no server, no second source of truth. This is how we hit
+  gbrain *capability* without gbrain's Postgres: the embedded-ANN era (LanceDB) is what newly makes
+  100k+ notes searchable on one laptop. **Measured** (`test/run_search.py`, real local embeddings):
+  on queries whose wording shares no vocabulary with the target note, keyword+graph scores 0.00
+  recall@5 and local vectors recover **1.00** — vectors recover exactly what keyword structurally
+  cannot. (`sqlite-vec` is excluded *for vectors* — brute-force, dies past ~1M; LanceDB replaces it.)
+- **Rejected — the server tier:** gbrain's Postgres + pgvector; FalkorDB / LightRAG graph+vector;
+  Qdrant/Weaviate-as-service; RDF/semantic-web layers. Each is a *server* or an *LLM-extracted second
+  graph that goes stale* — both violate principle 6. We scale by **embedded** ANN, not by standing up
+  a database service. The graph is the `[[wikilink]]`/edge table (recursive-CTE multi-hop), not a
+  graph-DB daemon.
 
-**The trigger stays empirical, not aspirational** (principle 7). Stage 2 ships only when `ops
-search` (FTS5 + wikilink graph) *demonstrably* misses real queries — re-run `test/run_search.py`
-against your **actual query log** (it auto-buckets lexical vs semantic and uses your local embedder
-via Ollama or `OPS_EMBED_CMD`). The mechanism is proven and philosophy-safe; the only open question
-is how often *your* queries are semantic, which only your log answers.
+**Empirical, even at scale** (principle 7). The stages bring up on the same architecture; the query
+log (`.logs/queries.jsonl`) + `test/run_search.py` keep tuning honest (which mode, which model, where
+rerank helps). And the storage-spine bend is explicit: 100k+ plaintext files exceed what one git repo
+handles, so the markdown is **sharded** (per-area/year repos + `notes/<aa>/` fanout + git large-repo
+tuning) — git still versions plaintext truth, just not all in one repo.
 
 **Measured on a fair vault (2026-06-19).** A real ops-shaped vault (58 notes, 13 area hubs, 435
 wikilinks, built from an LLM/agents KB; `vault/`) was queried with 25 realistic queries (11
@@ -863,22 +876,18 @@ vectors agree (keyword suffices). Natural-language queries: ~8 clear vector wins
 **keyword+graph missed the right note entirely even at rank 3** while vectors got it at #1 (~32%
 clear wins, 40% divergence). So for **conceptual/natural-language** retrieval, stage-2 vectors are
 *earned*; for **entity/proper-noun** lookups, keyword+graph already suffices. Conclusion: build
-stage 1 now, keep query-logging on (`.logs/queries.jsonl`), and turn on stage 2 (sqlite-vec +
-local Ollama) once your production log confirms the natural-language share — which on this evidence
-it likely will. (See `DECISIONS.md` ADR-002 and `test/vault_queries.txt`.)
+stage 1 now, keep query-logging on (`.logs/queries.jsonl`), and bring up stage 2 (**LanceDB ANN** +
+local Ollama embeddings) on the scale architecture — the natural-language share already justifies it
+and only grows with the corpus. (See `DECISIONS.md` ADR-002/006 and `test/vault_queries.txt`.)
 
-**Engine choice for stage 2: plain SQLite + `sqlite-vec`, not libSQL.** libSQL (Turso's MIT fork
-of SQLite) was evaluated. It is file-format-compatible, runs fully embedded, and has *native*
-vector search (`F32_BLOB`, `vector_distance_cos`, DiskANN `vector_top_k`) — nicer than loading an
-extension. But principle 6 decides against it: plain SQLite is already present (Python `sqlite3`
-stdlib, the `sqlite3` CLI, public domain, outlives any company), whereas libSQL is a one-company
-fork whose reason-for-being — embedded replicas / sync / cloud — is the very server gravity this
-design walls off. Since `.index` is a disposable, rebuilt-from-markdown cache, native-vs-extension
-vectors is mere ergonomics, and DiskANN's ANN only matters past ~100k vectors (brute-force cosine
-is instant at this scale). **libSQL is kept as the documented drop-in fallback** — same file format,
-zero migration — should `sqlite-vec`'s extension-loading (macOS system Python sometimes disables
-`enable_load_extension`; use Homebrew Python / `apsw`) ever become painful. Its sync/cloud features
-remain off-limits (they cross the server line).
+**Engine split (ADR-003 + ADR-006).** *Keyword / metadata / graph* → plain **SQLite FTS5** (already
+present via Python `sqlite3` stdlib + CLI, public domain, scales to millions of rows) — chosen over
+Turso's libSQL fork because libSQL's reason-for-being (embedded replicas / sync / cloud) is the
+server gravity this design walls off; libSQL stays a file-compatible fallback only. *Vectors* →
+**LanceDB**, NOT `sqlite-vec`: sqlite-vec is brute-force and fails past ~1M vectors, which our
+100k–500k-note target blows through; LanceDB is embedded, file-based, and disk-ANN (IVF-PQ) to
+billions on one node — scale without a server. Both stores live under `.index/`, are gitignored, and
+rebuild from the markdown. Net: two embedded engines, zero servers, principle 6 intact at scale.
 
 ---
 
