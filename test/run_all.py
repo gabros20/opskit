@@ -26,6 +26,7 @@ SUITES = [
     ("searchability model (§10.2)", "run_search.py"),
     ("stage-1 search impl (§10.2)", "run_search_impl.py"),
     ("stage-2 hybrid LanceDB (§10.2)", "run_search_vec.py"),
+    ("daily-driver verbs (§4/§7)", "run_verbs.py"),
 ]
 
 

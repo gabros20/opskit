@@ -16,9 +16,10 @@ engine* is implemented; most other verbs are still designed-but-not-built.
 |---|---|
 | **Design + decisions** | ✅ complete — `docs/design/` (v3.6 baseline + v3.7 active), `docs/DECISIONS.md` (ADR-001…006) |
 | **Retrieval engine** | ✅ built & tested — `ops index` / `ops search` (stage 1 FTS5+graph → stage 2 LanceDB vectors → stage 3 rerank) |
+| **Daily-driver verbs** | ✅ built & tested — `ops help` (manifest-rendered), `status`, `capture`, `task` (list/add/show/move/done) |
 | **Agent entry point** | ✅ files exist — `AGENTS.md`, `CLAUDE.md`, `skills/operate-ops/SKILL.md` |
-| **Other verbs** | ⬜ designed, NOT built — `capture`, `task`, `triage`, `start`, `close`, `status`, `new`, `invoice`, `week`, … |
-| **Guardrail enforcement** | ⬜ modeled & validated in `test/`, NOT yet wired into the dispatcher |
+| **Other verbs** | ⬜ designed, NOT built — `triage`, `start`, `close`, `week`, `new`, `invoice`, `wiki`, `doctor`, `backup`, … |
+| **Guardrail enforcement** | ⬜ modeled & validated in `test/`, NOT yet wired into the dispatcher (next) |
 | **Validation harness** | ✅ `test/` — design simulation + retrieval tests (see `test/README.md`) |
 
 ## Layout (the four roots + this repo)
@@ -41,7 +42,10 @@ design §2; this repo is `~/ops`.
 ## Quick start
 
 ```sh
-./ops help                          # the surface (today: help, index, search)
+./ops help                          # the command surface (rendered from cmd.json)
+./ops capture "a passing thought"   # → inbox/
+./ops task add "Fix the webhook"    # → tasks/active/ ;  ops task list | move <id> waiting | done <id>
+./ops status                        # tasks, inbox, last index, repo state
 ./ops index                         # build the search index over wiki/  (stage 1: keyword + graph)
 ./ops search "your query"           # ranked file#heading hits
 
@@ -60,6 +64,6 @@ python3 test/run_simulation.py --model sonnet   # LLM-operator agnosticism/drift
 ```
 
 ## What's next
-Build the daily-driver verbs (`capture`, `task`, `status`, `help`-from-manifest) and wire the
-validated guardrail (`test/lib/guardrail.py`) into real dispatcher enforcement — see the build
-order in the design §17.
+Wire the validated guardrail (`test/lib/guardrail.py`) into real dispatcher enforcement (so write
+verbs are policed by the §5 path-wall + risk classes), then grow the flow verbs (`triage`, `start`,
+`close`, `week`) — see the build order in the design §17.

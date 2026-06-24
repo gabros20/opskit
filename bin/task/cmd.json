@@ -1,0 +1,9 @@
+{
+  "verb": "task",
+  "summary": "list | add \"<title>\" | show <id> | move <id> <status> | done <id>",
+  "usage": "ops task <action> [args]",
+  "risk": "safe_write",
+  "args": [{ "name": "action", "required": false, "default": "list" }],
+  "reads": ["tasks/"],
+  "writes": ["tasks/", "journal/"]
+}

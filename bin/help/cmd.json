@@ -1,0 +1,8 @@
+{
+  "verb": "help",
+  "summary": "list verbs / usage for one (rendered from ops.json)",
+  "usage": "ops help [verb]",
+  "risk": "read",
+  "reads": ["bin/*/cmd.json"],
+  "writes": ["ops.json"]
+}

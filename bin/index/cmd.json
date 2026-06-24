@@ -1,0 +1,8 @@
+{
+  "verb": "index",
+  "summary": "rebuild the search index over wiki (FTS5 + graph; +LanceDB if OPS_VECTORS=1)",
+  "usage": "ops index",
+  "risk": "safe_write",
+  "reads": ["wiki/"],
+  "writes": [".index/"]
+}

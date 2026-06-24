@@ -1,0 +1,9 @@
+{
+  "verb": "search",
+  "summary": "ranked file#heading hits (keyword + graph [+ vectors/rerank])",
+  "usage": "ops search \"<query>\"",
+  "risk": "read",
+  "args": [{ "name": "query", "required": true }],
+  "reads": [".index/", "wiki/"],
+  "writes": [".logs/queries.jsonl"]
+}

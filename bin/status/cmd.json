@@ -1,0 +1,8 @@
+{
+  "verb": "status",
+  "summary": "dashboard: active/waiting tasks, inbox, last index, repo state",
+  "usage": "ops status",
+  "risk": "read",
+  "reads": ["tasks/", "inbox/", "wiki/", ".index/"],
+  "writes": []
+}

@@ -1,33 +1,14 @@
 #!/usr/bin/env bash
-# ops — the single entrypoint dispatcher (§4.2). Stage-1 slice: help | index | search.
-# Verbs live in bin/<verb>/run.py; OPS_HOME defaults to this repo.
+# ops — the single entrypoint dispatcher (§4.2). Verbs live in bin/<verb>/run.py with a cmd.json
+# sidecar; `ops help` renders the surface from those. OPS_HOME defaults to this repo.
+# Built today: help, status, capture, task, index, search. Others are designed (see ops help / README).
 set -euo pipefail
 OPS="${OPS_HOME:-$(cd "$(dirname "$0")" && pwd)}"
 export OPS_HOME="$OPS"
 VERB="${1:-help}"; shift || true
+case "$VERB" in -h|--help) VERB=help;; esac
 
-case "$VERB" in
-  help|-h|--help)
-    cat <<'EOF'
-ops — search slice (validated against docs/design/PERSONAL_OS_DESIGN_v2.md §10.2)
-  ops index               rebuild the search index from the content tree
-  ops search "<query>"    ranked file#heading hits (FTS5 keyword + wikilink graph [+ vectors])
-  ops help                this message
-
-Stage 1 (default): SQLite FTS5 keyword + wikilink-graph, fused by RRF.
-Stage 2 (opt-in):  OPS_VECTORS=1 adds LanceDB ANN over local embeddings (ADR-006).
-  e.g.  OPS_VECTORS=1 OPS_EMBED_MODEL=embeddinggemma ops index
-        OPS_VECTORS=1 ops search "how do I stop an agent looping forever"
-  Needs: a running Ollama with the embed model pulled, and `pip install lancedb`.
-Stage 3 (opt-in):  OPS_RERANK=1 reorders the top candidates with a local cross-encoder.
-  e.g.  OPS_VECTORS=1 OPS_RERANK=1 ops search "let a person sign off before risky actions"
-  Needs: `pip install fastembed` (ONNX, no torch; multilingual jina reranker auto-picked).
-Rebuild rule: rm -rf .index && ops index   (the index is a disposable, rebuildable cache)
-EOF
-    ;;
-  *)
-    CMD="$OPS/bin/$VERB/run.py"
-    [ -f "$CMD" ] || { echo "unknown verb: $VERB (try: ops help)" >&2; exit 1; }
-    exec python3 "$CMD" "$@"
-    ;;
-esac
+CMD="$OPS/bin/$VERB/run.py"
+[ -f "$CMD" ] || { echo "unknown verb: $VERB (try: ops help)" >&2; exit 1; }
+# (guardrail enforcement — bin/lib/guardrail — wires in here next, before exec)
+exec python3 "$CMD" "$@"

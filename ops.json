@@ -1,0 +1,98 @@
+{
+  "verbs": [
+    {
+      "verb": "capture",
+      "summary": "thought -> inbox (also: pipe stdin)",
+      "usage": "ops capture \"<text>\"",
+      "risk": "safe_write",
+      "args": [
+        {
+          "name": "text",
+          "required": false,
+          "default": "stdin"
+        }
+      ],
+      "reads": [],
+      "writes": [
+        "inbox/",
+        "journal/"
+      ]
+    },
+    {
+      "verb": "help",
+      "summary": "list verbs / usage for one (rendered from ops.json)",
+      "usage": "ops help [verb]",
+      "risk": "read",
+      "reads": [
+        "bin/*/cmd.json"
+      ],
+      "writes": [
+        "ops.json"
+      ]
+    },
+    {
+      "verb": "index",
+      "summary": "rebuild the search index over wiki (FTS5 + graph; +LanceDB if OPS_VECTORS=1)",
+      "usage": "ops index",
+      "risk": "safe_write",
+      "reads": [
+        "wiki/"
+      ],
+      "writes": [
+        ".index/"
+      ]
+    },
+    {
+      "verb": "search",
+      "summary": "ranked file#heading hits (keyword + graph [+ vectors/rerank])",
+      "usage": "ops search \"<query>\"",
+      "risk": "read",
+      "args": [
+        {
+          "name": "query",
+          "required": true
+        }
+      ],
+      "reads": [
+        ".index/",
+        "wiki/"
+      ],
+      "writes": [
+        ".logs/queries.jsonl"
+      ]
+    },
+    {
+      "verb": "status",
+      "summary": "dashboard: active/waiting tasks, inbox, last index, repo state",
+      "usage": "ops status",
+      "risk": "read",
+      "reads": [
+        "tasks/",
+        "inbox/",
+        "wiki/",
+        ".index/"
+      ],
+      "writes": []
+    },
+    {
+      "verb": "task",
+      "summary": "list | add \"<title>\" | show <id> | move <id> <status> | done <id>",
+      "usage": "ops task <action> [args]",
+      "risk": "safe_write",
+      "args": [
+        {
+          "name": "action",
+          "required": false,
+          "default": "list"
+        }
+      ],
+      "reads": [
+        "tasks/"
+      ],
+      "writes": [
+        "tasks/",
+        "journal/"
+      ]
+    }
+  ]
+}

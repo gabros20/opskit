@@ -1,0 +1,9 @@
+{
+  "verb": "capture",
+  "summary": "thought -> inbox (also: pipe stdin)",
+  "usage": "ops capture \"<text>\"",
+  "risk": "safe_write",
+  "args": [{ "name": "text", "required": false, "default": "stdin" }],
+  "reads": [],
+  "writes": ["inbox/", "journal/"]
+}
