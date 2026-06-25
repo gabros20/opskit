@@ -2,37 +2,12 @@
 """ops task list|add "<title>"|show <id>|move <id> <status>|done <id> — the task system (§7)."""
 import re
 import sys
-from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import paths, filing  # noqa: E402
 
-STATUSES = ("inbox", "active", "waiting", "done")
-TEMPLATE = """\
----
-type: task
-id: {id}
-status: {status}
-created: {created}
-updated: {created}
-source: manual
-risk: green
-why:
----
-# {title}
-
-## Intent
-{title}
-
-## Plan
-
-## Outcome
-<!-- COMPILED TRUTH: current best state, rewritten as it changes -->
-
-## Log
-<!-- TIMELINE: append-only; commands run, files changed -->
-"""
+STATUSES = filing.STATUSES
 
 
 def _find(task_id: str):
@@ -41,17 +16,6 @@ def _find(task_id: str):
         if f.exists():
             return f, st
     return None, None
-
-
-def _next_id() -> str:
-    day = date.today().strftime("%Y%m%d")
-    n = 0
-    for st in STATUSES:
-        for f in (paths.TASKS / st).glob(f"T-{day}-*.md"):
-            m = re.search(rf"T-{day}-(\d+)", f.stem)
-            if m:
-                n = max(n, int(m.group(1)))
-    return f"T-{day}-{n + 1:02d}"
 
 
 def _set_status(f: Path, status: str):
@@ -82,14 +46,9 @@ def main(argv):
         title = " ".join(argv[1:]).strip()
         if not title:
             print('usage: ops task add "<title>"', file=sys.stderr); return 2
-        tid = _next_id()
-        d = paths.TASKS / "active"
-        d.mkdir(parents=True, exist_ok=True)
-        f = d / f"{tid}.md"
-        f.write_text(TEMPLATE.format(id=tid, status="active", created=paths.today(), title=title),
-                     encoding="utf-8")
-        paths.append_journal(f"task added {tid}: {title[:60]}")
-        print(f"added {tid} -> {f.relative_to(paths.OPS_HOME)}")
+        f = filing.create_task(title, source="manual")
+        paths.append_journal(f"task added {f.stem}: {title[:60]}")
+        print(f"added {f.stem} -> {f.relative_to(paths.OPS_HOME)}")
     elif action in ("show",):
         f, _ = _find(argv[1]) if len(argv) > 1 else (None, None)
         if not f:

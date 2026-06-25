@@ -2,7 +2,7 @@
   "verb": "doctor",
   "summary": "self-check: tools, folders, manifest, adapters, secrets, index (--init creates folders)",
   "usage": "ops doctor [--init]",
-  "risk": "read",
+  "risk": "safe_write",
   "reads": ["bin/", "ops.json", "AGENTS.md", "CLAUDE.md", "skills/", ".index/"],
-  "writes": ["(folders only with --init)"]
+  "writes": ["(skeleton folders, only with --init)"]
 }

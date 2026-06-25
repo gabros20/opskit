@@ -10,11 +10,10 @@ wiki/conventions.md ## Filing rules — the plaintext learning loop.
 """
 import re
 import sys
-from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import paths, filing  # noqa: E402
 
 # An item is a TASK when its first word is an imperative action verb (matched as a whole word,
 # so "merges"/"writing" don't false-trigger), or it's an explicit todo/checkbox line.
@@ -22,35 +21,6 @@ ACTION_VERBS = {"fix", "call", "email", "send", "ask", "schedule", "review", "pi
                 "book", "draft", "update", "write", "check", "reply", "chase", "invoice", "deploy",
                 "merge", "rename", "do", "make", "add", "remove", "create", "investigate", "prep",
                 "prepare", "ship", "test", "refactor", "migrate", "follow"}
-TASK_TMPL = """\
----
-type: task
-id: {id}
-status: active
-created: {created}
-updated: {created}
-source: triage
-risk: green
-why:
----
-# {title}
-
-## Intent
-{body}
-
-## Plan
-
-## Outcome
-<!-- COMPILED TRUTH: current best state, rewritten as it changes -->
-
-## Log
-<!-- TIMELINE: append-only -->
-"""
-
-
-def slugify(s, n=50):
-    s = re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
-    return (s[:n].rstrip("-")) or "note"
 
 
 def parse_item(p: Path) -> str:
@@ -74,39 +44,13 @@ def classify(text: str) -> str:
     return "note"
 
 
-def next_task_id() -> str:
-    day = date.today().strftime("%Y%m%d")
-    n = 0
-    for st in ("inbox", "active", "waiting", "done"):
-        for f in (paths.TASKS / st).glob(f"T-{day}-*.md"):
-            m = re.search(rf"T-{day}-(\d+)", f.stem)
-            if m:
-                n = max(n, int(m.group(1)))
-    return f"T-{day}-{n + 1:02d}"
-
-
 def make_task(text: str) -> Path:
-    tid = next_task_id()
-    d = paths.TASKS / "active"
-    d.mkdir(parents=True, exist_ok=True)
-    title = text.splitlines()[0][:70]
-    f = d / f"{tid}.md"
-    f.write_text(TASK_TMPL.format(id=tid, created=paths.today(), title=title, body=text), encoding="utf-8")
-    return f
+    title = text.splitlines()[0][:70] if text.strip() else "task"
+    return filing.create_task(title, intent=text, source="triage")
 
 
 def make_note(text: str) -> Path:
-    title = text.splitlines()[0][:70]
-    base = slugify(title)
-    d = paths.WIKI / "notes"
-    d.mkdir(parents=True, exist_ok=True)
-    slug, i = base, 2
-    while (d / f"{slug}.md").exists():   # slugs are globally unique (§10.1)
-        slug, i = f"{base}-{i}", i + 1
-    f = d / f"{slug}.md"
-    f.write_text(f"---\ntype: note\ntitle: {title}\nstatus: draft\ncreated: {paths.today()}\n"
-                 f"updated: {paths.today()}\ntags: []\naliases: []\n---\n# {title}\n\n{text}\n", encoding="utf-8")
-    return f
+    return filing.create_note(text)
 
 
 def record_rule(rule: str):
@@ -139,7 +83,7 @@ def main(argv):
         text = parse_item(p)
         kind = classify(text)
         title = (text.splitlines()[0] if text.strip() else p.stem)[:70]
-        dest = "tasks/active/" if kind == "task" else f"wiki/notes/{slugify(title)}.md"
+        dest = "tasks/active/" if kind == "task" else f"wiki/notes/{paths.slugify(title)}.md"
         print(f"• {p.name}: \"{title}\"")
         print(f"    proposal: {kind.upper()} -> {dest}")
         if dry:

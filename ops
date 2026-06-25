@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ops — the single entrypoint dispatcher (§4.2). Verbs live in bin/<verb>/run.py with a cmd.json
-# sidecar; `ops help` renders the surface from those. OPS_HOME defaults to this repo.
-# Built today: help, status, capture, task, index, search. Others are designed (see ops help / README).
+# sidecar; `ops help` renders the surface from those, and the guardrail gates each by its risk.
+# OPS_HOME defaults to this repo. The verb set is whatever bin/*/ exists — run `ops help`.
 set -euo pipefail
 OPS="${OPS_HOME:-$(cd "$(dirname "$0")" && pwd)}"
 export OPS_HOME="$OPS"
