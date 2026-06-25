@@ -31,6 +31,7 @@ SUITES = [
     ("triage flow (§4/§10)", "run_triage.py"),
     ("daily/weekly rhythm (§16)", "run_loops.py"),
     ("health verbs: doctor, wiki (§14/§10)", "run_health.py"),
+    ("maintenance: backup, consolidate (§14/§15)", "run_maintenance.py"),
 ]
 
 

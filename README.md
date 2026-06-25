@@ -16,9 +16,9 @@ engine* is implemented; most other verbs are still designed-but-not-built.
 |---|---|
 | **Design + decisions** | ✅ complete — `docs/design/` (v3.6 baseline + v3.7 active), `docs/DECISIONS.md` (ADR-001…006) |
 | **Retrieval engine** | ✅ built & tested — `ops index` / `ops search` (stage 1 FTS5+graph → stage 2 LanceDB vectors → stage 3 rerank) |
-| **Verbs built (12)** | ✅ `help` `status` `capture` `triage` `task` `index` `search` `start` `close` `week` `doctor` `wiki` — all guardrail-gated, self-describing. **The capture → triage → task → done spine, the daily/weekly loop, search, self-check, and wiki navigation all work end-to-end.** |
+| **Verbs built (14)** | ✅ `help` `status` `capture` `triage` `task` `index` `search` `start` `close` `week` `doctor` `wiki` `backup` `consolidate` — all guardrail-gated, self-describing. **The capture → triage → task → done spine, the daily/weekly loop, search, self-check, wiki navigation, backup-nag, and nightly consolidation all work end-to-end.** |
 | **Agent entry point** | ✅ files exist — `AGENTS.md`, `CLAUDE.md`, `skills/operate-ops/SKILL.md` |
-| **Other verbs** | ⬜ designed, NOT built — `new`, `backup`, `consolidate`, `invoice`, `repo`, `files`, `sweep`, jobs |
+| **Other verbs** | ⬜ designed, NOT built — `new`, `invoice`, `repo`, `files`, `sweep`, and the jobs scheduler (cron wiring for `consolidate`/`close`) |
 | **Guardrail enforcement** | ✅ wired — `bin/lib/guardrail.py` gates every verb by risk class (deny refused, confirm needs `--yes`, new verbs default confirm) + logs to `.logs/ops.log`; mirrors the validated §5 model (parity-tested) |
 | **Validation harness** | ✅ `test/` — design simulation + retrieval tests (see `test/README.md`) |
 
@@ -50,6 +50,8 @@ design §2; this repo is `~/ops`.
 ./ops start  /  ./ops close  /  ./ops week   # daily start · daily close · weekly review (§16)
 ./ops wiki new note "An idea"  /  ./ops wiki backlinks <slug>  /  ./ops wiki orphans
 ./ops doctor                        # self-check: folders, manifest, adapters, secrets, index
+./ops backup                        # nag if ~/ops has uncommitted/unpushed work (never pushes for you)
+./ops consolidate                   # nightly: wiki orphans/stale + day digest → journal
 ./ops index                         # build the search index over wiki/  (stage 1: keyword + graph)
 ./ops search "your query"           # ranked file#heading hits
 
@@ -68,6 +70,7 @@ python3 test/run_simulation.py --model sonnet   # LLM-operator agnosticism/drift
 ```
 
 ## What's next
-`backup` (verify ops/dotfiles/work committed + pushed; nag if stale), `consolidate` (the dream-lite
-nightly job — refresh backlinks, flag stale/orphans, journal digest), and `new` (scaffold a project/
-client). Each is a `bin/<verb>/{run.py,cmd.json}`, guardrail-gated and in `ops help`. See §15–17.
+`new` (scaffold a project/client: wiki hub + `~/work` repo from template), and the **jobs scheduler**
+(§15) that runs `consolidate` / `close` / `backup` on a cron so the maintenance verbs fire unattended.
+Then the work-facing verbs (`repo`, `files`, `invoice`). Each is a `bin/<verb>/{run.py,cmd.json}`,
+guardrail-gated and in `ops help`. See §15–17.

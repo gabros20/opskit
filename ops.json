@@ -1,6 +1,16 @@
 {
   "verbs": [
     {
+      "verb": "backup",
+      "summary": "verify ~/ops is committed + pushed; nag (exit 1) if at risk. Never pushes for you",
+      "usage": "ops backup",
+      "risk": "read",
+      "reads": [
+        ".git"
+      ],
+      "writes": []
+    },
+    {
       "verb": "capture",
       "summary": "thought -> inbox (also: pipe stdin)",
       "usage": "ops capture \"<text>\"",
@@ -26,6 +36,21 @@
       "reads": [
         "tasks/",
         "journal/",
+        ".git"
+      ],
+      "writes": [
+        "journal/"
+      ]
+    },
+    {
+      "verb": "consolidate",
+      "summary": "nightly dream-lite pass: wiki orphans/stale + day digest into the journal",
+      "usage": "ops consolidate [--automated]",
+      "risk": "safe_write",
+      "reads": [
+        "wiki/",
+        "tasks/",
+        "inbox/",
         ".git"
       ],
       "writes": [

@@ -1,0 +1,8 @@
+{
+  "verb": "consolidate",
+  "summary": "nightly dream-lite pass: wiki orphans/stale + day digest into the journal",
+  "usage": "ops consolidate [--automated]",
+  "risk": "safe_write",
+  "reads": ["wiki/", "tasks/", "inbox/", ".git"],
+  "writes": ["journal/"]
+}

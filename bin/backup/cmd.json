@@ -1,0 +1,8 @@
+{
+  "verb": "backup",
+  "summary": "verify ~/ops is committed + pushed; nag (exit 1) if at risk. Never pushes for you",
+  "usage": "ops backup",
+  "risk": "read",
+  "reads": [".git"],
+  "writes": []
+}
