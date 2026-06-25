@@ -1,6 +1,7 @@
 """paths.py — shared filesystem roots + small helpers for the ops verbs."""
 from __future__ import annotations
 import os
+import re
 from datetime import date, datetime
 from pathlib import Path
 
@@ -56,9 +57,21 @@ def git(*args) -> str:
         return ""
 
 
+def slugify(s: str, n: int = 60) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+    return (s[:n].rstrip("-")) or "note"
+
+
+LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+
+
+def link_targets(text: str) -> list[str]:
+    """Normalized [[wikilink]] targets (strip #heading / |alias)."""
+    return [t.split("#", 1)[0].split("|", 1)[0].strip() for t in LINK_RE.findall(text)]
+
+
 def fm_field(path: Path, key: str) -> str:
     """Read a single frontmatter `key:` value from a markdown file ('' if absent)."""
-    import re
     try:
         m = re.search(rf"(?m)^{re.escape(key)}:\s*(.+)$", path.read_text(encoding="utf-8"))
         return m.group(1).strip() if m else ""
