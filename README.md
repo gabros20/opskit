@@ -21,6 +21,34 @@ engine* is implemented; most other verbs are still designed-but-not-built.
 | **Other verbs** | ⬜ designed, NOT built — `new`, `repo`, `files`, `sweep`, `invoice` |
 | **Guardrail enforcement** | ✅ wired — `bin/lib/guardrail.py` gates every verb by risk class (deny refused, confirm needs `--yes`, new verbs default confirm) + logs to `.logs/ops.log`; mirrors the validated §5 model (parity-tested) |
 | **Validation harness** | ✅ `test/` — design simulation + retrieval tests (see `test/README.md`) |
+| **Install / setup flow** | ✅ `script/setup` (template → your vault: PATH, sibling roots, upstream, lean, doctor, first commit) + `script/update` (pull engine only) |
+
+## Install — from template to your vault
+
+This repo is a **GitHub template, not your data.** You make your own copy; one script wires the machine.
+
+1. **Get your own copy.** On GitHub → **Use this template → Create a new repository** (fresh history, your account). Then clone it to `~/ops` (the path matters — the safety path-wall is rooted there):
+   ```sh
+   git clone git@github.com:<you>/ops.git ~/ops && cd ~/ops
+   ```
+2. **Run setup** — puts `ops` on your PATH, creates the sibling roots `~/work` + `~/files`, tracks this
+   template as `upstream`, drops the dev-only test harness (lean), runs `ops doctor`, makes the first
+   commit. It never pushes — that's your call.
+   ```sh
+   ./script/setup --lean
+   ```
+3. **Make it live:**
+   ```sh
+   git push -u origin main                                       # your repo, your GitHub
+   pip install -r requirements.txt && ollama pull embeddinggemma # optional: semantic search
+   ops job apply                                                 # optional: schedule the nightly jobs
+   ```
+
+Now `ops` works from anywhere. **`~/ops` is yours** (your git repo); `~/work`, `~/files`, `~/dotfiles`
+are **siblings, never inside it.** Pull engine improvements later without touching your notes:
+```sh
+./script/update   # checks out ONLY engine paths (bin/, skills/, docs/design…) from upstream; stages for review
+```
 
 ## Layout (the four roots + this repo)
 
@@ -33,8 +61,9 @@ wiki/                # KNOWLEDGE — your durable notes (starts ~empty; see wiki
 tasks/               # folder = status: inbox/ active/ waiting/ done/
 journal/  inbox/  templates/         # daily log · capture zone · scaffolds
 jobs/registry.json                   # §15 scheduled-job definitions (ops job apply → launchd plists)
+script/              # setup (new-machine install) · update (pull engine from upstream) · engine.txt
 docs/                # design/ (the spec) + DECISIONS.md (ADRs)
-test/                # validation harness + fixtures/ (the KB-derived test vault lives here)
+test/                # validation harness + fixtures/ (dev-only; dropped from a lean vault)
 requirements.txt     # optional deps (lancedb, fastembed) for stage-2/3 search
 ```
 The other roots (`~/work` code, `~/files` binaries, `~/dotfiles` machine) are described in the

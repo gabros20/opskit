@@ -1,0 +1,20 @@
+# engine.txt — the boundary between FRAMEWORK and YOUR CONTENT.
+#
+# These paths are the engine: owned by the template, refreshed by `script/update` from upstream.
+# Everything NOT listed here is yours (wiki/ tasks/ journal/ inbox/ templates/ jobs/registry.json,
+# your README) and is NEVER touched by an update. `script/update` checks out ONLY these paths from
+# upstream/main, so engine fixes flow to you without disturbing your knowledge — and dev-only paths
+# (test/, ref/) that a lean vault drops are never re-introduced, because they aren't listed here.
+#
+# One path per line; blank lines and #comments ignored.
+
+ops
+bin
+skills
+AGENTS.md
+CLAUDE.md
+requirements.txt
+docs/design
+docs/DECISIONS.md
+.gitignore
+script

@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# script/setup — turn a fresh clone of the template into YOUR living ~/ops vault on this machine.
+# Idempotent and non-destructive by default. It does NOT push anything (that step stays yours, §3).
+#
+#   ~/ops/script/setup [--lean|--full] [--yes] [--dry-run] [--no-commit] [--upstream URL]
+#
+# What it does: puts `ops` on PATH, creates the sibling roots (~/work, ~/files), adds the template
+# as `upstream` (so `script/update` can pull engine fixes), optionally strips dev-only test/+ref/
+# for a lean vault, runs `ops doctor --init`, and makes the first commit. Then it tells you how to
+# point the vault at your own GitHub and push.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+UPSTREAM_URL="https://github.com/gabros20/personal-operating-system.git"
+ROOTS_HOME="${OPS_ROOTS_HOME:-$HOME}"          # where ~/work, ~/files are created (override for tests)
+BIN_DIR="${OPS_BIN_DIR:-$HOME/.local/bin}"      # where the `ops` symlink goes
+LEAN="ask"; YES=0; DRY=0; COMMIT=1
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --lean) LEAN=1 ;;
+    --full) LEAN=0 ;;
+    --yes|-y) YES=1 ;;
+    --dry-run) DRY=1 ;;
+    --no-commit) COMMIT=0 ;;
+    --upstream) shift; UPSTREAM_URL="$1" ;;
+    -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown flag: $1" >&2; exit 2 ;;
+  esac; shift
+done
+
+say() { printf '\033[1m%s\033[0m\n' "$*"; }
+run() { printf '  + %s\n' "$*"; [ "$DRY" = 1 ] || eval "$*"; }
+ask() { [ "$YES" = 1 ] && return 0; read -r -p "  $1 [Y/n] " a; [ -z "$a" ] || [ "$a" = y ] || [ "$a" = Y ]; }
+
+say "ops setup — making this clone your ~/ops vault"
+echo "  repo:  $ROOT"
+[ "$ROOT" = "$ROOTS_HOME/ops" ] || echo "  note:  for the path-wall, the vault should live at ~/ops (you're at $ROOT)"
+echo
+
+say "1. put 'ops' on PATH"
+run "mkdir -p '$BIN_DIR'"
+run "ln -sf '$ROOT/ops' '$BIN_DIR/ops'"
+case ":$PATH:" in *":$BIN_DIR:"*) : ;; *) echo "  note:  $BIN_DIR is not on PATH — add it to your shell rc" ;; esac
+
+say "2. create the sibling roots (never inside this repo)"
+for r in work files; do
+  if [ -e "$ROOTS_HOME/$r" ]; then echo "  ok:    ~/$r exists"; else run "mkdir -p '$ROOTS_HOME/$r'"; fi
+done
+[ -e "$ROOTS_HOME/dotfiles" ] && echo "  ok:    ~/dotfiles detected" || echo "  note:  ~/dotfiles absent — the machine root is optional"
+
+say "3. track the template as 'upstream' (for script/update)"
+if git -C "$ROOT" remote | grep -qx upstream; then
+  echo "  ok:    upstream already set"
+else
+  run "git -C '$ROOT' remote add upstream '$UPSTREAM_URL'"
+fi
+if git -C "$ROOT" remote get-url origin >/dev/null 2>&1; then
+  if [ "$(git -C "$ROOT" remote get-url origin)" = "$UPSTREAM_URL" ]; then
+    echo "  note:  origin still points at the template — set your own before pushing (step below)"
+  else
+    echo "  ok:    origin is your own remote"
+  fi
+else
+  echo "  note:  no origin yet — you'll add yours below"
+fi
+
+say "4. lean vault (drop dev-only test/ + ref/)"
+if [ "$LEAN" = "ask" ]; then
+  if [ "$YES" = 1 ]; then LEAN=0; else ask "Make this a lean vault? (test/+ref/ stay in upstream, restorable)" && LEAN=1 || LEAN=0; fi
+fi
+if [ "$LEAN" = 1 ]; then
+  for p in test ref; do
+    if git -C "$ROOT" ls-files --error-unmatch "$p" >/dev/null 2>&1; then run "git -C '$ROOT' rm -r -q '$p'"; fi
+  done
+  echo "  ok:    lean (engine + content + design docs)"
+else
+  echo "  ok:    full vault (test harness kept)"
+fi
+
+say "5. validate the skeleton"
+run "'$ROOT/ops' doctor --init"
+
+say "6. first commit"
+if [ "$COMMIT" = 1 ]; then
+  run "git -C '$ROOT' add -A"
+  if [ "$DRY" = 1 ] || ! git -C "$ROOT" diff --cached --quiet; then
+    run "git -C '$ROOT' -c commit.gpgsign=false commit -q -m 'ops: machine setup (vault initialized)'"
+  else
+    echo "  ok:    nothing to commit"
+  fi
+fi
+
+echo
+say "done. next (these are yours to run — setup never pushes):"
+cat <<EOF
+  • optional semantic search:  pip install -r requirements.txt && ollama pull embeddinggemma
+  • schedule the jobs:         ops job apply   (then the printed launchctl step)
+  • point at your GitHub:      git -C "$ROOT" remote set-url origin git@github.com:<you>/ops.git
+                               git -C "$ROOT" push -u origin main
+  • daily:                     ops start  ·  ops capture "…"  ·  ops triage  ·  ops close
+EOF
