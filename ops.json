@@ -120,6 +120,32 @@
       ]
     },
     {
+      "verb": "new",
+      "summary": "scaffold a project (wiki hub + ~/work repo) or client (wiki hub + ~/files tree)",
+      "usage": "ops new project \"<name>\" [--kind labs|products|tools] | new client \"<name>\"",
+      "risk": "safe_write",
+      "args": [
+        {
+          "name": "type",
+          "required": true
+        },
+        {
+          "name": "name",
+          "required": true
+        }
+      ],
+      "reads": [
+        "templates/project-repo/",
+        "wiki/"
+      ],
+      "writes": [
+        "wiki/",
+        "~/work/",
+        "~/files/clients/",
+        "journal/"
+      ]
+    },
+    {
       "verb": "search",
       "summary": "ranked file#heading hits (keyword + graph [+ vectors/rerank])",
       "usage": "ops search \"<query>\"",

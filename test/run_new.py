@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""run_new.py — exercises `ops new project` and `ops new client` against temp ~/ops + sibling roots
+(OPS_HOME + OPS_ROOTS_HOME), asserting wiki hubs, the ~/work repo scaffold, and slug uniqueness."""
+from __future__ import annotations
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+GREEN, RED, DIM, BOLD, RESET = "\033[32m", "\033[31m", "\033[2m", "\033[1m", "\033[0m"
+results = []
+
+
+def check(name, cond, detail=""):
+    results.append((name, cond, detail))
+
+
+def run(opshome, roots, *args):
+    env = {**os.environ, "OPS_HOME": str(opshome), "OPS_ROOTS_HOME": str(roots)}
+    return subprocess.run([sys.executable, str(REPO / "bin" / "new" / "run.py"), *args],
+                          capture_output=True, text=True, env=env)
+
+
+def main() -> int:
+    with tempfile.TemporaryDirectory() as td:
+        ops, roots = Path(td) / "ops", Path(td) / "home"
+        (ops / "wiki").mkdir(parents=True)
+        (ops / "journal").mkdir()
+        shutil.copytree(REPO / "templates", ops / "templates")  # the verb reads templates/project-repo
+
+        # project
+        r = run(ops, roots, "project", "Acme Webapp", "--kind", "products")
+        repo = roots / "work" / "products" / "acme-webapp"
+        hub = ops / "wiki" / "projects" / "acme-webapp.md"
+        check("new project creates the wiki hub", hub.exists(), r.stdout + r.stderr)
+        check("new project scaffolds the ~/work repo", repo.is_dir() and (repo / "README.md").exists())
+        check("repo is git-initialized", (repo / ".git").is_dir())
+        check("template placeholders filled", "Acme Webapp" in (repo / "README.md").read_text()
+              and "{{name}}" not in (repo / "README.md").read_text())
+        check("repo lands under the routing kind", repo.parent.name == "products")
+        check("sibling repo is NOT inside ~/ops", not (ops / "work").exists())
+
+        # client
+        r = run(ops, roots, "client", "Globex")
+        chub = ops / "wiki" / "clients" / "globex.md"
+        ctree = roots / "files" / "clients" / "globex"
+        check("new client creates the wiki hub", chub.exists(), r.stdout + r.stderr)
+        check("new client creates the ~/files material tree", (ctree / "in").is_dir() and (ctree / "out").is_dir())
+
+        # uniqueness
+        r = run(ops, roots, "project", "Acme Webapp")
+        check("new refuses a duplicate slug", r.returncode == 1 and "already exists" in (r.stdout + r.stderr), r.stderr)
+
+    print(f"{BOLD}new verb (scaffold project/client) — {len(results)} checks{RESET}\n")
+    passed = sum(1 for _, ok, _ in results if ok)
+    for name, ok, detail in results:
+        mark = f"{GREEN}PASS{RESET}" if ok else f"{RED}FAIL{RESET}"
+        print(f"  {mark} {name:<44}" + (f" {DIM}{detail.strip()[:80]}{RESET}" if (detail and not ok) else ""))
+    failed = len(results) - passed
+    print(f"\n{BOLD}Result:{RESET} {GREEN}{passed} passed{RESET}, "
+          f"{(RED if failed else DIM)}{failed} failed{RESET}, {len(results)} checks")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

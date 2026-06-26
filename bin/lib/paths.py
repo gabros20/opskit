@@ -13,6 +13,12 @@ WIKI = OPS_HOME / "wiki"
 BIN = OPS_HOME / "bin"
 TASK_STATUSES = ("inbox", "active", "waiting", "done")
 
+# The sibling roots (§2) — never inside ~/ops. OPS_ROOTS_HOME lets tests redirect them off real ~/.
+ROOTS_HOME = Path(os.environ.get("OPS_ROOTS_HOME") or os.environ.get("HOME") or Path.home())
+WORK_ROOT = ROOTS_HOME / "work"
+FILES_ROOT = ROOTS_HOME / "files"
+WORK_KINDS = ("products", "labs", "tools")   # clients/ is nested <client>/<project>; archive/ is special
+
 
 def today() -> str:
     return date.today().isoformat()

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# script/setup — prepare this project's environment. Edit for your stack.
+set -euo pipefail
+echo "setting up {{name}}…"
+# e.g. npm install   |   python -m venv .venv && .venv/bin/pip install -r requirements.txt

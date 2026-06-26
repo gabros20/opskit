@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# script/test — the single source of truth for "is it green?". Edit for your stack.
+set -euo pipefail
+echo "no tests yet for {{name}} — add them here."

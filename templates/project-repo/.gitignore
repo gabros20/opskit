@@ -1,0 +1,15 @@
+# dependencies & build output
+node_modules/
+dist/
+build/
+.venv/
+__pycache__/
+*.pyc
+
+# secrets & local env — never commit
+.env
+.env.*
+*.local
+
+# os / editor noise
+.DS_Store
