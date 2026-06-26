@@ -10,7 +10,7 @@ aliases: [normative conventions]
 # Conventions
 
 The normative rules for notes in this wiki (the shape every note/agent follows). Full rationale
-lives in `docs/design/PERSONAL_OS_DESIGN_v2.md` §10.1.
+lives in `docs/design/PERSONAL_OS_DESIGN.md` §10.1.
 
 ## Frontmatter (every note)
 `type`, `title`, `status`, `created`, `updated`, `tags`, `aliases`. Bump `updated:` on every edit.

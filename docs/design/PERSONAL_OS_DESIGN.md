@@ -1,13 +1,25 @@
 ---
-title: Personal Operating System — Unified Design (v3.6)
-status: design-v3.6 (merged + assets + lifecycle + restore-hardened + agent-entry + adapters ×10)
+title: Personal Operating System — Unified Design (v3.7)
+status: design-v3.7 (v3.6 + gbrain-informed: compiled-truth/timeline, brain-first, iron-law, auto-backlinks, routing-eval, dream-lite)
 owner: Tamas
-updated: 2026-06-10
-supersedes: [OPS_CORE_DESIGN.md (design-v2), Agent-Agnostic Local-First Personal Operating System (v1.0)]
+updated: 2026-06-17
+supersedes: [PERSONAL_OS_DESIGN.md (design-v3.6), OPS_CORE_DESIGN.md (design-v2), Agent-Agnostic Local-First Personal Operating System (v1.0)]
 tags: [meta, ops, architecture, agent-agnostic, local-first]
 ---
 
-# Personal Operating System — Unified Design (v3.6)
+# Personal Operating System — Unified Design (v3.7)
+
+> **v3.7 changelog (gbrain-informed).** After studying `garrytan/gbrain` (a Postgres-native
+> "compiled intelligence" knowledge runtime), six ideas were transposed onto this plaintext +
+> git + shell system — kept only where they fit the first principles, never importing gbrain's
+> runtime weight (no Postgres, no embeddings stack, no agent daemon). Added: **compiled-truth /
+> timeline two-zone notes** (§7.2, §10.1), **brain-first lookup** as a hard rule (§1, §12.3),
+> the **Iron Law — the model picks WHAT, the system guarantees WHERE/HOW** (§1, §5, §12.3),
+> **zero-LLM auto-backlinks on write** (§10), **routing-eval fixtures** as the checkable form of
+> the agnosticism test (§11, §12.4), and a **`consolidate` dream-lite nightly job** (§15). What
+> was deliberately *rejected* from gbrain is recorded in Appendix A. gbrain's own cautionary
+> tale — a 147k-token agent context file, "the exact anti-pattern it exists to fix" — is why
+> these are minimal additions, not a rewrite.
 
 > **What this is.** The single, merged design for a local-first, agent-agnostic personal
 > operating system. It takes the **topology** of the v1.0 document (system / code /
@@ -45,6 +57,17 @@ When anything is ambiguous, re-derive the answer from these. They are ordered.
    Nothing skips steps. Complexity must be earned by repeated friction.
 8. **Low memory burden.** You memorize ~10 verbs. Everything else is discoverable via
    `ops help` (and, for agents, `ops.json`). If you need a cheat sheet, the design failed.
+9. **The system answers before the world.** (brain-first.) Any driver checks `~/ops` —
+   `ops search` first — before reaching for an external API, the web, or its own memory.
+   The system is the cheapest, fastest, most personal source you have; external lookups
+   only fill gaps it can't. An agent that web-searches before searching the system is
+   giving a worse, more expensive answer from stale context.
+10. **The model picks WHAT; the system guarantees WHERE and HOW.** (The Iron Law.) The
+   agent supplies content and judgment — *which* note, *what* summary. The system, in code,
+   supplies structure — the slug, the path, the `[[wikilinks]]`, the backlinks, the
+   `source:` citation. Never let the model compose a path or a link by hand; derive them
+   deterministically from a verb. This makes whole classes of misfiling and broken-link
+   drift structurally impossible, not merely discouraged.
 
 **The agnosticism contract.** Any agent needs exactly three things: (a) the path
 `~/ops`, (b) the skill file `~/ops/skills/operate-ops/SKILL.md`, (c) a shell. Everything
@@ -60,8 +83,10 @@ document glossed over: **your code projects are their own git repos and must nev
 inside the system repo.**
 
 ```
-~/ops          # THE SYSTEM. One git repo. Knowledge, tasks, journal, verbs, skills,
-               # templates, jobs. Private remote. Never contains code repos.
+~/ops          # THE SYSTEM. Knowledge, tasks, journal, verbs, skills, templates, jobs.
+               # Private remote. Never contains code repos. ONE git repo at small scale;
+               # ONE git repo even at 100k+ notes: keep it fast with notes/<aa>/ subdirectory
+               # fanout + git large-repo tuning; binaries already live in ~/files (ADR-006, §10.2).
 
 ~/work         # YOUR CODE. A plain directory tree (NOT a git repo itself). Every
                # project inside is its own independent git repo with its own remote.
@@ -178,7 +203,9 @@ ops/
 │   ├── registry.yaml          # scheduler-neutral job definitions
 │   └── launchd/               # rendered .plist files (generated; macOS adapter only)
 │
-├── .index/                    # search DB (SQLite FTS5; later +vectors). GITIGNORED, rebuildable
+├── .index/                    # search indices, GITIGNORED, rebuildable from markdown:
+│                              #   ops.sqlite (FTS5 keyword + wikilink/edge graph) +
+│                              #   vectors.lance/ (LanceDB ANN, stage-2, OPS_VECTORS=1; ADR-006)
 └── .logs/                     # append-only run logs per verb/job. GITIGNORED
 #   .gitignore also excludes agent-written cruft: skills/**/.system/, .claude/**/cache, etc.
 #   The adapter files themselves (CLAUDE.md, .claude/settings.json, .codex/config.toml, the
@@ -220,6 +247,7 @@ SYSTEM
   ops doctor                # self-check: tools, PATH, folders, templates, index, remotes
   ops backup                # verify ops+dotfiles+work repos committed/pushed; warn loudly
   ops index                 # rebuild/refresh search index (+ regenerate ops.json manifest)
+  ops consolidate           # dream-lite: refresh backlinks, flag stale/orphans, journal digest (§15)
 
 FLOW
   ops capture "<text>"      # thought → inbox (also: pipe stdin, or drop a file in inbox/)
@@ -239,6 +267,9 @@ WORK
   ops new <type> "<name>"   # scaffold: project | client  (wiki note + templates; project
                             #   additionally scaffolds the repo in ~/work from template)
   ops repo <action>         # health (all ~/work repos: dirty/unpushed/stale) | clone <project> | clone --all
+                            #   | adopt <path> --kind <tools|labs|clients|products> (move an ALREADY-cloned
+                            #     repo into the routing-tree destination + write its wiki note/registry; §12.3 #4a)
+                            #   | nuke-modules --stale <days> (delete node_modules untouched N+ days; §15 job)
   ops archive <project>     # strip artifacts, git-bundle a dead repo into ~/work/archive/<year>/
   ops files <action>        # open <slug> (reveal in Finder) | ingest (route inbox files into ~/files + shadow notes)
   ops sweep                 # manually trigger the Desktop/Downloads decay sweep (also a nightly job)
@@ -329,11 +360,51 @@ Enforcement principles:
   iCloud/family tree — hits `deny` regardless of who asked. Within `~/files`, the
   `in/` folders (client-provided originals) are read-only for every verb: originals are
   evidence, never edited.
-- **Nothing transmits without a human `--yes`.** Email, push, deploy, payment: the verb
-  produces a draft and stops.
+- **The sweep zone is the one sanctioned write area outside the roots.** `ops sweep`
+  (§9.4) operates on the macOS inboxes `~/Desktop` and `~/Downloads` in **move-only** mode —
+  it relocates stale items *within* those dirs into `_swept/`, never into the three roots, and
+  never deletes on the 7-day pass (trashing is the separate 60-day pass). This is `safe_write`,
+  not a wall breach: it only shuffles already-non-secret user files in place and writes nothing
+  into `~/ops`/`~/work`/`~/files`. No other verb may write outside the roots. (Found by the
+  `test/` jobs suite: without this carve-out the path wall would `deny` the sweep job itself.)
+- **Nothing transmits without a human `--yes` — except the pre-authorized backup.** Email,
+  push, deploy, payment: the verb produces a draft and stops (`confirm`). The lone exception is
+  a scheduled `restic backup` to the **pre-configured** encrypted bucket (key in 1Password): it
+  makes no *per-run* external decision and sends nothing you chose, so it is `read`-class, not
+  `confirm`. A transmit is `confirm` precisely when a human is choosing *what* leaves and *to
+  whom*; an unattended dedup-backup to a fixed destination is not that. (Also surfaced by the
+  jobs suite: `files_backup` was flagged `read`-but-transmits until this distinction was made explicit.)
+- **Worktrees are sanctioned; "invent a verb" means the `ops` surface** (reliability, v3.7).
+  `~/work/.worktrees/<project>-<task-id>` is a first-class `safe_write` zone — it is a disposable,
+  gitignored checkout of the task's repo and the *required* place for agent code work (§8.4), so
+  the wall allows it for the current task. And the "never invent a verb" rule (§4, §12.3) governs
+  the **`ops` command surface only**: raw shell tools the design already endorses — `git`,
+  `script/*`, `rg`, `$EDITOR` (§13) — are not "invented verbs." They are bounded by the path wall
+  (their writes still get classified), the transmit/secret sniffers, and each agent's adapter
+  tool-scoping (§12.5) — not by the verb allowlist. (Both clarified after the `test/`
+  task-lifecycle simulation flagged legitimate `git worktree`/`script/test` use as violations.)
+- **Resolve before you wall** (reliability, v3.7). The guardrail resolves every target to its
+  real path (`realpath`, following symlinks) AND matches **case-insensitively** before deciding —
+  because macOS filesystems are case-insensitive (`IN/` ≡ `in/`) and a symlink inside `~/ops`
+  could otherwise point at iCloud or at a `~/files/**/in/` original. The wall is on where a write
+  *lands*, not on the string the agent typed. (Three escapes — symlink-to-iCloud, symlink-to-originals,
+  uppercase `IN/` — were found by the `test/` adversarial suite and closed here.)
+- **Transmit means *any* tool, not just git** (reliability, v3.7). The `confirm` wall on external
+  side effects fires for `git push`, `vercel/netlify/fly deploy`, `npm/yarn publish`, `aws s3` /
+  `gsutil`, `scp` / `rsync` to a remote, `gh pr merge` / `gh api -X POST`, and `curl/wget` POST/PUT
+  — anything that sends data off the machine or spends money. Recognizing only `git push` was a
+  hole (an agent could exfiltrate via `curl` or deploy via `vercel` unchecked); the dispatcher
+  classifies by *effect*, sniffing the command, and forced variants (`--force`, `rm -rf`/`-fr`/`-r -f`)
+  are `deny`, not `confirm`.
 - **Everything logs; failure is loud.** Append-only `.logs/`, non-zero exits, macOS
   notification on failure.
 - **New verbs default to `confirm`** until deliberately classified lower. Safe by default.
+- **The Iron Law is structural, not advisory** (principle 10). Paths, slugs, `[[wikilinks]]`,
+  backlinks, and `source:` citations are generated *by the verb*, never accepted as free text
+  from the agent. A verb that files a note computes its destination from the routing rules
+  (§4a / the MAP) and rejects an agent-supplied absolute path the same way it rejects any
+  out-of-root path. The agent proposes the *content*; the code owns *placement and linkage*.
+  This is what makes filing testable: given the same inputs, the destination is deterministic.
 
 Net effect: an agent can be given *broad* freedom to operate, because the things that
 could actually hurt are structurally impossible without you. Freedom for the agent,
@@ -422,9 +493,17 @@ why:                      # required when status: waiting
 
 ## Intent
 ## Plan
-## Log                    <!-- every driver appends here: commands run, files changed -->
-## Outcome                <!-- result, verification, follow-ups -->
+## Outcome                <!-- COMPILED TRUTH: current best state, REWRITTEN as it changes -->
+## Log                    <!-- TIMELINE: append-only; every driver adds commands run, files changed -->
 ```
+
+**Two zones, one discipline (from gbrain's "compiled truth + timeline").** A record has a
+*compiled* top — `Intent`/`Plan`/`Outcome` are the current synthesis, **rewritten in place**
+when the situation changes — and an *append-only* bottom (`## Log`) that is the immutable
+evidence trail. You never edit the Log; you rewrite the Outcome. The point: the top stays
+short and current (read it to know where things stand), while the bottom never loses history
+(read it to know how you got there). Every claim in the compiled top should trace to a Log
+line below. This is the same shape entity hubs use (§10.1), so one habit covers tasks and wiki.
 
 ### 7.3 Task rules
 
@@ -651,6 +730,14 @@ important is lost because ingesting *is* the act of saying "this matters." This 
 hygiene layer the rest of the design assumed but never specified — the machine stays
 clean without you tidying it.
 
+**Rescue is by ingest, not by reopening** (reliability, v3.7). Once a file is in `_swept/`,
+merely *touching* it (opening/previewing) does **not** reset the 60-day trash timer — only
+`ops files ingest` pulls it back out of the decay path. This keeps the timer predictable (a
+re-touch can't silently keep junk alive forever), but it means a file you reopen from `_swept`
+and forget to ingest will still be trashed on schedule. The 60-day window and the `_swept`
+folder being in plain sight are the safety net. (Surfaced by `test/run_sweep.py`, which models
+this explicitly so it's a deliberate choice, not an accident.)
+
 **The iCloud line, made operational.** A real ingest run finds two kinds of file: work
 material (a client brief, a generated invoice) and irreplaceable personal/family/legal
 docs (a tax return, a signed master contract, a baby medical record). The wall (§5) says
@@ -675,11 +762,30 @@ Conventions (normative copy lives in `wiki/conventions.md`):
 
 - Frontmatter on every note: `type`, `title`, `status`, `created`, `updated`, `tags`,
   `aliases`. Types: `client | project | area | person | tool | note | runbook | skill |
-  decision | meeting | research`.
+  decision | meeting | research | prediction`.
 - One idea per knowledge note (`wiki/notes/`); link generously; filenames are stable,
-  human-readable slugs (`stripe-webhook-retries.md`). Renames go through
-  `ops wiki rename` (later) so backlinks update.
-- Entity notes (client/project) are *hubs*: short, current, heavily linked — not essays.
+  human-readable slugs (`stripe-webhook-retries.md`). **Slugs are globally unique** across all
+  folders — because `[[bare-slug]]` links resolve by basename, two notes sharing a basename
+  (`clients/acme` and `notes/acme`) make every `[[acme]]` ambiguous. `ops doctor`/`consolidate`
+  flag slug collisions; `ops new`/`ops wiki rename` refuse to create one. Link syntax allows
+  `[[slug#heading]]` and `[[slug|Display text]]` — the resolver strips the `#`/`|` part.
+  Renames go through `ops wiki rename` (later) so backlinks update. (Collision + alias handling
+  verified by `test/run_wiki_edges.py`.)
+- **Entity notes (client/project) are *hubs* with two zones** (from gbrain): a *compiled
+  truth* top — short, current, rewritten as facts change — over a `## Timeline` section that
+  is append-only evidence. The hub IS the context: read the top to know the current state,
+  read the timeline to know how it got there. Hubs are heavily linked, never essays.
+- **Backlinks are generated, never hand-typed** (the Iron Law, principle 10). When any verb
+  writes a note, it extracts `[[wikilinks]]` with a pure regex — *zero LLM calls* — and
+  updates the backlink index. The wikilink graph grows for free on every write; `rg
+  '\[\[slug\]\]'` is the ground-truth backlink query and `ops wiki backlinks` wraps it.
+  (gbrain's benchmark showed typed-graph traversal is its single biggest retrieval lift —
+  which is why backlinks are not a "later" nicety here; see §10.2.)
+- **A `prediction` note** records a belief you can later be graded on: a claim, a confidence
+  (0–1), a resolution date, and (once known) the outcome. Cheap to write, plaintext, and it
+  unlocks a future "calibration" review — *how often were you right?* — with no database
+  (gbrain's takes-grading idea, reduced to one note type). Optional; write them when a real
+  call is being made.
 - No secrets, ever. References only.
 - Archive by moving to `wiki/archive/`; never delete knowledge.
 
@@ -693,28 +799,105 @@ file that any agent reads. The corrections compound; the file stays human-editab
 git-versioned; and because it's the *same* conventions file humans read, there's one
 source of truth, not a hidden agent brain. Start with zero rules; let friction write them.
 
-**The graph question, settled (from v2):** no graph database. Wikilinks already form a
-traversable graph (`rg '\[\[slug\]\]'` *is* the backlink query, wrapped as
-`ops wiki backlinks` when wanted). Vector+keyword hybrid covers ~95% of personal-KB
-retrieval. A graph DB adds extraction cost and a second source of truth that goes stale.
-Because everything is plaintext-with-explicit-links, adding Kùzu later is additive, never
-a migration.
+**The graph question, settled (from v2), sharpened by gbrain:** no graph *database* — but
+treat the wikilink graph as a first-class retrieval signal, not an afterthought. gbrain's
+public benchmark showed typed-link graph traversal was its single biggest retrieval lift
+(P@5 ~18 → ~49), far more than vectors. The lesson for a plaintext system: the cheap win is
+already in hand. Wikilinks form a traversable graph (`rg '\[\[slug\]\]'` *is* the query,
+wrapped as `ops wiki backlinks`), generated for free on every write (§10.1). So **stage 1
+includes backlink traversal, and stage 2 (vectors) is deferred further** — chase link
+coverage before embeddings. Vector+keyword hybrid still covers most retrieval; a graph DB
+adds extraction cost and a second source of truth that goes stale. Because everything is
+plaintext-with-explicit-links, adding the **LanceDB** vector layer (ADR-006) is additive, never a migration.
 
-### 10.2 Search — staged, each stage rebuildable
+### 10.2 Search — scale-ready from day one (target: 100k–500k+ notes), each stage rebuildable
 
-| Stage | What | When |
+**Scale target (ADR-006).** This system is built for **hundreds of thousands of notes** — single
+machine, **no server**, because the embedded-ANN era makes that possible. The stages below are a
+*bring-up path on one scale-ready architecture*, not "add it if you ever need it": each stage is
+built small but on the components that hold at 1M+ chunks, so there is **never a re-platforming**.
+
+| Stage | What | Role |
 |---|---|---|
-| 0 | `rg` / `fd` / `fzf` raw | day one; always works |
-| 1 | **SQLite FTS5** over wiki+tasks+journal, chunked by heading, incremental by file hash → `ops search` | build week one; covers most queries |
-| 2 | + `sqlite-vec` vectors, local Ollama `nomic-embed-text` embeddings (offline, free), hybrid ranking with FTS5 | add ONLY when FTS5 demonstrably misses things you ask for |
-| 3 | LanceDB / graph layer | not before ~100k chunks / a real multi-hop need. Probably never. |
+| 0 | `rg` / `fd` / `fzf` raw | bootstrap; always works |
+| 1 | **SQLite FTS5** (keyword) + **wikilink/edge graph**, chunked by heading, incremental by file hash → `ops search`. FTS5 scales to millions of rows. | the lexical + graph spine |
+| 2 | **LanceDB** vectors (embedded, file-based, disk **IVF-PQ ANN**, larger-than-RAM, billions-scale) + local **EmbeddingGemma** embeddings (ADR-005), fused with FTS5+graph via RRF | semantic, **scale-grade from the start** — flat index small, IVF-PQ as it grows, no migration |
+| 3 | local **cross-encoder rerank** (`bge-reranker-v2-m3` via Ollama/llama.cpp) over the fused candidates | precision layer (gbrain's zerank role, run locally) |
 
-One SQLite file at `.index/ops.sqlite`. Gitignored. **The rebuild rule:** if the index
-is ever wrong or corrupt — `rm -rf .index && ops index`. An index that can't be rebuilt
-from files is a bug.
+**NOT `sqlite-vec` for vectors** — it is brute-force and fails past ~1M vectors; at our target that's
+a non-starter, so vectors live in **LanceDB** from day one (still embedded/file-based/no-server).
+SQLite stays the keyword/metadata/graph engine. **Rejected outright (servers / 2nd source of truth):**
+Postgres+pgvector, FalkorDB, LightRAG, Qdrant-as-service, RDF — see §10.2.1.
 
-`ops index` also regenerates `ops.json` (the manifest) so one command refreshes
-everything derived.
+**Storage at scale.** Indices live under `.index/` — `.index/ops.sqlite` (FTS5 + graph) and
+`.index/vectors.lance/` (LanceDB) — all gitignored and **rebuildable from markdown**
+(`rm -rf .index && ops index`; an index that can't be rebuilt from files is a bug). The markdown
+**system of record stays ONE git repo, even at 100k+ notes — "git is the spine" holds, unbent.**
+A single repo of *plaintext* is fine at this scale; what keeps it fast is (1) **subdirectory fanout**
+(`notes/<aa>/<slug>.md`) so no folder holds 100k entries, and (2) **git large-repo tuning**
+(`feature.manyFiles`, `core.fsmonitor`, `core.untrackedCache`, `commit-graph`) — `git status` stays
+near-constant-time regardless of file count (Microsoft runs the 3.5M-file Windows repo on git).
+The thing that actually chokes git is **binary size**, not text file count — and the
+plaintext→git / binary→`~/files` rule (§2) already keeps binaries out of the repo (this is exactly
+what gbrain hit: its "2.3GB wiki" was ~300KB/file of embedded media, not 7k text files). **Multiple
+repos are an optional, much-later lever** (millions of files, or separating a noisy auto-ingest
+feed's cadence, or per-machine selective sync) — never a day-one requirement, and truth never moves
+into a DB. Initial indexing of a large vault is a **resumable, checkpointed, batched** backfill
+(incremental by file-hash thereafter). `ops index` also regenerates `ops.json` (the manifest).
+
+#### 10.2.1 The retrieval add-on test — embedded scales, servers don't (ADR-006)
+
+The foundation is **Karpathy's LLM Wiki** pattern (compile knowledge into interlinked markdown,
+maintain index files + backlinks, let the agent navigate the filesystem) — which is what this design
+already is (§3, §10.1). At **gbrain scale (100k–500k+ notes)** that foundation is *kept*, and the
+vector + graph + rerank layers are built **from day one** on top of it, on components that hold at
+1M+ chunks. The point is no longer "add vectors if earned" — it's "scale the right way."
+
+**The one test for any retrieval component** (a corollary of principle 6): *is it embedded —
+file-based, locally-computed, rebuilt-from-plaintext, no daemon — or is it a server / a second
+source of truth?* Embedded is allowed (and now scales to billions of vectors); a server is rejected.
+
+- **Allowed — embedded, scale-grade:** SQLite **FTS5** (keyword/graph, millions of rows) +
+  **LanceDB** (vectors; disk IVF-PQ ANN, larger-than-RAM, <20ms @1M, billions single-node) + local
+  **EmbeddingGemma** embeddings + a local cross-encoder reranker. All file-based under `.index/`,
+  gitignored, rebuilt from markdown — no server, no second source of truth. This is how we hit
+  gbrain *capability* without gbrain's Postgres: the embedded-ANN era (LanceDB) is what newly makes
+  100k+ notes searchable on one laptop. **Measured** (`test/run_search.py`, real local embeddings):
+  on queries whose wording shares no vocabulary with the target note, keyword+graph scores 0.00
+  recall@5 and local vectors recover **1.00** — vectors recover exactly what keyword structurally
+  cannot. (`sqlite-vec` is excluded *for vectors* — brute-force, dies past ~1M; LanceDB replaces it.)
+- **Rejected — the server tier:** gbrain's Postgres + pgvector; FalkorDB / LightRAG graph+vector;
+  Qdrant/Weaviate-as-service; RDF/semantic-web layers. Each is a *server* or an *LLM-extracted second
+  graph that goes stale* — both violate principle 6. We scale by **embedded** ANN, not by standing up
+  a database service. The graph is the `[[wikilink]]`/edge table (recursive-CTE multi-hop), not a
+  graph-DB daemon.
+
+**Empirical, even at scale** (principle 7). The stages bring up on the same architecture; the query
+log (`.logs/queries.jsonl`) + `test/run_search.py` keep tuning honest (which mode, which model, where
+rerank helps). And the storage spine does **not** bend: one git repo of plaintext, kept fast with
+`notes/<aa>/` subdirectory fanout + git large-repo tuning, carries 100k–500k notes — because the
+plaintext→git / binary→`~/files` rule already keeps the size-and-binary cause of git slowness out of
+the repo. Sharding into multiple repos is an optional much-later lever, not a requirement.
+
+**Measured on a fair vault (2026-06-19).** A real ops-shaped vault (58 notes, 13 area hubs, 435
+wikilinks, built from an LLM/agents KB; `vault/`) was queried with 25 realistic queries (11
+exact-term, 14 natural-language) via real local embeddings. Exact-term queries: keyword+graph and
+vectors agree (keyword suffices). Natural-language queries: ~8 clear vector wins, and on 5 of them
+**keyword+graph missed the right note entirely even at rank 3** while vectors got it at #1 (~32%
+clear wins, 40% divergence). So for **conceptual/natural-language** retrieval, stage-2 vectors are
+*earned*; for **entity/proper-noun** lookups, keyword+graph already suffices. Conclusion: build
+stage 1 now, keep query-logging on (`.logs/queries.jsonl`), and bring up stage 2 (**LanceDB ANN** +
+local Ollama embeddings) on the scale architecture — the natural-language share already justifies it
+and only grows with the corpus. (See `DECISIONS.md` ADR-002/006 and `test/vault_queries.txt`.)
+
+**Engine split (ADR-003 + ADR-006).** *Keyword / metadata / graph* → plain **SQLite FTS5** (already
+present via Python `sqlite3` stdlib + CLI, public domain, scales to millions of rows) — chosen over
+Turso's libSQL fork because libSQL's reason-for-being (embedded replicas / sync / cloud) is the
+server gravity this design walls off; libSQL stays a file-compatible fallback only. *Vectors* →
+**LanceDB**, NOT `sqlite-vec`: sqlite-vec is brute-force and fails past ~1M vectors, which our
+100k–500k-note target blows through; LanceDB is embedded, file-based, and disk-ANN (IVF-PQ) to
+billions on one node — scale without a server. Both stores live under `.index/`, are gitignored, and
+rebuild from the markdown. Net: two embedded engines, zero servers, principle 6 intact at scale.
 
 ---
 
@@ -732,6 +915,16 @@ The lifecycle (principle 7): a workflow earns a skill only after it has repeated
 earns a verb only after the skill is stable. `ops week` asks: *what did I do by hand
 twice this week?* — those are the skill/verb candidates. Start with exactly four skills:
 `operate-ops`, `triage`, `invoice-hu`, `weekly-review`.
+
+**"Stable" is checkable, not vibes (from gbrain's routing-evals).** A skill is stable when
+its routing is *tested*. Each skill ships a `skills/<name>/routing-eval.jsonl` — ≥5 lines of
+`{"intent": "<paraphrased user phrasing>", "expected_skill": "<name>"}`, including a few
+**adversarial** cases that look like a neighbor skill but must NOT match it
+(`{"intent": "...", "expected_skill": "<other>", "ambiguous_with": ["<this-skill>"]}`). A
+tiny checker (`ops skill check`, later) confirms every intent routes to the expected skill
+and that no two skills claim the same trigger (MECE). This is the cheap, plaintext form of
+gbrain's eval gate — no judge models, just substring/description matching — and it is the
+concrete pass/fail the agnosticism test (§12.4) runs.
 
 The skill set is tiered: `operate-ops` is the **always-load** system manual (§12);
 the others are **load-on-demand** recipes an agent reads only when the task matches their
@@ -871,6 +1064,21 @@ to bottom, FIRST hit wins — never skip to a lower one:
 If you cannot answer #1–#5 with confidence, STOP and ask. Misfiling a repo is worse than
 asking, because it pollutes the registry that drives backup and restore.
 
+Once the destination is decided, **place the repo with a verb, never by hand** (the Iron Law).
+For an already-cloned repo sitting outside `~/work`, that verb is `ops repo adopt <path>
+--kind <tools|labs|clients|products>`: it moves the clone to the routing-tree destination,
+computes the final path and slug, and writes the wiki note + `repo:`/`remote:` registry
+frontmatter. (`ops new project` scaffolds a *new blank* repo; `ops repo clone` pulls from a
+*registered remote*; `adopt` is the missing third case — an existing local clone.) Do NOT `mv`
+the directory yourself: a hand-composed `~/work/...` write hits the path wall, and an
+unregistered repo is invisible to `ops repo health` / `clone --all` and so silently drops out
+of backup and restore. If no verb yet covers the placement you need, STOP and propose adding
+one — never work around the surface.
+<!-- v3.7: the `adopt` verb + this note close a gap the agnosticism simulation found
+     (test/ cloned-tool-trap): two agents agreed WHERE a cloned tool goes but diverged on HOW
+     to place it — one hand-moved it (path-wall violation), one asked for a flag. -->
+
+
 ## 5. How to traverse and use the wiki (the LLM knowledge core)
 The wiki is Markdown + YAML frontmatter + `[[wikilinks]]`. Treat it like a graph of
 hubs, not a pile of files. Rules of traversal:
@@ -950,6 +1158,12 @@ happen for the next operator.
 - NEVER transmit externally (email, push, deploy, post, payment). Drafts only; human sends.
 - NEVER read `.env` or print secrets. References (`op://…`) may be named, never resolved.
 - NEVER hardcode tax rates — read `wiki/areas/business-admin/tax-formula.md`. Currency HUF.
+- BRAIN-FIRST: search the system (`ops search`) before any web/external lookup or relying on
+  your own memory. The system is the cheapest, most current, most personal source; external
+  calls only fill gaps it genuinely lacks. State when you fell back to an external source.
+- DON'T hand-compose paths, slugs, or `[[wikilinks]]` (the Iron Law). You supply content and
+  judgment; the verb computes the destination and the links. If no verb covers a placement,
+  STOP and propose one — never write to an absolute path you composed yourself.
 - Prefer the safe, revertible edit over asking; but STOP and ask for any `confirm` action,
   and STOP and report on any failure, missing file, or ambiguous convention. Never guess.
 ```
@@ -961,6 +1175,15 @@ Validate the entry point the way the design intends (from v2): hand `AGENTS.md` 
 the same place, traverse the wiki the same way, and refuse the same actions. Divergence
 means the manual is ambiguous *there* — fix the manual, not the agent. That test passing
 is what "agent-agnostic" means in practice.
+
+**This check is now mechanized** (see `test/` — the design's own simulation harness). The
+deterministic side is a guardrail model exercised by adversarial path/risk cases (does the
+path-wall actually deny every escape?); the probabilistic side plugs a real LLM in as the
+*operator*, feeds it the contract + manual + a simulated world + a scenario, and a judge
+scores whether it filed/refused/proposed correctly — run across two models to surface
+divergence. Skills' `routing-eval.jsonl` fixtures (§11) are the routing slice of the same
+harness. The rule holds: a failure is a defect in the *manual or the guardrail spec*, fixed
+there, not papered over in a prompt.
 
 Task-specific skills (`triage`, `invoice-hu`, `weekly-review`, and any you grow later) do
 NOT repeat this material. Each is a thin recipe: frontmatter `description` (when to load
@@ -1234,7 +1457,19 @@ jobs:
   files_backup: { command: "restic backup ~/files", schedule: { daily: "03:00" },    risk: read }   # reads ~/files, writes only to the bucket
   sweep:        { command: "ops sweep",          schedule: { daily: "02:00" },       risk: safe_write } # Desktop/Downloads → _swept → trash
   nuke_modules: { command: "ops repo nuke-modules --stale 30", schedule: { monthly: "1 04:00" }, risk: safe_write } # only node_modules untouched 30+ days — never an active project's
+  consolidate:  { command: "ops consolidate",    schedule: { daily: "02:30" },       risk: safe_write } # dream-lite: refresh backlinks, flag stale/orphan notes, draft a "what changed" journal digest
 ```
+
+**`ops consolidate` — the dream-lite nightly cycle (from gbrain's "dream", stripped to
+deterministic safe writes).** gbrain runs a ~20-phase LLM-heavy nightly cycle that synthesizes
+transcripts, clusters facts into "takes", recomputes salience, and probes for contradictions.
+The plaintext equivalent keeps only the phases that are *deterministic and reversible*: (1)
+regenerate the backlink index (§10.1); (2) flag stale notes (untouched past a threshold) and
+orphans (no inbound links) into a digest; (3) append a one-paragraph **"what changed today"**
+summary to the journal from the day's git log + closed tasks. It is `safe_write` (every change
+is a git diff), runs unattended, and — like every other job — calls a verb, never inline logic.
+The LLM-judgment phases gbrain runs (contradiction probing, take-grading) stay **manual verbs
+you run with eyes on**, never scheduled, per §15's rule that nothing surprising runs mid-work.
 
 Job rules: jobs call verbs, never inline logic; only `read`/`safe_write` risk classes
 may be scheduled; everything logs to `.logs/jobs/`; every job is manually runnable.
@@ -1304,7 +1539,19 @@ phase N is in daily use.
    2–3 active clients' material in, extend `ops new` to scaffold the files folder, add
    `ops files ingest` with shadow notes. (Can run in parallel with 6–8; folders + restic
    alone are already most of the value.)
-9. **(Only if earned) stage-2 search.** Ollama + sqlite-vec hybrid.
+9. **Stage-2 hybrid search (core at scale, ADR-006).** Local Ollama **EmbeddingGemma** (per-model
+   prompts) + **LanceDB** ANN, fused with FTS5+graph via weighted RRF (`OPS_VECTORS=1`). Built on
+   LanceDB from the first note so there is no re-platforming at 100k. Then **stage-3**: a local
+   cross-encoder reranker (`bge-reranker-v2-m3`) over the fused candidates for precision.
+10. **Scale-out plumbing (when the corpus grows).** Keep the ONE repo fast: `notes/<aa>/`
+   subdirectory fanout + git large-repo tuning (`feature.manyFiles`, `core.fsmonitor`,
+   `core.untrackedCache`, `commit-graph`); make `ops index` a **resumable, checkpointed, batched**
+   backfill (done) with a file-watcher for live incremental (or the hourly `ops index` job, §15).
+   Binaries already live in `~/files`, so the repo stays plaintext and git stays fast. *Optional,
+   much later:* split into multiple git repos only if you hit millions of files or want to separate a
+   noisy auto-ingest feed's cadence / per-machine selective sync. The architecture (embedded FTS +
+   LanceDB, markdown truth, one repo) does not change — only indexing throughput and (optionally) repo
+   layout do.
 
 ---
 
@@ -1369,3 +1616,23 @@ phase N is in daily use.
 | OpenClaw `exec` default-ungated → mandatory allowlist; doctor checks adapters | agent research | **Added** — closed the biggest always-on-agent risk; broken adapter is now a health-check failure |
 | Extended roster: opencode, Cursor CLI, Grok, Factory Droid, pi, Antigravity | agent research (round 2) | **Added (§12.6)** — 5/6 read `AGENTS.md` natively; only `.agents/skills`/`.factory/skills` symlinks + optional `GEMINI.md` needed. Validates the contract across 10 agents with zero structural change |
 | pi has no permission system; Antigravity global = `GEMINI.md` only | agent research (round 2) | **Noted as caveats** — pi runs contained (read/plan driver); global baseline goes in `GEMINI.md`, project rules stay in `AGENTS.md` |
+
+### Appendix A.1 — gbrain merge decisions (v3.7)
+
+| Concern | Source | Decision |
+|---|---|---|
+| Compiled-truth + timeline two-zone notes (rewrite the top, append the bottom) | gbrain | **Adopted** — applied to task records (§7.2) and entity hubs (§10.1); pure plaintext, one habit |
+| Brain-first lookup (check the system before the web/memory) | gbrain | **Adopted** — first principle 9 + a hard rule in `operate-ops` (§12.3) |
+| Iron Law: model picks WHAT, code guarantees WHERE/HOW (paths/slugs/links deterministic) | gbrain | **Adopted** — principle 10 + guardrail enforcement (§5) + skill hard rule (§12.3) |
+| Zero-LLM auto-backlinks generated on every write; graph as first-class retrieval | gbrain | **Adopted** — §10.1/§10.2; pulls backlink traversal into stage 1, defers vectors further |
+| `routing-eval.jsonl` fixtures as the checkable "stable skill" gate | gbrain | **Adopted, slimmed** — substring/description matching, no judge models (§11, §12.4) |
+| `prediction` note type → future calibration ("how often was I right?") | gbrain (takes-grading) | **Adopted, minimal** — one optional note type, no DB (§10.1) |
+| `ops consolidate` dream-lite nightly job (deterministic phases only) | gbrain ("dream" cycle) | **Adopted, stripped** — backlinks/stale/orphan/digest; LLM-judgment phases stay manual (§15) |
+| Postgres + pgvector + HNSW + cross-encoder reranker retrieval stack | gbrain | **Rejected as core** — violates reversibility (principle 6); FTS5→vectors staging unchanged (§10.2) |
+| Retrieval add-on test (file-based+local+rebuildable = OK; server/2nd-source = reject); stage-2 = **LanceDB** ANN + local Ollama embeddings + RRF; graph stays wikilinks | X research (Karpathy LLM Wiki) + real-embedder measurement (`test/run_search.py`) | **Added (§10.2.1)** — settles the vector question: local file-based vectors fit the philosophy and recover the semantic-bucket misses; server/graph-DB tiers (pgvector, FalkorDB, LightRAG, RDF) rejected |
+| Scale to 100k–500k+ notes, single-machine, no server: LanceDB ANN + ONE git repo (fanout + tuning) + resumable backfill + local rerank | owner's ambition + research (sqlite-vec brute-force limit, LanceDB scale, real git scaling facts) | **Added (ADR-006, §10.2/§17)** — reaches gbrain capability via embedded engines, no Postgres; git-spine stays one repo (gbrain's git pain was binary *size*, excluded here by plaintext→git/binary→files) |
+| Skillopt self-optimizing skills + 3-model judge panels + eval gates on every change | gbrain | **Rejected** — real ops/$$ cost for ~4 skills; routing-eval is the right-sized substitute |
+| Schema-packs / lens-packs / skillpack registry (versioned, distributable brain shape) | gbrain | **Rejected** — `wiki/conventions.md` "Filing rules" is the lightweight learning loop already (§10) |
+| Minions job queue / autopilot daemon / push-"volunteer"-context / MCP-HTTP server | gbrain | **Rejected / deferred** — agent supervisor was already out of scope; keep the four planes (§13) |
+| Single-DB "sources" model for separating repos | gbrain | **Rejected** — the four-root topology (code repos as independent git repos, §2) is cleaner for a dev |
+| Cautionary tale: gbrain's 147k-token agent context file | gbrain (self-described anti-pattern) | **Heeded** — v3.7 stays minimal-additions; `operate-ops` must stay ~one driving manual, not a brain dump |

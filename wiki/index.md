@@ -12,7 +12,7 @@ The map of this knowledge base. This is the real knowledge plane — your durabl
 (atomic notes in `notes/`, entity hubs in `clients/`, `projects/`, `areas/`, `people/`, etc.).
 
 It starts nearly empty by design — capture and triage fill it over time. See [[conventions]] for
-the note shape, and `docs/design/PERSONAL_OS_DESIGN_v2.md` for the full design.
+the note shape, and `docs/design/PERSONAL_OS_DESIGN.md` for the full design.
 
 ## Areas
 <!-- Link your area hubs here as they're created, e.g. - [[business-admin]] -->

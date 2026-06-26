@@ -2,7 +2,7 @@
 
 Append-only ADR log for the *design itself* (the §8.2 pattern, applied to this design repo).
 Each entry: context → decision → why → status. Newest at the bottom. Appendix A / A.1 in
-`PERSONAL_OS_DESIGN_v2.md` holds the per-merge table; this log holds the load-bearing "why".
+`PERSONAL_OS_DESIGN.md` holds the per-merge table; this log holds the load-bearing "why".
 
 ---
 

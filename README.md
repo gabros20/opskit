@@ -4,7 +4,7 @@ A local-first, agent-agnostic personal operating system: **plaintext is truth, g
 one `ops <verb>` command surface drives everything** — for you, for cron, and for any AI agent.
 This repo is the **canonical starter** for that system.
 
-> Full design: [`docs/design/PERSONAL_OS_DESIGN_v2.md`](docs/design/PERSONAL_OS_DESIGN_v2.md) (v3.7).
+> Full design: [`docs/design/PERSONAL_OS_DESIGN.md`](docs/design/PERSONAL_OS_DESIGN.md) (v3.7).
 > Why decisions were made: [`docs/DECISIONS.md`](docs/DECISIONS.md) (ADR log).
 
 ## State of the build (honest map)
