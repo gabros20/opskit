@@ -16,9 +16,9 @@ engine* is implemented; most other verbs are still designed-but-not-built.
 |---|---|
 | **Design + decisions** | ✅ complete — `docs/design/` (v3.6 baseline + v3.7 active), `docs/DECISIONS.md` (ADR-001…006) |
 | **Retrieval engine** | ✅ built & tested — `ops index` / `ops search` (stage 1 FTS5+graph → stage 2 LanceDB vectors → stage 3 rerank) |
-| **Verbs built (15)** | ✅ `help` `status` `capture` `triage` `task` `index` `search` `start` `close` `week` `doctor` `wiki` `backup` `consolidate` `job` — all guardrail-gated, self-describing. **The capture → triage → task → done spine, the daily/weekly loop, search, self-check, wiki navigation, backup-nag, nightly consolidation, and the launchd jobs scheduler all work end-to-end.** |
+| **Verbs built (21/21 — all of §4.1)** | ✅ system: `help` `status` `doctor` `backup` `index` `consolidate` · flow: `capture` `triage` `start` `close` `week` · knowledge: `search` `wiki` · tasks: `task` · work: `new` `repo` `archive` `files` `sweep` · business: `invoice` · jobs: `job`. All guardrail-gated, self-describing, and tested. **The full design surface works end-to-end.** |
 | **Agent entry point** | ✅ files exist — `AGENTS.md`, `CLAUDE.md`, `skills/operate-ops/SKILL.md` |
-| **Other verbs** | ⬜ designed, NOT built — `new`, `repo`, `files`, `sweep`, `invoice` |
+| **Remaining for v1 release** | ⬜ template polish — LICENSE, `.github/` (issue templates + "Use this template"), seed example notes, the two-agent agnosticism check actually run |
 | **Guardrail enforcement** | ✅ wired — `bin/lib/guardrail.py` gates every verb by risk class (deny refused, confirm needs `--yes`, new verbs default confirm) + logs to `.logs/ops.log`; mirrors the validated §5 model (parity-tested) |
 | **Validation harness** | ✅ `test/` — design simulation + retrieval tests (see `test/README.md`) |
 | **Install / setup flow** | ✅ `script/setup` (template → your vault: PATH, sibling roots, upstream, lean, doctor, first commit) + `script/update` (pull engine only) |
@@ -101,6 +101,7 @@ python3 test/run_simulation.py --model sonnet   # LLM-operator agnosticism/drift
 ```
 
 ## What's next
-`new` (scaffold a project/client: wiki hub + `~/work` repo from template), then the work-facing
-verbs (`repo` health/clone/adopt, `files` ingest, `sweep` the Desktop/Downloads inbox, `invoice`
-drafting). Each is a `bin/<verb>/{run.py,cmd.json}`, guardrail-gated and in `ops help`. See §15–17.
+The verb surface is complete (all 21 of §4.1). What remains is **template finalization for a public
+v1 release**: a LICENSE, `.github/` (issue templates + "Use this template" guidance), a couple of
+seed example notes so `search`/`wiki` demo out of the box, and running the two-agent agnosticism
+check (`run_simulation.py`) on two different agents per the §18 definition of done.
