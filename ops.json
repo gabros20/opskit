@@ -166,6 +166,22 @@
       "writes": []
     },
     {
+      "verb": "sweep",
+      "summary": "decay Desktop/Downloads: untouched 7d \u2192 _swept/YYYY-MM/, 60d in _swept \u2192 Trash",
+      "usage": "ops sweep [--dry-run]",
+      "risk": "safe_write",
+      "reads": [
+        "~/Desktop",
+        "~/Downloads"
+      ],
+      "writes": [
+        "~/Desktop/_swept",
+        "~/Downloads/_swept",
+        "~/.Trash",
+        "journal/"
+      ]
+    },
+    {
       "verb": "task",
       "summary": "list | add \"<title>\" | show <id> | move <id> <status> | done <id>",
       "usage": "ops task <action> [args]",

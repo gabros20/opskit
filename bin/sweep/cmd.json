@@ -1,0 +1,8 @@
+{
+  "verb": "sweep",
+  "summary": "decay Desktop/Downloads: untouched 7d → _swept/YYYY-MM/, 60d in _swept → Trash",
+  "usage": "ops sweep [--dry-run]",
+  "risk": "safe_write",
+  "reads": ["~/Desktop", "~/Downloads"],
+  "writes": ["~/Desktop/_swept", "~/Downloads/_swept", "~/.Trash", "journal/"]
+}
