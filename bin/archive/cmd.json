@@ -1,0 +1,9 @@
+{
+  "verb": "archive",
+  "summary": "retire a dead ~/work repo: git-bundle all history into ~/work/archive/<year>/, mark hub archived",
+  "usage": "ops archive <slug>",
+  "risk": "safe_write",
+  "args": [{ "name": "slug", "required": true }],
+  "reads": ["~/work/", "wiki/projects/"],
+  "writes": ["~/work/archive/", "wiki/projects/", "journal/"]
+}

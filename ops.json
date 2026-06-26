@@ -1,6 +1,27 @@
 {
   "verbs": [
     {
+      "verb": "archive",
+      "summary": "retire a dead ~/work repo: git-bundle all history into ~/work/archive/<year>/, mark hub archived",
+      "usage": "ops archive <slug>",
+      "risk": "safe_write",
+      "args": [
+        {
+          "name": "slug",
+          "required": true
+        }
+      ],
+      "reads": [
+        "~/work/",
+        "wiki/projects/"
+      ],
+      "writes": [
+        "~/work/archive/",
+        "wiki/projects/",
+        "journal/"
+      ]
+    },
+    {
       "verb": "backup",
       "summary": "verify ~/ops is committed + pushed; nag (exit 1) if at risk. Never pushes for you",
       "usage": "ops backup",
@@ -118,6 +139,30 @@
       ],
       "writes": [
         ".index/"
+      ]
+    },
+    {
+      "verb": "invoice",
+      "summary": "DRAFT an invoice for a client (reads tax-formula.md; computes VAT; never sends)",
+      "usage": "ops invoice <client> --amount <net> [--desc \"<text>\"]",
+      "risk": "draft_only",
+      "args": [
+        {
+          "name": "client",
+          "required": true
+        },
+        {
+          "name": "amount",
+          "required": true
+        }
+      ],
+      "reads": [
+        "templates/tax-formula.md",
+        "wiki/clients/"
+      ],
+      "writes": [
+        "~/files/clients/<slug>/out/",
+        "journal/"
       ]
     },
     {

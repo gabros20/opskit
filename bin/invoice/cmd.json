@@ -1,0 +1,9 @@
+{
+  "verb": "invoice",
+  "summary": "DRAFT an invoice for a client (reads tax-formula.md; computes VAT; never sends)",
+  "usage": "ops invoice <client> --amount <net> [--desc \"<text>\"]",
+  "risk": "draft_only",
+  "args": [{ "name": "client", "required": true }, { "name": "amount", "required": true }],
+  "reads": ["templates/tax-formula.md", "wiki/clients/"],
+  "writes": ["~/files/clients/<slug>/out/", "journal/"]
+}

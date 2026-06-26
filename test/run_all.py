@@ -38,6 +38,7 @@ SUITES = [
     ("new: scaffold project/client (§4/§12)", "run_new.py"),
     ("repo: ~/work fleet (§4/§12)", "run_repo.py"),
     ("files: binary-assets plane (§9)", "run_files.py"),
+    ("archive + invoice (§4)", "run_archive_invoice.py"),
 ]
 
 
