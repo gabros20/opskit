@@ -99,6 +99,27 @@
       ]
     },
     {
+      "verb": "job",
+      "summary": "list | run <name> | apply \u2014 scheduler-neutral jobs (\u00a715); apply renders launchd plists",
+      "usage": "ops job [list|run <name>|apply]",
+      "risk": "safe_write",
+      "args": [
+        {
+          "name": "action",
+          "required": false,
+          "default": "list"
+        }
+      ],
+      "reads": [
+        "jobs/registry.json"
+      ],
+      "writes": [
+        "jobs/launchd/",
+        ".logs/jobs/",
+        "journal/"
+      ]
+    },
+    {
       "verb": "search",
       "summary": "ranked file#heading hits (keyword + graph [+ vectors/rerank])",
       "usage": "ops search \"<query>\"",

@@ -1,0 +1,10 @@
+{
+  "description": "The §15 jobs registry — scheduler-neutral job definitions. `ops job apply` renders launchd plists; `ops job run <name>` runs any job manually (the universal fallback). Rules: jobs call ONE verb (no inline logic), only read/safe_write may be scheduled, everything logs to .logs/jobs/. JSON (not the design's YAML) to keep the core stdlib-only.",
+  "external_allowlist": ["restic"],
+  "jobs": {
+    "index":        { "command": "ops index",             "schedule": { "interval_minutes": 60 }, "risk": "read",       "writes": ["~/ops/.index"] },
+    "consolidate":  { "command": "ops consolidate",        "schedule": { "daily": "02:30" },       "risk": "safe_write", "writes": ["~/ops/journal"] },
+    "close_nudge":  { "command": "ops close --automated",  "schedule": { "daily": "18:30" },       "risk": "safe_write", "writes": ["~/ops/journal"] },
+    "backup_check": { "command": "ops backup",             "schedule": { "weekly": "Fri 17:00" },  "risk": "read",       "writes": [] }
+  }
+}

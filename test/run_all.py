@@ -20,6 +20,7 @@ SUITES = [
     ("guardrail model (§5)", "run_deterministic.py"),
     ("guardrail enforcement (§5)", "run_guardrail.py"),
     ("jobs registry (§15)", "run_jobs.py"),
+    ("jobs scheduler verb (§15)", "run_jobverb.py"),
     ("sweep decay (§9.4)", "run_sweep.py"),
     ("wiki integrity (§10)", "run_wiki.py"),
     ("wiki link edges (§10)", "run_wiki_edges.py"),

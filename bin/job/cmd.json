@@ -1,0 +1,9 @@
+{
+  "verb": "job",
+  "summary": "list | run <name> | apply — scheduler-neutral jobs (§15); apply renders launchd plists",
+  "usage": "ops job [list|run <name>|apply]",
+  "risk": "safe_write",
+  "args": [{ "name": "action", "required": false, "default": "list" }],
+  "reads": ["jobs/registry.json"],
+  "writes": ["jobs/launchd/", ".logs/jobs/", "journal/"]
+}
