@@ -16,5 +16,6 @@ CLAUDE.md
 requirements.txt
 docs/design
 docs/DECISIONS.md
+docs/how-it-works.html
 .gitignore
 script

@@ -4,6 +4,10 @@ A local-first, agent-agnostic personal operating system: **plaintext is truth, g
 one `ops <verb>` command surface drives everything** — for you, for cron, and for any AI agent.
 This repo is the **canonical starter** for that system.
 
+> 🖱️ **New here? Open [`docs/how-it-works.html`](docs/how-it-works.html)** — a single self-contained
+> interactive walkthrough of the whole system. No install, no dependencies: just open it in a browser
+> and click through the four roots, the 21 verbs, the daily loop, the guardrail, and the setup flow.
+>
 > Full design: [`docs/design/PERSONAL_OS_DESIGN.md`](docs/design/PERSONAL_OS_DESIGN.md) (v3.7).
 > Why decisions were made: [`docs/DECISIONS.md`](docs/DECISIONS.md) (ADR log).
 
@@ -22,6 +26,33 @@ engine* is implemented; most other verbs are still designed-but-not-built.
 | **Guardrail enforcement** | ✅ wired — `bin/lib/guardrail.py` gates every verb by risk class (deny refused, confirm needs `--yes`, new verbs default confirm) + logs to `.logs/ops.log`; mirrors the validated §5 model (parity-tested) |
 | **Validation harness** | ✅ `test/` — design simulation + retrieval tests (see `test/README.md`) |
 | **Install / setup flow** | ✅ `script/setup` (template → your vault: PATH, sibling roots, upstream, lean, doctor, first commit) + `script/update` (pull engine only) |
+
+## How it works (in brief)
+
+*(The interactive version of this is [`docs/how-it-works.html`](docs/how-it-works.html).)*
+
+**Three commitments.** Plaintext is truth (every note/task/journal entry is a Markdown file; indexes
+are disposable caches). Git is the spine (one repo, every change a revertible diff). One command
+surface (`ops <verb>` — you never edit the plumbing by hand). A model decides *what*; the system
+guarantees *where* and *how* — so any AI agent operates it through the same verbs and guardrail you do.
+
+**Four roots, separated by location.** `~/ops` (this repo: knowledge, tasks, journal, verbs) and three
+siblings that sit *next to* it, never inside: `~/work` (code — each project its own git repo),
+`~/files` (binaries, not in git), `~/dotfiles` (machine config). The separation keeps the knowledge
+repo small, plaintext, and fast.
+
+**The daily loop.** `capture` a thought into `inbox/` (zero decisions) → `triage` proposes a home and
+you approve → it lands as a `task` (folder = status) or a `wiki` note (auto-linked) → `start`/`close`
+bookend the day in the `journal`, and `week` reviews it. `search` finds anything.
+
+**Safety is enforced.** Before any verb runs, the guardrail classifies it: `read` (free) ·
+`safe_write` (a revertible diff inside the roots) · `draft_only` (you send, never the system) ·
+`confirm` (needs `--yes`; the default for new verbs) · `deny` (force-push, `rm -rf`, reading secrets,
+writing iCloud — never). The same wall applies to you and to any agent.
+
+**Finding things — three local stages.** Keyword + wikilink-graph (FTS5, built in) → semantic vectors
+(local EmbeddingGemma + LanceDB, opt-in) → cross-encoder rerank (opt-in). No server, no cloud,
+rebuildable from your Markdown.
 
 ## Install — from template to your vault
 

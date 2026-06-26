@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal Operating System — how it works</title>
+<style>
+  :root{
+    --bg:#F0EEE6; --surface:#FAF9F5; --card:#FFFFFF; --ink:#29261F; --muted:#6F6A5C;
+    --accent:#C96442; --accent-d:#A94E30; --accent-soft:#EFD9CF; --line:#E4DFD2;
+    --read:#4F8A6B; --write:#4A77B0; --draft:#C08A2E; --confirm:#CC7A33; --deny:#C0473B;
+    --shadow:0 1px 2px rgba(41,38,31,.06),0 8px 28px rgba(41,38,31,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55; padding:0 20px 80px;
+  }
+  .wrap{max-width:920px; margin:0 auto}
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif; font-weight:600; letter-spacing:-.01em; line-height:1.2}
+  header.top{padding:46px 0 18px; text-align:center}
+  header.top .kicker{font-size:13px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent-d); font-weight:600}
+  header.top h1{font-size:38px; margin:.35em 0 .15em}
+  header.top p{color:var(--muted); margin:0 auto; max-width:560px; font-size:16px}
+  .mono{font-family:"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* chapter pills */
+  nav.pills{position:sticky; top:0; z-index:20; background:linear-gradient(var(--bg) 72%,rgba(240,238,230,0));
+    display:flex; flex-wrap:wrap; gap:7px; justify-content:center; padding:14px 0 16px}
+  .pill{border:1px solid var(--line); background:var(--surface); color:var(--muted); border-radius:999px;
+    padding:6px 13px; font-size:13px; cursor:pointer; transition:.15s; white-space:nowrap}
+  .pill:hover{border-color:var(--accent-soft); color:var(--ink)}
+  .pill.active{background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:var(--shadow)}
+  .pill .n{opacity:.6; margin-right:6px; font-variant-numeric:tabular-nums}
+
+  /* chapter */
+  .chapter{display:none; animation:fade .4s ease}
+  .chapter.show{display:block}
+  @keyframes fade{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
+  .chapter h2{font-size:27px; margin:8px 0 4px}
+  .lead{color:var(--muted); font-size:16.5px; margin:0 0 22px; max-width:660px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px; box-shadow:var(--shadow)}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
+
+  /* roots */
+  .roots{display:grid; grid-template-columns:repeat(4,1fr); gap:12px}
+  @media(max-width:680px){.roots{grid-template-columns:1fr 1fr}}
+  .root{cursor:pointer; border:1.5px solid var(--line); border-radius:14px; padding:16px 14px; background:var(--surface);
+    text-align:center; transition:.15s}
+  .root:hover{transform:translateY(-2px)}
+  .root.sel{border-color:var(--accent); background:#fff; box-shadow:var(--shadow)}
+  .root.ops{border-style:solid; box-shadow:inset 0 0 0 1.5px var(--accent-soft)}
+  .root .ic{font-size:24px}
+  .root .nm{font-family:Georgia,serif; font-size:18px; margin-top:4px}
+  .root .tag{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:2px}
+  .detail{margin-top:16px; border-left:3px solid var(--accent); padding:4px 0 4px 16px; min-height:54px}
+  .detail h4{margin:0 0 4px; font-family:Georgia,serif; font-size:17px}
+  .detail p{margin:0; color:var(--muted); font-size:14.5px}
+
+  /* verb explorer */
+  .groups{display:flex; flex-direction:column; gap:14px}
+  .group .glabel{font-size:11.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--accent-d); font-weight:700; margin-bottom:7px}
+  .chips{display:flex; flex-wrap:wrap; gap:7px}
+  .chip{cursor:pointer; border:1px solid var(--line); background:var(--surface); border-radius:9px; padding:6px 11px;
+    font-size:13.5px; transition:.13s; display:flex; align-items:center; gap:7px}
+  .chip:hover{border-color:var(--accent-soft); transform:translateY(-1px)}
+  .chip.sel{background:#fff; border-color:var(--accent); box-shadow:var(--shadow)}
+  .chip .dot{width:8px; height:8px; border-radius:50%}
+  .chip .v{font-family:"SF Mono",Menlo,monospace; font-size:13px}
+  .vdetail{margin-top:18px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px}
+  .vdetail .cmd{font-family:"SF Mono",Menlo,monospace; font-size:14px; color:var(--accent-d)}
+  .vdetail p{margin:8px 0 0; color:var(--muted); font-size:14.5px}
+  .riskbadge{display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em; padding:2px 8px;
+    border-radius:6px; color:#fff; vertical-align:middle; margin-left:8px}
+
+  /* flow */
+  .flow{display:flex; align-items:stretch; gap:8px; flex-wrap:wrap; justify-content:center; position:relative}
+  .fnode{cursor:pointer; flex:1; min-width:104px; border:1.5px solid var(--line); background:var(--surface);
+    border-radius:13px; padding:14px 10px; text-align:center; transition:.18s}
+  .fnode:hover{transform:translateY(-2px)}
+  .fnode.sel{border-color:var(--accent); background:#fff; box-shadow:var(--shadow)}
+  .fnode.lit{border-color:var(--accent); background:var(--accent-soft)}
+  .fnode .fic{font-size:20px}
+  .fnode .fnm{font-family:"SF Mono",Menlo,monospace; font-size:12.5px; margin-top:3px}
+  .fnode .fsub{font-size:11px; color:var(--muted)}
+  .arrow{align-self:center; color:var(--accent); font-size:18px; opacity:.5}
+  @media(max-width:680px){.arrow{display:none}}
+  .btn{cursor:pointer; border:1px solid var(--accent); background:var(--accent); color:#fff; border-radius:10px;
+    padding:9px 16px; font-size:14px; font-weight:600; transition:.15s}
+  .btn:hover{background:var(--accent-d)}
+  .btn.ghost{background:transparent; color:var(--accent-d)}
+  .btn:disabled{opacity:.4; cursor:default}
+
+  /* ladder */
+  .ladder{display:flex; flex-direction:column; gap:7px}
+  .rung{cursor:pointer; display:flex; align-items:center; gap:12px; border:1px solid var(--line); border-radius:11px;
+    padding:11px 14px; background:var(--surface); transition:.13s}
+  .rung:hover{transform:translateX(3px)}
+  .rung.sel{background:#fff; box-shadow:var(--shadow)}
+  .rung .bar{width:6px; align-self:stretch; border-radius:4px; min-height:34px}
+  .rung .rk{font-family:"SF Mono",Menlo,monospace; font-size:13.5px; font-weight:600; min-width:118px}
+  .rung .rd{font-size:13.5px; color:var(--muted)}
+
+  /* stages */
+  .stage{display:flex; gap:14px; align-items:flex-start; padding:14px 0; border-bottom:1px solid var(--line)}
+  .stage:last-child{border-bottom:0}
+  .stage .num{flex:none; width:34px; height:34px; border-radius:10px; background:var(--accent-soft); color:var(--accent-d);
+    font-family:Georgia,serif; font-weight:700; display:flex; align-items:center; justify-content:center}
+  .stage h4{margin:2px 0 3px; font-family:Georgia,serif; font-size:17px}
+  .stage p{margin:0; color:var(--muted); font-size:14px}
+  .stage .opt{font-size:11px; color:var(--accent-d); border:1px solid var(--accent-soft); border-radius:6px; padding:1px 7px; margin-left:6px}
+
+  /* setup steps */
+  ol.steps{list-style:none; counter-reset:s; padding:0; margin:0; display:flex; flex-direction:column; gap:12px}
+  ol.steps li{counter-increment:s; display:flex; gap:14px; align-items:flex-start}
+  ol.steps li::before{content:counter(s); flex:none; width:30px; height:30px; border-radius:50%; background:var(--accent);
+    color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:14px}
+  ol.steps code{display:block; background:#2C2A24; color:#F0EEE6; border-radius:9px; padding:9px 12px; margin-top:6px;
+    font-family:"SF Mono",Menlo,monospace; font-size:12.5px; overflow:auto}
+  .cap{font-size:12.5px; color:var(--muted); margin-top:6px}
+
+  /* footer nav */
+  .footnav{position:fixed; bottom:0; left:0; right:0; background:rgba(250,249,245,.9); backdrop-filter:blur(8px);
+    border-top:1px solid var(--line); padding:11px 20px}
+  .footnav .inner{max-width:920px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px}
+  .progress{flex:1; height:5px; background:var(--line); border-radius:3px; overflow:hidden; max-width:340px}
+  .progress > i{display:block; height:100%; background:var(--accent); transition:width .35s ease}
+  .stepcount{font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums; min-width:64px; text-align:center}
+  .pillrow-note{text-align:center; font-size:12.5px; color:var(--muted); margin-top:6px}
+  .tip{font-size:12.5px; color:var(--muted); margin-top:14px}
+  b.k{font-family:"SF Mono",Menlo,monospace; background:var(--surface); border:1px solid var(--line); border-radius:5px; padding:0 5px; font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="kicker">~/ops · interactive walkthrough</div>
+    <h1>Personal Operating System</h1>
+    <p>A local-first, agent-agnostic system for your knowledge, tasks, and work. Plaintext is truth, git is the spine, and one <span class="mono">ops&nbsp;&lt;verb&gt;</span> surface drives everything — for you, for cron, and for any AI agent.</p>
+  </header>
+
+  <nav class="pills" id="pills"></nav>
+
+  <!-- 0 INTRO -->
+  <section class="chapter" data-title="Idea">
+    <h2>One system, three commitments</h2>
+    <p class="lead">Everything else falls out of these three rules. They're what keep the system yours, portable, and impossible to lock in.</p>
+    <div class="grid2">
+      <div class="card"><h3 style="margin-top:0">📄 Plaintext is truth</h3><p style="color:var(--muted);margin:0">Every note, task, and journal entry is a Markdown file you can read, grep, and edit with anything. Indexes and embeddings are disposable caches rebuilt from the text — never the source of truth.</p></div>
+      <div class="card"><h3 style="margin-top:0">🌳 Git is the spine</h3><p style="color:var(--muted);margin:0">The whole system is one git repo. Every change is a diff, every mistake is revertible, your history is yours. Back it up by pushing to your own GitHub.</p></div>
+      <div class="card"><h3 style="margin-top:0">⌨️ One command surface</h3><p style="color:var(--muted);margin:0">You never poke at files by hand. <span class="mono">ops &lt;verb&gt;</span> is the single door — 21 verbs that know <i>where</i> things go and <i>how</i> to keep them safe.</p></div>
+      <div class="card"><h3 style="margin-top:0">🤖 Agent-agnostic</h3><p style="color:var(--muted);margin:0">A model decides <i>what</i> to do; the system guarantees <i>where</i> and <i>how</i>. Any AI agent operates it through the same verbs and the same guardrails you do.</p></div>
+    </div>
+    <p class="tip">Use the chapter tabs above, the <b class="k">Next ›</b> button, or your <b class="k">←</b> <b class="k">→</b> arrow keys to move through.</p>
+  </section>
+
+  <!-- 1 ROOTS -->
+  <section class="chapter" data-title="Four roots">
+    <h2>Four roots, cleanly separated</h2>
+    <p class="lead">The system lives in <span class="mono">~/ops</span>. Three sibling folders sit <i>next to</i> it — never inside. Click each to see what it holds and why it's kept apart.</p>
+    <div class="card">
+      <div class="roots" id="roots"></div>
+      <div class="detail" id="rootDetail">
+        <h4>Click a root above</h4>
+        <p>Separation is the whole point: code, binaries, and machine config each have a home, so the knowledge repo stays small, plaintext, and fast.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 VERBS -->
+  <section class="chapter" data-title="The verbs">
+    <h2>The command surface — 21 verbs</h2>
+    <p class="lead">Every action is a verb. Each is self-describing (it ships a tiny manifest), so <span class="mono">ops help</span>, the guardrail, and any agent all learn the surface from one place. Click any verb.</p>
+    <div class="card">
+      <div class="groups" id="groups"></div>
+      <div class="vdetail" id="verbDetail">
+        <span class="cmd">ops &lt;verb&gt;</span>
+        <p>Pick a verb to see what it does and its safety class.</p>
+      </div>
+    </div>
+    <p class="pillrow-note">Colour = risk class — the system knows how dangerous each verb is. That's the next chapter.</p>
+  </section>
+
+  <!-- 3 FLOW -->
+  <section class="chapter" data-title="Daily loop">
+    <h2>The daily loop</h2>
+    <p class="lead">A thought becomes structured knowledge without you deciding where anything goes. Press play to watch a note travel the pipeline — or click any stage.</p>
+    <div class="card">
+      <div class="flow" id="flow"></div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:16px">
+        <button class="btn" id="playBtn">▶ Play the loop</button>
+        <span class="stepcount" id="flowState" style="text-align:left"></span>
+      </div>
+      <div class="detail" id="flowDetail" style="margin-top:18px">
+        <h4>capture → triage → task / wiki → done</h4>
+        <p>Capture is zero-decision: dump the thought. Triage proposes where it belongs and you approve. From there it's either a tracked task or a durable note — and the journal records the whole day.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 GUARDRAIL -->
+  <section class="chapter" data-title="Safety">
+    <h2>Safety is enforced, not hoped for</h2>
+    <p class="lead">Before any verb runs, a guardrail classifies it. New verbs default to <i>confirm</i>; nothing leaves your machine without you. Click a class.</p>
+    <div class="card">
+      <div class="ladder" id="ladder"></div>
+      <div class="detail" id="riskDetail" style="margin-top:16px">
+        <h4>A five-rung ladder</h4>
+        <p>From freely-runnable reads up to always-refused actions. The same wall applies whether it's you or an AI agent at the keyboard.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 SEARCH -->
+  <section class="chapter" data-title="Finding things">
+    <h2>Finding anything — three local stages</h2>
+    <p class="lead">All on your machine, no server, no cloud. Keyword search works out of the box; the semantic stages are opt-in and rebuildable from your Markdown.</p>
+    <div class="card" id="stages"></div>
+    <p class="tip">The index lives in <b class="k">.index/</b> and is disposable — <span class="mono">rm -rf .index &amp;&amp; ops index</span> rebuilds it from your notes.</p>
+  </section>
+
+  <!-- 6 SETUP -->
+  <section class="chapter" data-title="Make it yours">
+    <h2>From template to your vault</h2>
+    <p class="lead">This repo is a template, not your data. You make your own copy, and one script wires the machine. Your commits go to <i>your</i> GitHub; the template stays a one-way upstream you pull engine fixes from.</p>
+    <div class="card">
+      <ol class="steps">
+        <li><div><b>Use this template → your own repo</b>, then clone it to <span class="mono">~/ops</span> (the path matters — the safety wall is rooted there).<code>git clone git@github.com:&lt;you&gt;/ops.git ~/ops &amp;&amp; cd ~/ops</code></div></li>
+        <li><div><b>Run setup</b> — puts <span class="mono">ops</span> on your PATH, creates the sibling roots, tracks the template as fetch-only <span class="mono">upstream</span>, runs a health check, makes the first commit. It never pushes.<code>./script/setup --lean</code></div></li>
+        <li><div><b>Make it live</b> — push to your GitHub; optionally enable semantic search and schedule the nightly jobs.<code>git push -u origin main</code><div class="cap">Later: <span class="mono">./script/update</span> pulls only engine files from upstream — your notes are never touched.</div></div></li>
+      </ol>
+    </div>
+    <p class="tip" style="text-align:center;margin-top:22px">That's the whole system — <b>21 verbs</b>, one git repo, four roots, guardrailed, and yours. ✦</p>
+  </section>
+
+  <div style="height:30px"></div>
+</div>
+
+<div class="footnav">
+  <div class="inner">
+    <button class="btn ghost" id="prev">‹ Prev</button>
+    <div class="progress"><i id="bar"></i></div>
+    <span class="stepcount" id="count"></span>
+    <button class="btn" id="next">Next ›</button>
+  </div>
+</div>
+
+<script>
+const RISK = {
+  read:{c:'var(--read)',label:'read',rule:'Pure read. Runs freely, even unattended.'},
+  safe_write:{c:'var(--write)',label:'safe_write',rule:'Writes inside the roots — every change is a revertible git diff.'},
+  draft_only:{c:'var(--draft)',label:'draft_only',rule:'Produces a draft. A human sends; the system never transmits.'},
+  confirm:{c:'var(--confirm)',label:'confirm',rule:'Needs an explicit --yes. New/undeclared verbs default here.'},
+  deny:{c:'var(--deny)',label:'deny',rule:'Always refused: force-push, rm -rf, reading secrets, writing iCloud.'}
+};
+const GROUPS = [
+  ['SYSTEM',[['help','read','list verbs / usage — rendered from the manifest'],['status','read','dashboard: tasks, inbox, last index, repo state'],['doctor','safe_write','self-check: tools, folders, manifest, adapters, secrets, index'],['backup','read','nag if ~/ops is uncommitted or unpushed — never pushes for you'],['index','safe_write','rebuild the search index from your Markdown'],['consolidate','safe_write','nightly dream-lite: flag orphans/stale + a day digest']]],
+  ['FLOW',[['capture','safe_write','a thought → inbox/ (zero decisions; also reads stdin)'],['triage','safe_write','propose filing each inbox item into a task or note — you approve'],['start','safe_write','daily start: today\'s journal, carry-forward, dashboard'],['close','safe_write','daily close: summarize the day, flag loose ends'],['week','safe_write','weekly review: shipped/stalled, repo health, sweep done/']]],
+  ['KNOWLEDGE',[['search','read','ranked file#heading hits (keyword + graph [+ vectors])'],['wiki','safe_write','open / new / backlinks / stale / orphans']]],
+  ['TASKS',[['task','safe_write','list / add / show / move / done — folder = status']]],
+  ['WORK',[['new','safe_write','scaffold a project (repo + hub) or client (files + hub)'],['repo','safe_write','~/work fleet: health / clone / adopt / nuke-modules'],['archive','safe_write','git-bundle a dead repo into ~/work/archive/<year>/'],['files','safe_write','ingest binaries → ~/files + a wiki shadow note'],['sweep','safe_write','decay Desktop/Downloads: 7d → _swept → 60d → Trash']]],
+  ['BUSINESS',[['invoice','draft_only','DRAFT an invoice (reads tax-formula.md); never sends']]],
+  ['JOBS',[['job','safe_write','list / run / apply — render launchd plists for the nightly jobs']]]
+];
+const ROOTS = [
+  {ic:'🧠',nm:'~/ops',tag:'the system',ops:true,d:'<b>This repo.</b> Your knowledge (wiki), tasks, journal, the ops verbs and skills. Git-tracked — it becomes your own repo pushed to your GitHub. Plaintext only, so git stays fast even at 100k notes.'},
+  {ic:'💻',nm:'~/work',tag:'code',d:'<b>Every project is its own git repo</b>, organized into products/ labs/ tools/ clients/. Not part of ~/ops — the system operates on it (scaffold, health, archive) but never contains it.'},
+  {ic:'📦',nm:'~/files',tag:'binaries',d:'<b>Binary assets</b> — client docs, deliverables, PDFs, datasets. Not in git at all. The wiki references them with lightweight "shadow notes" so the graph knows about material it never stores.'},
+  {ic:'⚙️',nm:'~/dotfiles',tag:'the machine',d:'<b>Machine config.</b> Installs the tools and puts ops on PATH. The system inspects it but doesn\'t change it without being asked. Owns zero of your knowledge.'}
+];
+const FLOW = [
+  {ic:'💭',nm:'capture',sub:'thought',d:'<b>ops capture "…"</b> — drop a thought into inbox/ with zero decisions about where it goes. Pipe stdin or drop a file too.'},
+  {ic:'📥',nm:'inbox/',sub:'holding',d:'The inbox is a holding zone, not a home. Things wait here until you triage them — it should trend toward empty.'},
+  {ic:'🔀',nm:'triage',sub:'you approve',d:'<b>ops triage</b> — the system <i>proposes</i> a destination (task or note) for each item; you accept or redirect. Overrides teach it a filing rule.'},
+  {ic:'✅',nm:'task / wiki',sub:'it lands',d:'It becomes either a tracked task (folder = status: active/waiting/done) or a durable wiki note, auto-linked into the knowledge graph.'},
+  {ic:'📓',nm:'journal',sub:'the record',d:'<b>start</b> opens the day and carries forward open work; <b>close</b> summarizes it. Every capture, triage, and task move is logged automatically.'}
+];
+const STAGES = [
+  {h:'Keyword + graph',opt:'built in',p:'SQLite FTS5 full-text search fused with the wiki\'s [[wikilink]] graph via reciprocal-rank fusion. Fast, exact, zero setup.'},
+  {h:'Semantic vectors',opt:'opt-in',p:'Local embeddings (EmbeddingGemma via Ollama) in a LanceDB index find notes by meaning, not just words — multilingual, no server. Enable with OPS_VECTORS=1.'},
+  {h:'Cross-encoder rerank',opt:'opt-in',p:'A local reranker re-scores the top candidates for precision on hard, paraphrased queries. Enable with OPS_RERANK=1.'}
+];
+
+let cur=0, sections, total;
+const pills=document.getElementById('pills');
+
+function build(){
+  // roots
+  const rc=document.getElementById('roots');
+  ROOTS.forEach((r,i)=>{const el=document.createElement('div');el.className='root'+(r.ops?' ops':'');
+    el.innerHTML=`<div class="ic">${r.ic}</div><div class="nm mono">${r.nm}</div><div class="tag">${r.tag}</div>`;
+    el.onclick=()=>{document.querySelectorAll('#roots .root').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');
+      document.getElementById('rootDetail').innerHTML=`<h4 class="mono">${r.nm}</h4><p>${r.d}</p>`};rc.appendChild(el);});
+  // verbs
+  const g=document.getElementById('groups');
+  GROUPS.forEach(([name,verbs])=>{const blk=document.createElement('div');blk.className='group';
+    blk.innerHTML=`<div class="glabel">${name}</div>`;const ch=document.createElement('div');ch.className='chips';
+    verbs.forEach(([v,risk,desc])=>{const c=document.createElement('div');c.className='chip';
+      c.innerHTML=`<span class="dot" style="background:${RISK[risk].c}"></span><span class="v">${v}</span>`;
+      c.onclick=()=>{document.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel'));c.classList.add('sel');
+        document.getElementById('verbDetail').innerHTML=
+          `<span class="cmd">ops ${v}</span><span class="riskbadge" style="background:${RISK[risk].c}">${RISK[risk].label}</span>`+
+          `<p>${desc}</p><p style="color:var(--ink)"><b>Safety:</b> ${RISK[risk].rule}</p>`};
+      ch.appendChild(c);});blk.appendChild(ch);g.appendChild(blk);});
+  // flow
+  const f=document.getElementById('flow');
+  FLOW.forEach((n,i)=>{const el=document.createElement('div');el.className='fnode';el.dataset.i=i;
+    el.innerHTML=`<div class="fic">${n.ic}</div><div class="fnm">${n.nm}</div><div class="fsub">${n.sub}</div>`;
+    el.onclick=()=>selectFlow(i);f.appendChild(el);
+    if(i<FLOW.length-1){const a=document.createElement('div');a.className='arrow';a.textContent='→';f.appendChild(a);}});
+  // ladder
+  const l=document.getElementById('ladder');
+  Object.keys(RISK).forEach(k=>{const r=RISK[k];const el=document.createElement('div');el.className='rung';
+    el.innerHTML=`<div class="bar" style="background:${r.c}"></div><div class="rk">${r.label}</div><div class="rd">${r.rule}</div>`;
+    el.onclick=()=>{document.querySelectorAll('.rung').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');
+      document.getElementById('riskDetail').innerHTML=`<h4 class="mono">${r.label}</h4><p>${r.rule}</p>`+
+      (k==='deny'?'<p style="color:var(--ink)">These never run — not with a flag, not for an agent, not for you. The wall is the system\'s last line.</p>':
+       k==='confirm'?'<p style="color:var(--ink)">The safe default: anything the system isn\'t sure about asks first.</p>':'')};l.appendChild(el);});
+  // stages
+  const s=document.getElementById('stages');
+  STAGES.forEach((st,i)=>{const el=document.createElement('div');el.className='stage';
+    el.innerHTML=`<div class="num">${i+1}</div><div><h4>${st.h}<span class="opt">${st.opt}</span></h4><p>${st.p}</p></div>`;s.appendChild(el);});
+
+  // chapters + pills
+  sections=[...document.querySelectorAll('.chapter')];total=sections.length;
+  sections.forEach((sec,i)=>{const p=document.createElement('div');p.className='pill';
+    p.innerHTML=`<span class="n">${i}</span>${sec.dataset.title}`;p.onclick=()=>go(i);pills.appendChild(p);});
+  go(0);
+}
+function selectFlow(i){document.querySelectorAll('.fnode').forEach(x=>x.classList.remove('sel'));
+  document.querySelector(`.fnode[data-i="${i}"]`).classList.add('sel');
+  document.getElementById('flowDetail').innerHTML=`<h4 class="mono">${FLOW[i].nm}</h4><p>${FLOW[i].d}</p>`;}
+let playing=false;
+function play(){if(playing)return;playing=true;const btn=document.getElementById('playBtn');btn.disabled=true;
+  const nodes=document.querySelectorAll('.fnode');nodes.forEach(n=>n.classList.remove('lit'));
+  const st=document.getElementById('flowState');let i=0;
+  const tick=()=>{if(i>0)nodes[i-1].classList.remove('lit');
+    if(i<FLOW.length){nodes[i].classList.add('lit');selectFlow(i);st.textContent='→ '+FLOW[i].nm;i++;setTimeout(tick,900);}
+    else{playing=false;btn.disabled=false;st.textContent='✓ a thought is now durable knowledge';
+      setTimeout(()=>nodes.forEach(n=>n.classList.remove('lit')),700);}};tick();}
+function go(i){cur=Math.max(0,Math.min(total-1,i));
+  sections.forEach((s,k)=>s.classList.toggle('show',k===cur));
+  [...pills.children].forEach((p,k)=>p.classList.toggle('active',k===cur));
+  document.getElementById('bar').style.width=((cur+1)/total*100)+'%';
+  document.getElementById('count').textContent=(cur+1)+' / '+total;
+  document.getElementById('prev').disabled=cur===0;
+  document.getElementById('next').textContent=cur===total-1?'Done ✦':'Next ›';
+  window.scrollTo({top:0,behavior:'smooth'});}
+document.getElementById('next').onclick=()=>go(cur+1);
+document.getElementById('prev').onclick=()=>go(cur-1);
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')go(cur+1);if(e.key==='ArrowLeft')go(cur-1);});
+document.addEventListener('click',e=>{if(e.target.id==='playBtn')play();});
+build();
+</script>
+</body>
+</html>
