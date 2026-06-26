@@ -6,7 +6,9 @@ This repo is the **canonical starter** for that system.
 
 > 🖱️ **New here? Open [`docs/how-it-works.html`](docs/how-it-works.html)** — a single self-contained
 > interactive walkthrough of the whole system. No install, no dependencies: just open it in a browser
-> and click through the four roots, the 21 verbs, the daily loop, the guardrail, and the setup flow.
+> and click through the four roots, the 21 verbs, the guardrail, the setup flow, and a **Flows** tab
+> with six animated `ops` flowcharts (capture→knowledge, file ingest, daily/weekly, nightly jobs,
+> the guardrail check, and search).
 >
 > Full design: [`docs/design/PERSONAL_OS_DESIGN.md`](docs/design/PERSONAL_OS_DESIGN.md) (v3.7).
 > Why decisions were made: [`docs/DECISIONS.md`](docs/DECISIONS.md) (ADR log).
