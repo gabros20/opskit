@@ -1,0 +1,9 @@
+{
+  "verb": "files",
+  "summary": "binary assets: ingest [<path>] (→ ~/files + shadow note; iCloud proposed, not written) | open <slug>",
+  "usage": "ops files ingest [<path>] | open <slug>",
+  "risk": "safe_write",
+  "args": [{ "name": "action", "required": false, "default": "ingest" }],
+  "reads": ["inbox/", "wiki/files/"],
+  "writes": ["~/files/", "wiki/files/", "journal/"]
+}
