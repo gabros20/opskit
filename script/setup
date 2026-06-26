@@ -49,12 +49,15 @@ for r in work files; do
 done
 [ -e "$ROOTS_HOME/dotfiles" ] && echo "  ok:    ~/dotfiles detected" || echo "  note:  ~/dotfiles absent — the machine root is optional"
 
-say "3. track the template as 'upstream' (for script/update)"
+say "3. track the template as 'upstream' (fetch-only, for script/update)"
 if git -C "$ROOT" remote | grep -qx upstream; then
   echo "  ok:    upstream already set"
 else
   run "git -C '$ROOT' remote add upstream '$UPSTREAM_URL'"
 fi
+# fetch-only: disable pushing to upstream so your private vault can never leak to the template.
+# `git push` (no remote) goes to origin = your repo; only `script/update` reads from upstream.
+run "git -C '$ROOT' remote set-url --push upstream DISABLED_no_push_to_template"
 if git -C "$ROOT" remote get-url origin >/dev/null 2>&1; then
   if [ "$(git -C "$ROOT" remote get-url origin)" = "$UPSTREAM_URL" ]; then
     echo "  note:  origin still points at the template — set your own before pushing (step below)"

@@ -48,6 +48,8 @@ def main() -> int:
         check("sibling roots created", (home / "work").is_dir() and (home / "files").is_dir())
         check("sibling roots are NOT inside the repo", not (vault / "work").exists())
         check("upstream remote set", git(vault, "remote", "get-url", "upstream").stdout.strip() == UPSTREAM)
+        check("upstream is fetch-only (push disabled)",
+              "DISABLED" in git(vault, "remote", "get-url", "--push", "upstream").stdout)
         check("lean: test/ dropped from the vault", not git(vault, "ls-files", "test/").stdout.strip())
         check("lean: engine kept (bin/)", bool(git(vault, "ls-files", "bin/").stdout.strip()))
         check("lean: design docs kept", bool(git(vault, "ls-files", "docs/design/").stdout.strip()))
