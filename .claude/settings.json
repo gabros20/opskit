@@ -1,0 +1,20 @@
+{
+  "_comment": "Claude Code adapter for ~/ops. CLAUDE.md bridges to AGENTS.md; this is the guardrail in Claude's vocabulary. allow is additive (auto-approve the ops surface); deny blocks the §5 always-refused actions. For a fully autonomous operator vault, add \"defaultMode\": \"deny\" so ONLY the allowed tools run.",
+  "permissions": {
+    "allow": [
+      "Bash(ops:*)",
+      "Bash(./ops:*)",
+      "Bash(./script/setup:*)",
+      "Bash(./script/update:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(rm -rf:*)"
+    ]
+  }
+}

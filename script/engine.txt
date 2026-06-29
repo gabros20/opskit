@@ -13,6 +13,8 @@ bin
 skills
 AGENTS.md
 CLAUDE.md
+.codex
+.claude
 requirements.txt
 docs/design
 docs/DECISIONS.md

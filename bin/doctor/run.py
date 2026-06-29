@@ -74,6 +74,27 @@ def main(argv):
         "adapter: CLAUDE.md bridges @AGENTS.md" if claude.exists() else "adapter: CLAUDE.md MISSING")
     (ok if skill.exists() else fail)(f"adapter: skills/operate-ops/SKILL.md {'present' if skill.exists() else 'MISSING'}")
 
+    # per-agent adapters: warn if absent (a vault may not use every agent), FAIL if present-but-broken
+    cdx_cfg, cdx_sk = paths.OPS_HOME / ".codex" / "config.toml", paths.OPS_HOME / ".codex" / "skills"
+    if cdx_cfg.exists() or cdx_sk.is_symlink() or cdx_sk.exists():
+        (ok if cdx_cfg.exists() else warn)(".codex/config.toml" + ("" if cdx_cfg.exists() else " MISSING"))
+        (ok if (cdx_sk / "operate-ops").exists() else fail)(".codex/skills → skills/ resolves"
+            if (cdx_sk / "operate-ops").exists() else ".codex/skills symlink is BROKEN")
+    else:
+        warn(".codex/ adapter not set up (Codex & Grok read AGENTS.md natively regardless)")
+    cl_set, cl_sk = paths.OPS_HOME / ".claude" / "settings.json", paths.OPS_HOME / ".claude" / "skills"
+    if cl_set.exists() or cl_sk.is_symlink() or cl_sk.exists():
+        try:
+            json.loads(cl_set.read_text()); ok(".claude/settings.json parses")
+        except FileNotFoundError:
+            warn(".claude/settings.json MISSING")
+        except Exception as e:
+            fail(f".claude/settings.json is INVALID json: {e}")
+        (ok if (cl_sk / "operate-ops").exists() else fail)(".claude/skills → skills/ resolves"
+            if (cl_sk / "operate-ops").exists() else ".claude/skills symlink is BROKEN")
+    else:
+        warn(".claude/ adapter not set up (add it to lock Claude Code to the ops surface)")
+
     # 5. no tracked secrets / binaries in wiki
     tracked = paths.git("ls-files").splitlines()
     if tracked:

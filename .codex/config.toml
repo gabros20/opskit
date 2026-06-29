@@ -1,0 +1,5 @@
+# ~/ops/.codex/config.toml — Codex CLI adapter (NOT a second source of truth).
+# Codex reads ~/ops/AGENTS.md natively; this only scopes its sandbox to the ops surface.
+# Run Codex from ~/ops (or `codex --cd ~/ops`). The skill is reached via the .codex/skills symlink.
+sandbox_mode    = "workspace-write"   # writes confined to ~/ops; add ~/files & a repo per task
+approval_policy = "on-request"        # ask before anything outside the sandbox

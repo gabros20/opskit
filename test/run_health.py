@@ -38,11 +38,23 @@ def main() -> int:
         shutil.copy(REPO / "CLAUDE.md", h / "CLAUDE.md")
         (h / "skills" / "operate-ops").mkdir(parents=True)
         shutil.copy(REPO / "skills" / "operate-ops" / "SKILL.md", h / "skills" / "operate-ops" / "SKILL.md")
+        # per-agent adapters (relative skill symlinks, like the real repo)
+        (h / ".codex").mkdir(); (h / ".claude").mkdir()
+        (h / ".codex" / "config.toml").write_text('sandbox_mode="workspace-write"\n')
+        (h / ".claude" / "settings.json").write_text('{"permissions":{"allow":["Bash(ops:*)"]}}')
+        os.symlink("../skills", h / ".codex" / "skills"); os.symlink("../skills", h / ".claude" / "skills")
         run(h, "doctor", "--init")   # create skeleton folders
         run(h, "help")               # generate ops.json
         r = run(h, "doctor")
         check("doctor: well-formed ops has no FAIL", r.returncode == 0 and "FAIL" not in r.stdout, r.stdout)
         check("doctor checks adapters + manifest", "AGENTS.md present" in r.stdout and "ops.json parses" in r.stdout, r.stdout)
+        check("doctor verifies per-agent adapters", ".claude/settings.json parses" in r.stdout
+              and ".codex/skills → skills/ resolves" in r.stdout, r.stdout)
+        # a broken adapter symlink must FAIL
+        (h / ".claude" / "skills").unlink(); os.symlink("../nope", h / ".claude" / "skills")
+        rb = run(h, "doctor")
+        check("doctor FAILs on a broken adapter symlink", rb.returncode == 1 and "BROKEN" in rb.stdout, rb.stdout)
+        os.unlink(h / ".claude" / "skills"); os.symlink("../skills", h / ".claude" / "skills")
         r2 = run(h, "doctor")  # idempotent
         check("doctor is idempotent", r2.returncode == 0)
 
