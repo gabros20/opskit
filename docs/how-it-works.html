@@ -231,11 +231,14 @@
     <div class="card">
       <div class="flowtabs" id="flowtabs"></div>
       <div class="flowstage"><svg id="flowsvg" viewBox="0 0 980 320" preserveAspectRatio="xMidYMid meet" role="img"></svg></div>
-      <div style="display:flex; gap:10px; align-items:center; margin-top:14px">
+      <div style="display:flex; gap:8px; align-items:center; margin-top:14px; flex-wrap:wrap">
         <button class="btn" id="fcPlay">▶ Play</button>
+        <button class="btn ghost" id="fcBack">‹ Step</button>
+        <button class="btn ghost" id="fcFwd">Step ›</button>
         <button class="btn ghost" id="fcReset">Reset</button>
-        <span class="stepcount" id="fcCap" style="text-align:left; flex:1; min-width:0"></span>
+        <span class="stepcount" id="fcNum" style="min-width:48px"></span>
       </div>
+      <p class="stepcount" id="fcCap" style="text-align:left; margin:10px 2px 0; min-height:20px"></p>
       <div class="fclegend">
         <span><i class="fckey" style="background:#fff;border-color:var(--accent-soft);border-radius:8px"></i> start / end</span>
         <span><i class="fckey" style="background:var(--surface)"></i> verb / process</span>
@@ -444,25 +447,34 @@ function renderFlow(f){
     lines.forEach((ln,k)=>{const t=svgEl('text',{x:n.x,y:startY+k*14+4,'text-anchor':'middle'});t.textContent=ln;g.appendChild(t);});
     svg.appendChild(g);}
 }
-let fcTimer=null,fcCurrent=null;
-function fcResetVisual(){if(fcTimer){clearTimeout(fcTimer);fcTimer=null;}
+let fcTimer=null,fcCurrent=null,fcStep=0;
+function fcApply(){ // light steps 0..fcStep-1 cumulatively
   document.querySelectorAll('#flowsvg .on').forEach(e=>e.classList.remove('on'));
-  document.getElementById('fcCap').textContent='';document.getElementById('fcPlay').disabled=false;}
-function fcPlay(){fcResetVisual();const f=fcCurrent;const cap=document.getElementById('fcCap');let i=0;
-  document.getElementById('fcPlay').disabled=true;
-  const step=()=>{if(i>=f.seq.length){document.getElementById('fcPlay').disabled=false;fcTimer=null;return;}
-    const s=f.seq[i];
+  const f=fcCurrent;let cap='';
+  for(let i=0;i<fcStep;i++){const s=f.seq[i];
     (s.n||[]).forEach(id=>{const el=document.querySelector('#flowsvg [data-node="'+id+'"]');if(el)el.classList.add('on');});
     (s.e||[]).forEach(([a,b])=>{const e1=document.querySelector('#flowsvg [data-edge="'+a+'>'+b+'"]');if(e1)e1.classList.add('on');
       const l1=document.querySelector('#flowsvg [data-elab="'+a+'>'+b+'"]');if(l1)l1.classList.add('on');});
-    cap.textContent=s.t||'';i++;fcTimer=setTimeout(step,1100);};
-  step();}
-function fcSelect(idx){fcCurrent=FLOWS[idx];
+    cap=s.t||'';}
+  document.getElementById('fcCap').textContent=cap;
+  document.getElementById('fcNum').textContent=fcStep+' / '+f.seq.length;
+  document.getElementById('fcBack').disabled=fcStep<=0;
+  document.getElementById('fcFwd').disabled=fcStep>=f.seq.length;}
+function fcStopTimer(){if(fcTimer){clearTimeout(fcTimer);fcTimer=null;}document.getElementById('fcPlay').disabled=false;}
+function fcFwd(){fcStopTimer();if(fcStep<fcCurrent.seq.length){fcStep++;fcApply();}}
+function fcBack(){fcStopTimer();if(fcStep>0){fcStep--;fcApply();}}
+function fcReset(){fcStopTimer();fcStep=0;fcApply();}
+function fcPlay(){if(fcTimer)return;if(fcStep>=fcCurrent.seq.length)fcStep=0;
+  document.getElementById('fcPlay').disabled=true;
+  const tick=()=>{if(fcStep>=fcCurrent.seq.length){fcTimer=null;document.getElementById('fcPlay').disabled=false;return;}
+    fcStep++;fcApply();fcTimer=setTimeout(tick,1100);};tick();}
+function fcSelect(idx){fcStopTimer();fcCurrent=FLOWS[idx];fcStep=0;
   [...document.getElementById('flowtabs').children].forEach((t,k)=>t.classList.toggle('active',k===idx));
-  renderFlow(fcCurrent);fcResetVisual();}
+  renderFlow(fcCurrent);fcApply();}
 function initFlows(){const tabs=document.getElementById('flowtabs');
   FLOWS.forEach((f,i)=>{const b=document.createElement('div');b.className='flowtab';b.textContent=f.name;b.onclick=()=>fcSelect(i);tabs.appendChild(b);});
-  document.getElementById('fcPlay').onclick=fcPlay;document.getElementById('fcReset').onclick=fcResetVisual;fcSelect(0);}
+  document.getElementById('fcPlay').onclick=fcPlay;document.getElementById('fcReset').onclick=fcReset;
+  document.getElementById('fcBack').onclick=fcBack;document.getElementById('fcFwd').onclick=fcFwd;fcSelect(0);}
 
 let cur=0, sections, total;
 const pills=document.getElementById('pills');
