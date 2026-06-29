@@ -224,12 +224,17 @@ end-to-end. **23 offline test suites** (run in CI) cover the verbs, the guardrai
 
 ```sh
 python3 test/run_all.py                          # every offline suite (stdlib only, no network)
-python3 test/run_simulation.py --model sonnet    # optional: LLM-operator agnosticism check (needs a CLI)
+python3 test/run_simulation.py --compare sonnet opus   # LLM-operator agnosticism check (needs a CLI)
 ```
 
-Remaining before flipping public: run the two-agent agnosticism check across two different agents
-(`run_simulation.py`), and a final content pass. Seed notes, the per-agent adapters (`.codex/`,
-`.claude/`), the §6 agent indirection, and CI are all in place.
+**Agnosticism check (§18): passed.** The 18 adversarial operator scenarios were run through two
+different operators (Claude Sonnet and Opus): **18/18 passed for both, with 0 divergences** — they
+filed the same repo to the same root, refused the same actions, and traversed the wiki the same way.
+Zero divergence means the contract (`AGENTS.md` + `operate-ops`) is unambiguous. (Cross-vendor agents
+read the *same* contract; this harness measures it via Claude tiers because it asks the operator to
+emit a JSON plan rather than act.) Everything else — seed notes, per-agent adapters (`.codex/`,
+`.claude/`), the §6 agent indirection, and CI — is in place. The system is v1-complete; flipping
+public is your call.
 
 Design: [`docs/design/PERSONAL_OS_DESIGN.md`](docs/design/PERSONAL_OS_DESIGN.md) (v3.7) ·
 decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md).
