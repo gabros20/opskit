@@ -73,7 +73,7 @@ if [ "$LEAN" = "ask" ]; then
   if [ "$YES" = 1 ]; then LEAN=0; else ask "Make this a lean vault? (test/+ref/ stay in upstream, restorable)" && LEAN=1 || LEAN=0; fi
 fi
 if [ "$LEAN" = 1 ]; then
-  for p in test ref; do
+  for p in test ref .github; do
     if git -C "$ROOT" ls-files --error-unmatch "$p" >/dev/null 2>&1; then run "git -C '$ROOT' rm -r -q '$p'"; fi
   done
   echo "  ok:    lean (engine + content + design docs)"

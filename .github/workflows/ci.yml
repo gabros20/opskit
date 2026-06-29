@@ -1,0 +1,29 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  offline-suites:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: git identity (suites create temp repos)
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "ops-ci"
+          git config --global init.defaultBranch main
+      - name: run offline test suites
+        run: |
+          if [ -f test/run_all.py ]; then
+            python3 test/run_all.py
+          else
+            echo "lean vault — no test harness, nothing to run"
+          fi
