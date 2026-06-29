@@ -6,7 +6,7 @@ a terminal, on a schedule, or through any AI agent. No server, no cloud, no lock
 Markdown files in your own git repo; you can read them, grep them, and walk away from this tool at any
 time with nothing stranded.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · 21 verbs · 22 test suites · macOS / Linux · Python 3 + git
+[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · 21 verbs · 23 test suites · CI · macOS / Linux · Python 3 + git
 
 > 🖱️ **Want the 2-minute tour first?** Open **[`docs/how-it-works.html`](docs/how-it-works.html)** —
 > a single self-contained interactive walkthrough (no install, just open it in a browser). Click
@@ -220,15 +220,16 @@ The other roots (`~/work`, `~/files`, `~/dotfiles`) are created next to this one
 
 All **21 verbs of the design surface are built, guardrail-gated, and tested.** The retrieval engine,
 the enforced guardrail, the installer (`script/setup`/`update`), and the jobs scheduler all work
-end-to-end. **22 offline test suites** cover the verbs, the guardrail model, retrieval, and the flows.
+end-to-end. **23 offline test suites** (run in CI) cover the verbs, the guardrail model, the agent indirection, retrieval, and the flows.
 
 ```sh
 python3 test/run_all.py                          # every offline suite (stdlib only, no network)
 python3 test/run_simulation.py --model sonnet    # optional: LLM-operator agnosticism check (needs a CLI)
 ```
 
-Remaining for a public v1: seed example notes, ship the per-agent adapter config files, and run the
-two-agent agnosticism check across two different agents.
+Remaining before flipping public: run the two-agent agnosticism check across two different agents
+(`run_simulation.py`), and a final content pass. Seed notes, the per-agent adapters (`.codex/`,
+`.claude/`), the §6 agent indirection, and CI are all in place.
 
 Design: [`docs/design/PERSONAL_OS_DESIGN.md`](docs/design/PERSONAL_OS_DESIGN.md) (v3.7) ·
 decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md).

@@ -55,6 +55,10 @@ def main() -> int:
         rb = run(h, "doctor")
         check("doctor FAILs on a broken adapter symlink", rb.returncode == 1 and "BROKEN" in rb.stdout, rb.stdout)
         os.unlink(h / ".claude" / "skills"); os.symlink("../skills", h / ".claude" / "skills")
+        # `ops index --manifest` regenerates ops.json from the cmd.json sidecars
+        (h / "ops.json").unlink(missing_ok=True)
+        rm = run(h, "index", "--manifest")
+        check("ops index --manifest regenerates ops.json", rm.returncode == 0 and (h / "ops.json").exists(), rm.stdout + rm.stderr)
         r2 = run(h, "doctor")  # idempotent
         check("doctor is idempotent", r2.returncode == 0)
 

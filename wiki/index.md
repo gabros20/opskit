@@ -18,4 +18,7 @@ the note shape, and `docs/design/PERSONAL_OS_DESIGN.md` for the full design.
 <!-- Link your area hubs here as they're created, e.g. - [[business-admin]] -->
 
 ## Entry points
+- [[welcome]] — start here (example starter notes; delete when you're ready)
+- [[the-ops-loop]] — capture → triage → task/note
+- [[risk-classes]] — what the guardrail enforces
 - [[conventions]] — how notes are shaped and linked
