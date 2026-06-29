@@ -31,6 +31,7 @@ SUITES = [
     ("stage-2 hybrid LanceDB (§10.2)", "run_search_vec.py"),
     ("daily-driver verbs (§4/§7)", "run_verbs.py"),
     ("triage flow (§4/§10)", "run_triage.py"),
+    ("agent indirection (§6)", "run_agentlib.py"),
     ("daily/weekly rhythm (§16)", "run_loops.py"),
     ("health verbs: doctor, wiki (§14/§10)", "run_health.py"),
     ("maintenance: backup, consolidate (§14/§15)", "run_maintenance.py"),

@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths, filing  # noqa: E402
+from lib import paths, filing, agent  # noqa: E402
 
 # An item is a TASK when its first word is an imperative action verb (matched as a whole word,
 # so "merges"/"writing" don't false-trigger), or it's an explicit todo/checkbox line.
@@ -35,6 +35,17 @@ def parse_item(p: Path) -> str:
 def classify(text: str) -> str:
     if not text.strip():
         return "note"
+    # §6: if an agent is configured, borrow its judgment; otherwise fall through to the shell rule.
+    if agent.available():
+        ans = agent.run_agent(
+            "Classify this captured item as exactly one word — 'task' (an action to do) or "
+            f"'note' (a fact/idea to keep). Reply with only the word.\n\n{text}", scope="read")
+        if ans:
+            a = ans.strip().lower()
+            if "task" in a and "note" not in a:
+                return "task"
+            if "note" in a and "task" not in a:
+                return "note"
     first = text.splitlines()[0].lower()
     if first.startswith(("- [ ]", "todo", "[]")) or "follow up" in first:
         return "task"
