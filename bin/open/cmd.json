@@ -1,0 +1,28 @@
+{
+  "verb": "open",
+  "summary": "resolve & open anything: task id | wiki slug | files asset | search top hit",
+  "usage": "ops open <target> [--edit|--reveal|--obsidian]",
+  "risk": "read",
+  "args": [
+    {
+      "name": "target",
+      "required": false
+    }
+  ],
+  "reads": [
+    "tasks/",
+    "wiki/",
+    ".index/"
+  ],
+  "writes": [],
+  "hints": "One resolver for every addressable thing (task id → wiki slug → files shadow → search top hit). Default PRINTS the path — never launches a GUI. --edit ($EDITOR), --reveal (Finder open -R), --obsidian (obsidian:// URI via wiki open). Bare `ops open` with fzf = fuzzy picker with preview.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "target": "string",
+      "kind": "string",
+      "slug": "string",
+      "path": "string"
+    }
+  }
+}

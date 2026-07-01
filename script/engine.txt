@@ -11,6 +11,7 @@
 ops
 VERSION
 bin
+frontends
 skills
 AGENTS.md
 CLAUDE.md
@@ -21,5 +22,6 @@ docs/design
 docs/DECISIONS.md
 docs/how-it-works.html
 docs/obsidian-compat.md
+docs/mobile-and-capture.md
 .gitignore
 script

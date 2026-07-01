@@ -417,6 +417,69 @@
       "source": "engine"
     },
     {
+      "verb": "open",
+      "summary": "resolve & open anything: task id | wiki slug | files asset | search top hit",
+      "usage": "ops open <target> [--edit|--reveal|--obsidian]",
+      "risk": "read",
+      "args": [
+        {
+          "name": "target",
+          "required": false
+        }
+      ],
+      "reads": [
+        "tasks/",
+        "wiki/",
+        ".index/"
+      ],
+      "writes": [],
+      "hints": "One resolver for every addressable thing (task id \u2192 wiki slug \u2192 files shadow \u2192 search top hit). Default PRINTS the path \u2014 never launches a GUI. --edit ($EDITOR), --reveal (Finder open -R), --obsidian (obsidian:// URI via wiki open). Bare `ops open` with fzf = fuzzy picker with preview.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "target": "string",
+          "kind": "string",
+          "slug": "string",
+          "path": "string"
+        }
+      },
+      "source": "engine"
+    },
+    {
+      "verb": "orient",
+      "summary": "one-call session bootstrap: journal tail, tasks, inbox, proposals, index/backup age, git, recent notes",
+      "usage": "ops orient [--json|--line]",
+      "risk": "read",
+      "reads": [
+        "journal/",
+        "tasks/",
+        "inbox/",
+        "wiki/",
+        ".index/"
+      ],
+      "writes": [
+        ".cache/orient.line"
+      ],
+      "hints": "Read-only session bootstrap for humans and agents in one call. --json = the full envelope; --line = a \u226460-char string cached (short TTL, OPS_ORIENT_TTL) for a starship/tmux prompt hook. Common mistake: confusing it with `ops start`, which writes the journal.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "active": "int",
+          "waiting": "int",
+          "inbox": "int",
+          "proposals": "int",
+          "index_age_min": "int",
+          "backup_age_min": "int",
+          "git_dirty": "int",
+          "journal_tail": "array",
+          "top_tasks": "array",
+          "recent_notes": "array",
+          "line": "string"
+        }
+      },
+      "source": "engine"
+    },
+    {
       "verb": "plugin",
       "summary": "install/list/trust/update/remove plugin packs (untrusted until you trust them)",
       "usage": "ops plugin add <owner/repo|path>[@tag] --yes | list | trust <name> --yes | update <name> --yes | remove <name> --yes",
@@ -509,13 +572,14 @@
       "writes": [
         ".logs/queries.jsonl"
       ],
-      "hints": "Ranked file#heading hits (keyword + graph, +vectors if OPS_VECTORS). Common mistake: running before `ops index`, or too narrow a query \u2014 broaden and reindex.",
+      "hints": "Ranked file#heading hits with an FTS5 snippet excerpt (keyword + graph, +vectors if OPS_VECTORS). `--open` jumps to the top hit via `ops open`; bare `ops search` in a tty with fzf opens a live search session. Common mistake: running before `ops index`, or too narrow a query \u2014 broaden and reindex.",
       "output": {
         "mode": "rows",
         "fields": {
           "path": "string",
           "heading": "string",
-          "score": "number"
+          "score": "number",
+          "snippet": "string"
         }
       },
       "source": "engine"

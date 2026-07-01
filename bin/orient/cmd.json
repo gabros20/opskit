@@ -1,0 +1,33 @@
+{
+  "verb": "orient",
+  "summary": "one-call session bootstrap: journal tail, tasks, inbox, proposals, index/backup age, git, recent notes",
+  "usage": "ops orient [--json|--line]",
+  "risk": "read",
+  "reads": [
+    "journal/",
+    "tasks/",
+    "inbox/",
+    "wiki/",
+    ".index/"
+  ],
+  "writes": [
+    ".cache/orient.line"
+  ],
+  "hints": "Read-only session bootstrap for humans and agents in one call. --json = the full envelope; --line = a ≤60-char string cached (short TTL, OPS_ORIENT_TTL) for a starship/tmux prompt hook. Common mistake: confusing it with `ops start`, which writes the journal.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "active": "int",
+      "waiting": "int",
+      "inbox": "int",
+      "proposals": "int",
+      "index_age_min": "int",
+      "backup_age_min": "int",
+      "git_dirty": "int",
+      "journal_tail": "array",
+      "top_tasks": "array",
+      "recent_notes": "array",
+      "line": "string"
+    }
+  }
+}

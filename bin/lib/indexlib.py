@@ -255,6 +255,31 @@ def log_query(query: str, hits: list[tuple[str, str, float]]) -> None:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
+def snippets(query: str, wanted, k: int = 40) -> dict:
+    """FTS5 snippet() per matched note (proposal Part 3.4) — a short highlighted excerpt so an agent
+    judges relevance without opening the file. Keyed by path; '' for a hit that matched via the graph
+    or vector arm (no FTS body match). One MATCH query, first snippet per path (mirrors search()'s
+    keyword arm). Never raises — snippets are a display aid, not the ranking."""
+    wanted = set(wanted)
+    if not wanted:
+        return {}
+    con = connect()
+    out: dict = {}
+    try:
+        rows = con.execute(
+            "SELECT path, snippet(chunks, 2, '<', '>', '…', 12) AS s, bm25(chunks) AS r "
+            "FROM chunks WHERE chunks MATCH ? ORDER BY r LIMIT ?",
+            (_fts_query(query), k),
+        ).fetchall()
+        for path, s, _r in rows:
+            if path in wanted and path not in out:
+                out[path] = " ".join((s or "").split())
+    except sqlite3.OperationalError:
+        pass
+    con.close()
+    return out
+
+
 def search(query: str, k: int = 10, graph: bool = True, log: bool = False) -> list[tuple[str, str, float]]:
     """Return [(path, heading, score)] — FTS5 keyword + one-hop wikilink-graph, fused by RRF."""
     con = connect()
