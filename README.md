@@ -91,6 +91,8 @@ auto-detected — nothing is required to run `ops`:
 - Semantic search (stages 2–3): [Ollama](https://ollama.com) + `pip install -r requirements.txt`.
 - Prettier note rendering: [`glow`](https://github.com/charmbracelet/glow) or `bat` (else a built-in renderer).
 - Fuzzy note-picking: [`fzf`](https://github.com/junegunn/fzf) (else `ops wiki open` with no slug just lists notes).
+- Better bookmark extraction: [`trafilatura`](https://github.com/adbar/trafilatura) (`pip install trafilatura`) turns a
+  URL into real main-content Markdown; without it `ops bookmark` uses a built-in crude strip. Stays local — no cloud reader.
 
 ---
 

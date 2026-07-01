@@ -122,6 +122,31 @@ def main() -> int:
         r = run(h, "bookmark")
         check("bookmark with no url → usage", r.returncode == 2, r.stderr)
 
+    # ---- F: extraction auto-upgrades to trafilatura when installed (else crude strip) ----
+    try:
+        import trafilatura  # noqa: F401
+        have_traf = True
+    except Exception:
+        have_traf = False
+    if have_traf:
+        with tempfile.TemporaryDirectory() as td:
+            h = Path(td)
+            fx = h / "article.html"
+            fx.write_text(
+                "<html><head><title>Ranking Fusion</title></head><body>"
+                "<nav>Home About Contact SUBSCRIBE-NOW-JUNK</nav>"
+                "<article><h1>Ranking Fusion</h1>"
+                "<p>Reciprocal rank fusion combines multiple ranked lists without tuning weights.</p>"
+                "<p>It is robust because it depends only on rank position, not raw scores.</p>"
+                "</article><footer>COPYRIGHT-FOOTER-JUNK 2026</footer></body></html>", encoding="utf-8")
+            r = run(h, "bookmark", "https://example.com/fusion", env_extra={"OPS_BOOKMARK_FIXTURE": str(fx)})
+            body = read(h / "wiki" / "bookmarks" / "ranking-fusion.md") if (h / "wiki" / "bookmarks" / "ranking-fusion.md").exists() else ""
+            check("trafilatura extracts the article body", "Reciprocal rank fusion combines" in body, r.stdout + body[:120])
+            check("trafilatura drops nav/footer boilerplate",
+                  "SUBSCRIBE-NOW-JUNK" not in body and "COPYRIGHT-FOOTER-JUNK" not in body, body)
+    else:
+        check("trafilatura extraction (skipped: not installed)", True)
+
     # ---- F: the guardrail admits bookmark (the gate the dispatcher runs before exec) ----
     g = subprocess.run([sys.executable, str(_BINLIB / "guardrail.py"), "bookmark", "https://example.com/x", "--no-fetch"],
                        capture_output=True, text=True)

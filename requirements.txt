@@ -12,3 +12,7 @@ fastembed>=0.4         # ONNX runtime, no torch; auto-picks jina-reranker-v2-bas
 # ...plus a local embedder, NOT a pip dep: a running Ollama with the model pulled —
 #   ollama pull embeddinggemma         # default (ADR-005); or bge-m3 / qwen3-embedding:0.6b
 # Override the model with OPS_EMBED_MODEL. Everything stays local/offline; no cloud, no server.
+#
+# Bookmark extraction (ops bookmark) — optional local upgrade. Without it, `ops bookmark` still
+# works (built-in crude strip); with it you get real main-content article → Markdown, all local:
+trafilatura>=2.0       # best-in-class local extractor (drops nav/ads, native MD). Auto-detected.

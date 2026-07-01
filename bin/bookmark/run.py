@@ -54,11 +54,27 @@ def _fetch(url: str):
 
 
 def _readable(html: str, limit: int = 1200) -> str:
+    """Zero-dependency fallback: crude tag-strip, capped (noisy — keeps nav/boilerplate)."""
     text = _ANGLE.sub(" ", _TAGS.sub(" ", html))
     text = _WS.sub(" ", _unescape(text))
     lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
     joined = " ".join(lines)
     return (joined[:limit] + "…") if len(joined) > limit else joined
+
+
+def _extract(html: str, url: str) -> str:
+    """Main-content extraction → Markdown. Auto-upgrades to trafilatura (local, pip) if importable —
+    real article extraction that drops nav/ads and keeps the full body; else the crude strip above.
+    (Cloud readers like Jina are deliberately NOT a default — they'd send the URL to a third party.)"""
+    try:
+        import trafilatura  # optional local enhancer; `pip install trafilatura`
+        md = trafilatura.extract(html, url=url, output_format="markdown",
+                                 include_links=True, include_comments=False)
+        if md and md.strip():
+            return md.strip()
+    except Exception:
+        pass
+    return _readable(html)
 
 
 def _title_from_url(url: str) -> str:
@@ -111,7 +127,7 @@ def main(argv: list[str]) -> int:
     if note_extra:
         body_parts.append(note_extra)
     if html and not no_fetch:
-        body_parts.append("## Extract\n" + _readable(html))
+        body_parts.append("## Extract\n" + _extract(html, url))
     body = "\n\n".join(body_parts)
 
     d = paths.WIKI / notetype.type_dir("bookmark")
