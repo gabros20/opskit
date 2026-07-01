@@ -103,7 +103,7 @@ Fridays. Everything else is discoverable via `ops help`. The full surface:
 |---|---|
 | **System** | `help` · `status` · `doctor` (self-check) · `backup` (commit/push nag) · `index` · `consolidate` |
 | **Flow** | `capture` · `triage` · `start` · `close` · `week` |
-| **Knowledge** | `search` · `wiki` (open / edit / new / backlinks / stale / orphans) |
+| **Knowledge** | `search` · `wiki` (open / edit / new / backlinks / stale / orphans) · `bookmark` (URL → note) |
 | **Tasks** | `task` (list / add / show / move / done — folder = status) |
 | **Work** | `new` (scaffold project/client) · `repo` (fleet health/clone/adopt) · `archive` · `files` (ingest binaries) · `sweep` (Desktop/Downloads decay) |
 | **Business** | `invoice` (draft only — never sends) |
@@ -116,6 +116,7 @@ ops wiki new note "An idea"    # a structured note (frontmatter + slug, right fo
 ops wiki open rrf              # read a note, rendered in the terminal
 ops wiki edit rrf              # open it in $EDITOR
 ops wiki backlinks rrf         # what links here
+ops bookmark https://… --archive   # save a URL as a note (title fetched); snapshot to ~/files
 ops new project "Acme Webapp" --kind products   # scaffold a ~/work repo + wiki hub
 ops doctor                     # is everything healthy?
 ```

@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import manifest, paths  # noqa: E402
+from lib import manifest, notetype, paths  # noqa: E402
 
 WIKI_SUBS = {
     "open": "render a note in the terminal", "edit": "open a note in $EDITOR",
@@ -23,10 +23,6 @@ WIKI_SUBS = {
     "stale": "notes untouched for N+ days", "orphans": "notes with no inbound links",
     "list": "counts by type",
 }
-WIKI_TYPES = {"note": "atomic note", "client": "client hub", "project": "project hub",
-              "area": "area hub", "person": "person", "tool": "tool", "runbook": "runbook",
-              "decision": "decision record", "meeting": "meeting note", "research": "research",
-              "prediction": "prediction", "skill": "skill"}
 TASK_SUBS = {"list": "list tasks", "add": "add a task", "show": "show one task",
              "move": "change status", "done": "mark done"}
 TASK_STATUSES = {"inbox": "", "active": "", "waiting": "", "done": ""}
@@ -82,7 +78,8 @@ def main(prior: list[str]) -> int:
         elif prior[1] in ("open", "edit", "backlinks"):
             _emit(_note_slugs())
         elif prior[1] == "new" and len(prior) == 2:
-            _emit(WIKI_TYPES.items())
+            reg = notetype.load_types()
+            _emit((t, "hub" if reg[t].get("hub") else reg[t].get("dir", "")) for t in sorted(reg))
     elif verb == "task":
         if len(prior) == 1:
             _emit(TASK_SUBS.items())

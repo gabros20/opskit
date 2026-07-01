@@ -10,11 +10,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths, render  # noqa: E402
-
-TYPE_DIR = {"note": "notes", "client": "clients", "project": "projects", "area": "areas",
-            "person": "people", "tool": "tools", "runbook": "runbooks", "decision": "notes",
-            "meeting": "notes", "research": "research", "prediction": "predictions", "skill": "skills"}
+from lib import notetype, paths, render  # noqa: E402
 
 
 def _notes():
@@ -83,20 +79,16 @@ def main(argv):
         if len(argv) < 3:
             print("usage: ops wiki new <type> <name>", file=sys.stderr); return 2
         typ, name = argv[1], " ".join(argv[2:])
-        folder = TYPE_DIR.get(typ)
-        if not folder:
-            print(f"type must be one of {sorted(TYPE_DIR)}", file=sys.stderr); return 2
+        if not notetype.is_type(typ):
+            print(f"type must be one of {sorted(notetype.load_types())}", file=sys.stderr); return 2
         slug = paths.slugify(name)
         if slug in notes:
             print(f"slug '{slug}' already exists ({notes[slug].relative_to(paths.OPS_HOME)}) — slugs are unique",
                   file=sys.stderr); return 1
-        d = paths.WIKI / folder
+        d = paths.WIKI / notetype.type_dir(typ)
         d.mkdir(parents=True, exist_ok=True)
         f = d / f"{slug}.md"
-        hub = typ in ("client", "project", "area")
-        body = (f"# {name}\n\n" + ("\n## Timeline\n- " + paths.today() + " created\n" if hub else "\n"))
-        f.write_text(f"---\ntype: {typ}\ntitle: {name}\nstatus: active\ncreated: {paths.today()}\n"
-                     f"updated: {paths.today()}\ntags: []\naliases: []\n---\n{body}", encoding="utf-8")
+        f.write_text(notetype.render(typ, title=name, slug=slug), encoding="utf-8")
         paths.append_journal(f"wiki new {typ}: {slug}")
         print(f"created -> {f.relative_to(paths.OPS_HOME)}")
 

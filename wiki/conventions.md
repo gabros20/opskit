@@ -15,7 +15,12 @@ lives in `docs/design/PERSONAL_OS_DESIGN.md` §10.1.
 ## Frontmatter (every note)
 `type`, `title`, `status`, `created`, `updated`, `tags`, `aliases`. Bump `updated:` on every edit.
 Allowed `type`: `client | project | area | person | tool | note | runbook | skill | decision |
-meeting | research | prediction`.
+meeting | research | prediction | bookmark`.
+
+The type registry is **data-driven** — the authoritative list (and each type's target folder and
+per-type body template) lives in `templates/wiki/` (`types.json` + `<type>.md`). Adding a note type is
+config, not code: add an entry to `types.json` (and optionally a `<type>.md` template), and it's
+immediately usable by `ops wiki new <type>` and tab-completion. See `bin/lib/notetype.py`.
 
 ## Slugs & files
 - Filenames are stable, human-readable slugs (`stripe-webhook-retries.md`), **globally unique**

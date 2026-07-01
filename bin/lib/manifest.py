@@ -16,7 +16,7 @@ MANIFEST = paths.OPS_HOME / "ops.json"       # ...but ops.json is written to the
 GROUPS = [
     ("SYSTEM", ["help", "status", "doctor", "backup", "index", "consolidate"]),
     ("FLOW", ["capture", "triage", "start", "close", "week"]),
-    ("KNOWLEDGE", ["search", "wiki"]),
+    ("KNOWLEDGE", ["search", "wiki", "bookmark"]),
     ("TASKS", ["task"]),
     ("WORK", ["new", "repo", "archive", "files", "sweep"]),
     ("BUSINESS", ["invoice"]),
