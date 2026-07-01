@@ -3,7 +3,28 @@
   "summary": "list | add \"<title>\" | show <id> | move <id> <status> | done <id>",
   "usage": "ops task <action> [args]",
   "risk": "safe_write",
-  "args": [{ "name": "action", "required": false, "default": "list" }],
-  "reads": ["tasks/"],
-  "writes": ["tasks/", "journal/"]
+  "args": [
+    {
+      "name": "action",
+      "required": false,
+      "default": "list"
+    }
+  ],
+  "reads": [
+    "tasks/"
+  ],
+  "writes": [
+    "tasks/",
+    "journal/"
+  ],
+  "hints": "The task system: list/add/show/move/done. Common mistake: inventing a status \u2014 it must be one of inbox/active/waiting/done.",
+  "output": {
+    "mode": "rows",
+    "fields": {
+      "id": "string",
+      "title": "string",
+      "status": "string"
+    }
+  },
+  "dry_run": true
 }

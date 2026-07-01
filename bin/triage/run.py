@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths, filing, agent  # noqa: E402
+from lib import paths, filing, agent, output  # noqa: E402
 
 # An item is a TASK when its first word is an imperative action verb (matched as a whole word,
 # so "merges"/"writing" don't false-trigger), or it's an explicit todo/checkbox line.
@@ -83,9 +83,21 @@ def items():
 
 
 def main(argv):
+    js, argv = output.parse_argv(argv)
     dry = "--dry-run" in argv
     yes = "--yes" in argv or "-y" in argv
     its = items()
+
+    if js:  # machine mode: emit proposals as rows, file nothing (agent files via task/wiki)
+        rows = []
+        for p in its:
+            text = parse_item(p)
+            kind = classify(text)
+            title = (text.splitlines()[0] if text.strip() else p.stem)[:70]
+            dest = "tasks/active/" if kind == "task" else f"wiki/notes/{paths.slugify(title)}.md"
+            rows.append({"item": p.name, "title": title, "proposal": kind, "dest": dest})
+        return output.emit_rows(rows, "triage", header={"items": len(its)})
+
     if not its:
         print("inbox is empty — nothing to triage.")
         return 0

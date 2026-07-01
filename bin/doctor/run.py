@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import guardrail, paths  # noqa: E402
+from lib import guardrail, output, paths  # noqa: E402
 
 GREEN, RED, YEL, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 BIN = Path(__file__).resolve().parents[1]
@@ -75,6 +75,7 @@ def _fm_churn(path: Path) -> str:
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
     init = "--init" in argv
 
     # 1. tools
@@ -208,10 +209,16 @@ def main(argv):
 
     nfail = sum(1 for lv, _ in checks if lv == "fail")
     nwarn = sum(1 for lv, _ in checks if lv == "warn")
-    for lv, m in checks:
-        c = {"ok": GREEN + "ok  ", "warn": YEL + "warn", "fail": RED + "FAIL"}[lv]
-        print(f"  {c}{RESET} {m}")
-    print(f"\ndoctor: {len(checks)-nfail-nwarn} ok, {nwarn} warn, {nfail} fail")
+    rows = [{"level": lv, "message": m} for lv, m in checks]
+
+    def render(_):
+        for lv, m in checks:
+            c = {"ok": GREEN + "ok  ", "warn": YEL + "warn", "fail": RED + "FAIL"}[lv]
+            print(f"  {c}{RESET} {m}")
+        print(f"\ndoctor: {len(checks)-nfail-nwarn} ok, {nwarn} warn, {nfail} fail")
+
+    output.emit_rows(rows, "doctor", human=render,
+                     header={"passed": len(checks) - nfail - nwarn, "warn": nwarn, "fail": nfail})
     return 1 if nfail else 0
 
 

@@ -3,6 +3,21 @@
   "summary": "list verbs / usage for one (rendered from ops.json)",
   "usage": "ops help [verb]",
   "risk": "read",
-  "reads": ["bin/*/cmd.json"],
-  "writes": ["ops.json"]
+  "reads": [
+    "bin/*/cmd.json"
+  ],
+  "writes": [
+    "ops.json"
+  ],
+  "hints": "The surface itself: verbs, capabilities, per-verb I/O contract. Read this first; never invent a verb. Common mistake: hardcoding a verb list instead of reading ops.json.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "schema": "string",
+      "ops_version": "string",
+      "api_version": "string",
+      "capabilities": "object",
+      "verbs": "list"
+    }
+  }
 }

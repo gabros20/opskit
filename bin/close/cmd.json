@@ -3,6 +3,23 @@
   "summary": "daily close: summarize the day into the journal, flag loose ends",
   "usage": "ops close [--automated]",
   "risk": "safe_write",
-  "reads": ["tasks/", "journal/", ".git"],
-  "writes": ["journal/"]
+  "reads": [
+    "tasks/",
+    "journal/",
+    ".git"
+  ],
+  "writes": [
+    "journal/"
+  ],
+  "hints": "Daily close: writes a facts digest (commits, completed, stalled) into the journal. Common mistake: expecting prose \u2014 the shell fallback logs facts only.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "journal": "string",
+      "commits": "int",
+      "completed": "int",
+      "no_progress": "int",
+      "uncommitted": "int"
+    }
+  }
 }

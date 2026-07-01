@@ -1,4 +1,14 @@
 {
+  "schema": "ops.json/2",
+  "ops_version": "4.0.0-dev",
+  "api_version": "1.0",
+  "json_envelope": 1,
+  "capabilities": {
+    "vectors": true,
+    "rerank": true,
+    "agent": "none",
+    "plugins": []
+  },
   "verbs": [
     {
       "verb": "archive",
@@ -19,7 +29,18 @@
         "~/work/archive/",
         "wiki/projects/",
         "journal/"
-      ]
+      ],
+      "hints": "Retire a dead ~/work repo to a restorable git bundle. Common mistake: run it on the repo you're still using \u2014 it removes the working tree (bundle restores it).",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "slug": "string",
+          "bundle": "string",
+          "hub_marked": "bool"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "backup",
@@ -29,7 +50,20 @@
       "reads": [
         ".git"
       ],
-      "writes": []
+      "writes": [],
+      "hints": "Check whether ~/ops is committed + pushed; exit 1 = at risk. Common mistake: expecting it to push \u2014 it never transmits, it only nags.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "git_repo": "bool",
+          "branch": "string",
+          "upstream": "string",
+          "dirty": "int",
+          "unpushed": "int",
+          "at_risk": "bool"
+        }
+      },
+      "source": "engine"
     },
     {
       "verb": "bookmark",
@@ -61,7 +95,20 @@
         "wiki/bookmarks/",
         "journal/",
         "~/files/bookmarks/ (with --archive)"
-      ]
+      ],
+      "hints": "Save a URL as a wiki bookmark note (title fetched best-effort). Common mistake: --archive without a reachable page \u2014 the HTML snapshot is skipped.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "url": "string",
+          "title": "string",
+          "slug": "string",
+          "path": "string",
+          "archived": "string"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "capture",
@@ -79,7 +126,17 @@
       "writes": [
         "inbox/",
         "journal/"
-      ]
+      ],
+      "hints": "Zero-decision dump of a thought into inbox/ for later triage. Common mistake: using it for an actionable to-do \u2014 use `ops task add` instead.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "path": "string",
+          "text": "string"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "close",
@@ -93,7 +150,19 @@
       ],
       "writes": [
         "journal/"
-      ]
+      ],
+      "hints": "Daily close: writes a facts digest (commits, completed, stalled) into the journal. Common mistake: expecting prose \u2014 the shell fallback logs facts only.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "journal": "string",
+          "commits": "int",
+          "completed": "int",
+          "no_progress": "int",
+          "uncommitted": "int"
+        }
+      },
+      "source": "engine"
     },
     {
       "verb": "consolidate",
@@ -108,7 +177,22 @@
       ],
       "writes": [
         "journal/"
-      ]
+      ],
+      "hints": "Nightly zero-LLM maintenance: wiki orphans/stale + day digest into the journal. Common mistake: scheduling something heavier \u2014 this is read + one journal append.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "journal": "string",
+          "notes": "int",
+          "orphans": "list",
+          "stale": "list",
+          "commits": "int",
+          "done_today": "int",
+          "captures": "int"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "doctor",
@@ -125,7 +209,16 @@
       ],
       "writes": [
         "(skeleton folders, only with --init)"
-      ]
+      ],
+      "hints": "Self-check: tools, folders, manifest, secrets, sync-wall. --init creates missing folders. Common mistake: ignoring a FAIL (exit 1) \u2014 WARN is advisory, FAIL is not.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "level": "string",
+          "message": "string"
+        }
+      },
+      "source": "engine"
     },
     {
       "verb": "files",
@@ -148,7 +241,19 @@
         "wiki/files/",
         "wiki/ (hub links)",
         "journal/"
-      ]
+      ],
+      "hints": "The binary-assets plane: ingest routes a file into ~/files + writes a wiki shadow note. Common mistake: expecting the binary in git \u2014 only the plaintext shadow note is tracked.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "slug": "string",
+          "title": "string",
+          "hub": "string",
+          "path": "string"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "help",
@@ -160,7 +265,19 @@
       ],
       "writes": [
         "ops.json"
-      ]
+      ],
+      "hints": "The surface itself: verbs, capabilities, per-verb I/O contract. Read this first; never invent a verb. Common mistake: hardcoding a verb list instead of reading ops.json.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "schema": "string",
+          "ops_version": "string",
+          "api_version": "string",
+          "capabilities": "object",
+          "verbs": "list"
+        }
+      },
+      "source": "engine"
     },
     {
       "verb": "index",
@@ -174,7 +291,16 @@
       "writes": [
         ".index/",
         "ops.json"
-      ]
+      ],
+      "hints": "Rebuild the FTS5 + graph search index over wiki (+vectors if OPS_VECTORS). Common mistake: searching before indexing \u2014 an empty index returns no hits.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "indexed": "int"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "invoice",
@@ -198,7 +324,23 @@
       "writes": [
         "~/files/clients/<slug>/out/",
         "journal/"
-      ]
+      ],
+      "hints": "DRAFT an invoice (computes VAT); never sends. Common mistake: expecting delivery \u2014 you export and send by hand.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "client": "string",
+          "invoice_no": "string",
+          "net": "number",
+          "vat": "number",
+          "gross": "number",
+          "currency": "string",
+          "rate": "number",
+          "path": "string"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "job",
@@ -219,7 +361,20 @@
         "jobs/launchd/",
         ".logs/jobs/",
         "journal/"
-      ]
+      ],
+      "hints": "Scheduler-neutral jobs: list/run/apply. Only read/safe_write may be scheduled. Common mistake: a job with inline shell logic \u2014 a job calls exactly ONE verb.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "name": "string",
+          "schedule": "string",
+          "command": "string",
+          "risk": "string",
+          "warns": "list"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "new",
@@ -248,7 +403,18 @@
         "bin/ (new verb)",
         "ops.json",
         "journal/"
-      ]
+      ],
+      "hints": "Scaffold a project (wiki hub + ~/work repo), client (hub + ~/files tree), or verb. Common mistake: a slug that collides \u2014 slugs are globally unique across the three roots.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "type": "string",
+          "slug": "string",
+          "hub": "string"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "repo",
@@ -270,7 +436,21 @@
         "~/work/",
         "wiki/projects/",
         "journal/"
-      ]
+      ],
+      "hints": "The ~/work fleet manager: health/clone/adopt/nuke-modules. health exit 1 = repos need attention. Common mistake: adopting into the wrong --kind (products|labs|tools).",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "repo": "string",
+          "dirty": "int",
+          "has_remote": "bool",
+          "unpushed": "int",
+          "age_days": "int",
+          "flags": "list",
+          "clean": "bool"
+        }
+      },
+      "source": "engine"
     },
     {
       "verb": "search",
@@ -289,7 +469,17 @@
       ],
       "writes": [
         ".logs/queries.jsonl"
-      ]
+      ],
+      "hints": "Ranked file#heading hits (keyword + graph, +vectors if OPS_VECTORS). Common mistake: running before `ops index`, or too narrow a query \u2014 broaden and reindex.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "path": "string",
+          "heading": "string",
+          "score": "number"
+        }
+      },
+      "source": "engine"
     },
     {
       "verb": "start",
@@ -303,7 +493,19 @@
       ],
       "writes": [
         "journal/"
-      ]
+      ],
+      "hints": "Daily start: opens today's journal, carries forward open tasks, shows the dashboard. Common mistake: expecting it to be read-only \u2014 it seeds and logs to the journal.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "date": "string",
+          "journal": "string",
+          "active": "int",
+          "waiting": "int",
+          "inbox": "int"
+        }
+      },
+      "source": "engine"
     },
     {
       "verb": "status",
@@ -316,7 +518,21 @@
         "wiki/",
         ".index/"
       ],
-      "writes": []
+      "writes": [],
+      "hints": "One-screen dashboard: tasks, inbox, index freshness, git state. Read-class. Common mistake: confusing it with `ops start` (which writes the journal).",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "ops_home": "string",
+          "active": "int",
+          "waiting": "int",
+          "inbox": "int",
+          "wiki": "int",
+          "index_age_min": "int",
+          "git_dirty": "int"
+        }
+      },
+      "source": "engine"
     },
     {
       "verb": "sweep",
@@ -332,7 +548,19 @@
         "~/Downloads/_swept",
         "~/.Trash",
         "journal/"
-      ]
+      ],
+      "hints": "Decay Desktop/Downloads: untouched 7d \u2192 _swept/, 60d in _swept \u2192 Trash (never deletes outright). Common mistake: expecting rescue by reopening \u2014 rescue is `ops files ingest`.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "action": "string",
+          "zone": "string",
+          "name": "string",
+          "bucket": "string"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "task",
@@ -352,7 +580,18 @@
       "writes": [
         "tasks/",
         "journal/"
-      ]
+      ],
+      "hints": "The task system: list/add/show/move/done. Common mistake: inventing a status \u2014 it must be one of inbox/active/waiting/done.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "id": "string",
+          "title": "string",
+          "status": "string"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "triage",
@@ -375,7 +614,19 @@
         "wiki/notes/",
         "journal/",
         "wiki/conventions.md"
-      ]
+      ],
+      "hints": "Propose filing of inbox/ items into a task or note; the human approves. --json lists proposals without filing. Common mistake: expecting it to auto-file without --yes.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "item": "string",
+          "title": "string",
+          "proposal": "string",
+          "dest": "string"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     },
     {
       "verb": "week",
@@ -389,7 +640,19 @@
       "writes": [
         "tasks/done/",
         "journal/"
-      ]
+      ],
+      "hints": "Weekly review: shipped vs stalled, repo health, sweeps done/ into done/<year>/. Common mistake: running it mid-week expecting it not to sweep \u2014 it always sweeps completed tasks.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "journal": "string",
+          "shipped": "int",
+          "stalled": "int",
+          "repo_dirty": "int",
+          "swept": "int"
+        }
+      },
+      "source": "engine"
     },
     {
       "verb": "wiki",
@@ -409,7 +672,17 @@
       "writes": [
         "wiki/",
         "journal/"
-      ]
+      ],
+      "hints": "Navigate/grow the wiki: open/edit/new/backlinks/stale/orphans/list. Common mistake: a duplicate slug on `new` \u2014 slugs are unique.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "type": "string",
+          "count": "int"
+        }
+      },
+      "dry_run": true,
+      "source": "engine"
     }
   ]
 }

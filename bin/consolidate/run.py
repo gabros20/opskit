@@ -9,7 +9,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import output, paths  # noqa: E402
 
 
 def _wiki_health():
@@ -37,6 +37,8 @@ def _wiki_health():
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
+    dry = "--dry-run" in argv
     td = date.today().isoformat()
     n_notes, orphans, stale = _wiki_health()
     commits = len([ln for ln in paths.git("log", "--since=00:00:00", "--oneline").splitlines() if ln.strip()])
@@ -51,15 +53,27 @@ def main(argv):
         block.append(f"- link these orphans: {', '.join(orphans[:12])}")
     if stale:
         block.append(f"- revisit stale: {', '.join(stale[:12])}")
-    note, _ = paths.ensure_journal()
-    with open(note, "a", encoding="utf-8") as fh:
-        fh.write("\n".join(block) + "\n")
-    paths.append_journal("consolidated" + (" (automated)" if "--automated" in argv else ""))
 
-    print(f"consolidate -> {note.relative_to(paths.OPS_HOME)}")
-    print(f"  wiki: {n_notes} notes, {len(orphans)} orphans, {len(stale)} stale | "
-          f"today: {commits} commits, {len(done_today)} done, {captures} to triage")
-    return 0
+    note = paths.journal_path(date.today())
+    if not dry:
+        note, _ = paths.ensure_journal()
+        with open(note, "a", encoding="utf-8") as fh:
+            fh.write("\n".join(block) + "\n")
+        paths.append_journal("consolidated" + (" (automated)" if "--automated" in argv else ""))
+
+    data = {"dry_run": dry, "journal": str(note.relative_to(paths.OPS_HOME)),
+            "notes": n_notes, "orphans": orphans, "stale": stale,
+            "commits": commits, "done_today": len(done_today), "captures": captures}
+
+    def render(_):
+        head = "would consolidate ->" if dry else "consolidate ->"
+        print(f"{head} {note.relative_to(paths.OPS_HOME)}")
+        print(f"  wiki: {n_notes} notes, {len(orphans)} orphans, {len(stale)} stale | "
+              f"today: {commits} commits, {len(done_today)} done, {captures} to triage")
+        if dry:
+            print("  (dry run — nothing written)")
+
+    return output.emit(data, "consolidate", human=render)
 
 
 if __name__ == "__main__":

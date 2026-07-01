@@ -9,10 +9,11 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import output, paths  # noqa: E402
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
     automated = "--automated" in argv  # used by the nightly nudge job (§15)
     td = date.today().isoformat()
     note, _ = paths.ensure_journal()
@@ -38,12 +39,22 @@ def main(argv):
         fh.write("\n".join(block) + "\n")
     paths.append_journal("closed the day" + (" (automated)" if automated else ""))
 
-    print(f"day closed -> {note.relative_to(paths.OPS_HOME)}")
-    print(f"  commits today: {len(commits)} | completed: {len(done_today)} | "
-          f"active without progress: {len(no_progress)} | uncommitted: {len(dirty)}")
-    if no_progress:
-        print("  nudge: " + ", ".join(f.stem for f in no_progress) + " saw no progress today")
+    data = {
+        "journal": str(note.relative_to(paths.OPS_HOME)),
+        "commits": len(commits), "completed": len(done_today),
+        "no_progress": len(no_progress), "no_progress_ids": [f.stem for f in no_progress],
+        "uncommitted": len(dirty),
+    }
+
+    def render(_):
+        print(f"day closed -> {note.relative_to(paths.OPS_HOME)}")
+        print(f"  commits today: {len(commits)} | completed: {len(done_today)} | "
+              f"active without progress: {len(no_progress)} | uncommitted: {len(dirty)}")
+        if no_progress:
+            print("  nudge: " + ", ".join(f.stem for f in no_progress) + " saw no progress today")
+
+    return output.emit(data, "close", human=render)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    raise SystemExit(main(sys.argv[1:]))

@@ -4,11 +4,41 @@
   "usage": "ops bookmark <url> [--note \"<text>\"] [--no-fetch] [--archive]",
   "risk": "safe_write",
   "args": [
-    { "name": "url", "required": true },
-    { "name": "--note", "required": false },
-    { "name": "--no-fetch", "required": false },
-    { "name": "--archive", "required": false }
+    {
+      "name": "url",
+      "required": true
+    },
+    {
+      "name": "--note",
+      "required": false
+    },
+    {
+      "name": "--no-fetch",
+      "required": false
+    },
+    {
+      "name": "--archive",
+      "required": false
+    }
   ],
-  "reads": ["<url> (external GET, best-effort)"],
-  "writes": ["wiki/bookmarks/", "journal/", "~/files/bookmarks/ (with --archive)"]
+  "reads": [
+    "<url> (external GET, best-effort)"
+  ],
+  "writes": [
+    "wiki/bookmarks/",
+    "journal/",
+    "~/files/bookmarks/ (with --archive)"
+  ],
+  "hints": "Save a URL as a wiki bookmark note (title fetched best-effort). Common mistake: --archive without a reachable page \u2014 the HTML snapshot is skipped.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "url": "string",
+      "title": "string",
+      "slug": "string",
+      "path": "string",
+      "archived": "string"
+    }
+  },
+  "dry_run": true
 }

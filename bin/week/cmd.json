@@ -3,6 +3,23 @@
   "summary": "weekly review: shipped/stalled, repo health, sweep done/ -> done/<year>/",
   "usage": "ops week",
   "risk": "safe_write",
-  "reads": ["tasks/", ".git"],
-  "writes": ["tasks/done/", "journal/"]
+  "reads": [
+    "tasks/",
+    ".git"
+  ],
+  "writes": [
+    "tasks/done/",
+    "journal/"
+  ],
+  "hints": "Weekly review: shipped vs stalled, repo health, sweeps done/ into done/<year>/. Common mistake: running it mid-week expecting it not to sweep \u2014 it always sweeps completed tasks.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "journal": "string",
+      "shipped": "int",
+      "stalled": "int",
+      "repo_dirty": "int",
+      "swept": "int"
+    }
+  }
 }

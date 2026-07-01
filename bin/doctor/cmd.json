@@ -3,6 +3,23 @@
   "summary": "self-check: tools, folders, manifest, adapters, secrets, index (--init creates folders)",
   "usage": "ops doctor [--init]",
   "risk": "safe_write",
-  "reads": ["bin/", "ops.json", "AGENTS.md", "CLAUDE.md", "skills/", ".index/"],
-  "writes": ["(skeleton folders, only with --init)"]
+  "reads": [
+    "bin/",
+    "ops.json",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "skills/",
+    ".index/"
+  ],
+  "writes": [
+    "(skeleton folders, only with --init)"
+  ],
+  "hints": "Self-check: tools, folders, manifest, secrets, sync-wall. --init creates missing folders. Common mistake: ignoring a FAIL (exit 1) \u2014 WARN is advisory, FAIL is not.",
+  "output": {
+    "mode": "rows",
+    "fields": {
+      "level": "string",
+      "message": "string"
+    }
+  }
 }

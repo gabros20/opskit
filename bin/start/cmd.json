@@ -3,6 +3,23 @@
   "summary": "daily start: today's journal, carry-forward open tasks, dashboard",
   "usage": "ops start",
   "risk": "safe_write",
-  "reads": ["tasks/", "inbox/", "journal/"],
-  "writes": ["journal/"]
+  "reads": [
+    "tasks/",
+    "inbox/",
+    "journal/"
+  ],
+  "writes": [
+    "journal/"
+  ],
+  "hints": "Daily start: opens today's journal, carries forward open tasks, shows the dashboard. Common mistake: expecting it to be read-only \u2014 it seeds and logs to the journal.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "date": "string",
+      "journal": "string",
+      "active": "int",
+      "waiting": "int",
+      "inbox": "int"
+    }
+  }
 }

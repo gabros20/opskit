@@ -3,7 +3,32 @@
   "summary": "binary assets: ingest [<path>] [--client|--project|--area <slug>|--research] | link <file> <hub> | list | open <slug>",
   "usage": "ops files ingest [<path>] [--client|--project|--area <slug> | --research] | link <file> <hub> | list [--hub <slug>] | open <slug>",
   "risk": "safe_write",
-  "args": [{ "name": "action", "required": false, "default": "ingest" }],
-  "reads": ["inbox/", "wiki/"],
-  "writes": ["~/files/", "wiki/files/", "wiki/ (hub links)", "journal/"]
+  "args": [
+    {
+      "name": "action",
+      "required": false,
+      "default": "ingest"
+    }
+  ],
+  "reads": [
+    "inbox/",
+    "wiki/"
+  ],
+  "writes": [
+    "~/files/",
+    "wiki/files/",
+    "wiki/ (hub links)",
+    "journal/"
+  ],
+  "hints": "The binary-assets plane: ingest routes a file into ~/files + writes a wiki shadow note. Common mistake: expecting the binary in git \u2014 only the plaintext shadow note is tracked.",
+  "output": {
+    "mode": "rows",
+    "fields": {
+      "slug": "string",
+      "title": "string",
+      "hub": "string",
+      "path": "string"
+    }
+  },
+  "dry_run": true
 }

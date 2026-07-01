@@ -8,14 +8,18 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import output, paths  # noqa: E402
 
 GREEN, RED, YEL, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[0m"
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
     if not (paths.OPS_HOME / ".git").exists():
-        print(f"{YEL}~/ops is not a git repo — your knowledge is NOT versioned. run: git init{RESET}")
+        data = {"git_repo": False, "branch": None, "upstream": None,
+                "dirty": 0, "unpushed": 0, "at_risk": True}
+        output.emit(data, "backup", human=lambda _:
+                    f"{YEL}~/ops is not a git repo — your knowledge is NOT versioned. run: git init{RESET}")
         return 1
 
     dirty = [ln for ln in paths.git("status", "--porcelain").splitlines() if ln.strip()]
@@ -27,22 +31,27 @@ def main(argv):
         ahead = int(out) if out.isdigit() else 0
 
     risk = bool(dirty) or (not upstream) or ahead > 0
-    print(f"ops repo: {branch}" + (f" → {upstream}" if upstream else " (no remote tracking)"))
-    if dirty:
-        print(f"  {RED}● {len(dirty)} uncommitted change(s){RESET} — run: git add -A && git commit")
-        for ln in dirty[:8]:
-            print(f"      {ln}")
-    else:
-        print(f"  {GREEN}● working tree clean{RESET}")
-    if not upstream:
-        print(f"  {YEL}● no upstream set{RESET} — your commits live only on this machine "
-              f"(set one: git push -u origin {branch})")
-    elif ahead:
-        print(f"  {RED}● {ahead} commit(s) not pushed{RESET} — run: git push")
-    else:
-        print(f"  {GREEN}● pushed — remote is current{RESET}")
+    data = {"git_repo": True, "branch": branch, "upstream": upstream or None,
+            "dirty": len(dirty), "dirty_files": dirty[:8], "unpushed": ahead, "at_risk": risk}
 
-    print(f"\nbackup: {'AT RISK — act on the lines above' if risk else 'safe (committed + pushed)'}")
+    def render(_):
+        print(f"ops repo: {branch}" + (f" → {upstream}" if upstream else " (no remote tracking)"))
+        if dirty:
+            print(f"  {RED}● {len(dirty)} uncommitted change(s){RESET} — run: git add -A && git commit")
+            for ln in dirty[:8]:
+                print(f"      {ln}")
+        else:
+            print(f"  {GREEN}● working tree clean{RESET}")
+        if not upstream:
+            print(f"  {YEL}● no upstream set{RESET} — your commits live only on this machine "
+                  f"(set one: git push -u origin {branch})")
+        elif ahead:
+            print(f"  {RED}● {ahead} commit(s) not pushed{RESET} — run: git push")
+        else:
+            print(f"  {GREEN}● pushed — remote is current{RESET}")
+        print(f"\nbackup: {'AT RISK — act on the lines above' if risk else 'safe (committed + pushed)'}")
+
+    output.emit(data, "backup", human=render)
     return 1 if risk else 0
 
 

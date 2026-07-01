@@ -3,7 +3,27 @@
   "summary": "open <slug> | edit <slug> | new <type> <name> | backlinks <slug> | stale | orphans | list",
   "usage": "ops wiki <action> [args]",
   "risk": "safe_write",
-  "args": [{ "name": "action", "required": false, "default": "list" }],
-  "reads": ["wiki/"],
-  "writes": ["wiki/", "journal/"]
+  "args": [
+    {
+      "name": "action",
+      "required": false,
+      "default": "list"
+    }
+  ],
+  "reads": [
+    "wiki/"
+  ],
+  "writes": [
+    "wiki/",
+    "journal/"
+  ],
+  "hints": "Navigate/grow the wiki: open/edit/new/backlinks/stale/orphans/list. Common mistake: a duplicate slug on `new` \u2014 slugs are unique.",
+  "output": {
+    "mode": "rows",
+    "fields": {
+      "type": "string",
+      "count": "int"
+    }
+  },
+  "dry_run": true
 }

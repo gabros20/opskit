@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import output, paths  # noqa: E402
 
 GREEN, RED, YEL, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 BIN = Path(__file__).resolve().parents[1]
@@ -91,26 +91,42 @@ def _plist(name, job) -> str:
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
+    dry = "--dry-run" in argv
+    argv = [a for a in argv if a != "--dry-run"]
     action = argv[0] if argv else "list"
     reg = _load()
     jobs, external = reg["jobs"], set(reg.get("external_allowlist", []))
 
     if action == "list":
-        print(f"{len(jobs)} job(s) in {REGISTRY.relative_to(paths.OPS_HOME)}:\n")
+        rows = []
         for name, job in jobs.items():
             warns = _validate(name, job, external)
-            flag = f" {RED}⚠ {'; '.join(warns)}{RESET}" if warns else f" {GREEN}✓{RESET}"
-            print(f"  {name:<14} {DIM}{_sched_str(job['schedule']):<16}{RESET} {job['command']:<26} "
-                  f"[{job.get('risk')}]{flag}")
-        print(f"\n  run one now:  ops job run <name>     install schedule:  ops job apply")
+            rows.append({"name": name, "schedule": _sched_str(job["schedule"]),
+                         "command": job["command"], "risk": job.get("risk"), "warns": warns})
+
+        def render(rs):
+            out = [f"{len(rs)} job(s) in {REGISTRY.relative_to(paths.OPS_HOME)}:\n"]
+            for r in rs:
+                flag = f" {RED}⚠ {'; '.join(r['warns'])}{RESET}" if r["warns"] else f" {GREEN}✓{RESET}"
+                out.append(f"  {r['name']:<14} {DIM}{r['schedule']:<16}{RESET} {r['command']:<26} "
+                           f"[{r['risk']}]{flag}")
+            out.append(f"\n  run one now:  ops job run <name>     install schedule:  ops job apply")
+            return "\n".join(out)
+        return output.emit_rows(rows, "job", human=render)
 
     elif action == "run":
         if len(argv) < 2 or argv[1] not in jobs:
-            print(f"usage: ops job run <name>   (one of: {', '.join(jobs)})", file=sys.stderr); return 2
+            output.fail(output.EXIT_USAGE,
+                        f"usage: ops job run <name>   (one of: {', '.join(jobs)})", verb="job")
         name = argv[1]; job = jobs[name]
         warns = _validate(name, job, external)
         if warns:
-            print(f"{RED}refusing to run '{name}': {'; '.join(warns)}{RESET}", file=sys.stderr); return 1
+            output.fail(output.EXIT_UNEXPECTED,
+                        f"{RED}refusing to run '{name}': {'; '.join(warns)}{RESET}", verb="job")
+        if dry:
+            return output.emit({"dry_run": True, "name": name, "command": job["command"]}, "job",
+                               human=lambda _: f"would run '{name}': {job['command']}  (dry run — nothing executed)")
         toks = job["command"].split()
         if toks[0] == "ops":
             cmd = [sys.executable, str(BIN / toks[1] / "run.py"), *toks[2:]]
@@ -129,7 +145,21 @@ def main(argv):
 
     elif action == "apply":
         skipped = [n for n, j in jobs.items() if j.get("risk") not in SCHEDULABLE]
-        out = paths.OPS_HOME / "jobs" / "launchd"; out.mkdir(parents=True, exist_ok=True)
+        schedulable = [n for n, j in jobs.items() if j.get("risk") in SCHEDULABLE]
+        out = paths.OPS_HOME / "jobs" / "launchd"
+        if dry:
+            data = {"dry_run": True, "would_render": [f"com.ops.{n}.plist" for n in schedulable],
+                    "skipped": skipped}
+
+            def render_dry(_):
+                print(f"would render {len(schedulable)} plist(s) -> {out.relative_to(paths.OPS_HOME)}/  (dry run — nothing written)")
+                for n in schedulable:
+                    print(f"  com.ops.{n}.plist")
+                if skipped:
+                    print(f"{YEL}skipped (not schedulable): {', '.join(skipped)}{RESET}")
+            return output.emit(data, "job", human=render_dry)
+
+        out.mkdir(parents=True, exist_ok=True)
         written = []
         for name, job in jobs.items():
             if job.get("risk") not in SCHEDULABLE:
@@ -137,17 +167,23 @@ def main(argv):
             f = out / f"com.ops.{name}.plist"
             f.write_text(_plist(name, job), encoding="utf-8")
             written.append(f)
-        print(f"rendered {len(written)} plist(s) -> {out.relative_to(paths.OPS_HOME)}/")
-        for f in written:
-            print(f"  {f.name}")
-        if skipped:
-            print(f"{YEL}skipped (not schedulable): {', '.join(skipped)}{RESET}")
-        print("\nactivate (the privileged, out-of-root step is yours to run):")
-        print(f"  ln -sf {out}/com.ops.*.plist ~/Library/LaunchAgents/")
-        print("  for p in ~/Library/LaunchAgents/com.ops.*.plist; do launchctl load \"$p\"; done")
+        data = {"rendered": [f.name for f in written], "skipped": skipped,
+                "dir": str(out.relative_to(paths.OPS_HOME))}
+
+        def render(_):
+            print(f"rendered {len(written)} plist(s) -> {out.relative_to(paths.OPS_HOME)}/")
+            for f in written:
+                print(f"  {f.name}")
+            if skipped:
+                print(f"{YEL}skipped (not schedulable): {', '.join(skipped)}{RESET}")
+            print("\nactivate (the privileged, out-of-root step is yours to run):")
+            print(f"  ln -sf {out}/com.ops.*.plist ~/Library/LaunchAgents/")
+            print("  for p in ~/Library/LaunchAgents/com.ops.*.plist; do launchctl load \"$p\"; done")
+
+        return output.emit(data, "job", human=render)
 
     else:
-        print("usage: ops job list | run <name> | apply", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE, "usage: ops job list | run <name> | apply", verb="job")
     return 0
 
 

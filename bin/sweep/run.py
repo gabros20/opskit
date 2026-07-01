@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import output, paths  # noqa: E402
 
 HOME = Path(os.environ.get("OPS_SWEEP_HOME", os.environ.get("HOME", "")))
 SWEEP_DAYS = int(os.environ.get("OPS_SWEEP_DAYS", "7"))
@@ -27,11 +27,16 @@ def _age_days(p: Path) -> float:
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
     dry = "--dry-run" in argv
     now = datetime.now()
     bucket = f"{now.year:04d}-{now.month:02d}"
     trash = HOME / ".Trash"
     promoted = trashed = 0
+    events, rows = [], []
+
+    def say(line):
+        events.append(line)
 
     for zname in ZONES:
         zone = HOME / zname
@@ -49,7 +54,8 @@ def main(argv):
                 i = 2
                 while dest.exists():
                     dest = dest_dir / f"{item.stem}-{i}{item.suffix}"; i += 1
-                print(f"  {'would move' if dry else 'moved'}: {zname}/{item.name} -> _swept/{bucket}/")
+                say(f"  {'would move' if dry else 'moved'}: {zname}/{item.name} -> _swept/{bucket}/")
+                rows.append({"action": "promote", "zone": zname, "name": item.name, "bucket": bucket})
                 if not dry:
                     dest_dir.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(item), str(dest))
@@ -63,7 +69,8 @@ def main(argv):
                     continue
                 for item in sorted(b.iterdir()):
                     if _age_days(item) >= TRASH_DAYS:
-                        print(f"  {'would trash' if dry else 'trashed'}: _swept/{b.name}/{item.name}")
+                        say(f"  {'would trash' if dry else 'trashed'}: _swept/{b.name}/{item.name}")
+                        rows.append({"action": "trash", "bucket": b.name, "name": item.name})
                         if not dry:
                             trash.mkdir(parents=True, exist_ok=True)
                             tdest = trash / item.name
@@ -75,11 +82,17 @@ def main(argv):
                 if not dry and b.is_dir() and not any(b.iterdir()):
                     b.rmdir()
 
-    print(f"\nsweep: {promoted} promoted to _swept, {trashed} trashed"
-          + (" (dry run)" if dry else ""))
     if not dry and (promoted or trashed):
         paths.append_journal(f"swept {promoted} to _swept, {trashed} to Trash")
-    return 0
+
+    def render(_):
+        for line in events:
+            print(line)
+        print(f"\nsweep: {promoted} promoted to _swept, {trashed} trashed"
+              + (" (dry run)" if dry else ""))
+
+    return output.emit_rows(rows, "sweep", human=render,
+                            header={"promoted": promoted, "trashed": trashed, "dry_run": dry})
 
 
 if __name__ == "__main__":

@@ -3,7 +3,29 @@
   "summary": "retire a dead ~/work repo: git-bundle all history into ~/work/archive/<year>/, mark hub archived",
   "usage": "ops archive <slug>",
   "risk": "safe_write",
-  "args": [{ "name": "slug", "required": true }],
-  "reads": ["~/work/", "wiki/projects/"],
-  "writes": ["~/work/archive/", "wiki/projects/", "journal/"]
+  "args": [
+    {
+      "name": "slug",
+      "required": true
+    }
+  ],
+  "reads": [
+    "~/work/",
+    "wiki/projects/"
+  ],
+  "writes": [
+    "~/work/archive/",
+    "wiki/projects/",
+    "journal/"
+  ],
+  "hints": "Retire a dead ~/work repo to a restorable git bundle. Common mistake: run it on the repo you're still using \u2014 it removes the working tree (bundle restores it).",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "slug": "string",
+      "bundle": "string",
+      "hub_marked": "bool"
+    }
+  },
+  "dry_run": true
 }

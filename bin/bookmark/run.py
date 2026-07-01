@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import notetype, paths  # noqa: E402
+from lib import notetype, output, paths  # noqa: E402
 
 GREEN, DIM, YEL, RESET = "\033[32m", "\033[2m", "\033[33m", "\033[0m"
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
@@ -84,6 +84,8 @@ def _title_from_url(url: str) -> str:
 
 
 def main(argv: list[str]) -> int:
+    _, argv = output.parse_argv(argv)
+    dry = "--dry-run" in argv
     args = [a for a in argv if not a.startswith("-")]
     no_fetch = "--no-fetch" in argv
     archive = "--archive" in argv
@@ -93,12 +95,12 @@ def main(argv: list[str]) -> int:
         note_extra = argv[i + 1] if i + 1 < len(argv) else ""
 
     if not args:
-        print("usage: ops bookmark <url> [--note \"<text>\"] [--no-fetch] [--archive]", file=sys.stderr)
-        return 2
+        output.fail(output.EXIT_USAGE,
+                    "usage: ops bookmark <url> [--note \"<text>\"] [--no-fetch] [--archive]", verb="bookmark")
     url = args[0]
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        print(f"not a http(s) url: {url}", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE, f"not a http(s) url: {url}", verb="bookmark")
 
     title, desc, html = "", "", None
     if not no_fetch:
@@ -121,6 +123,13 @@ def main(argv: list[str]) -> int:
     while slug in existing:
         slug, i = f"{base}-{i}", i + 1
 
+    f = paths.WIKI / notetype.type_dir("bookmark") / f"{slug}.md"
+    rel = f.relative_to(paths.OPS_HOME)
+    if dry:
+        data = {"dry_run": True, "url": url, "title": title, "slug": slug, "would_write": str(rel)}
+        return output.emit(data, "bookmark",
+                           human=lambda _: f"would save -> {rel}  {DIM}({title}){RESET}  (dry run — nothing written)")
+
     body_parts = []
     if desc:
         body_parts.append(f"> {desc}")
@@ -132,7 +141,6 @@ def main(argv: list[str]) -> int:
 
     d = paths.WIKI / notetype.type_dir("bookmark")
     d.mkdir(parents=True, exist_ok=True)
-    f = d / f"{slug}.md"
     f.write_text(notetype.render("bookmark", title=title, url=url, body=body, slug=slug), encoding="utf-8")
 
     archived = None
@@ -146,10 +154,15 @@ def main(argv: list[str]) -> int:
             print(f"{YEL}note{RESET}  --archive skipped (no fetched HTML)", file=sys.stderr)
 
     paths.append_journal(f"bookmark: {slug} <- {url}")
-    print(f"{GREEN}saved{RESET} -> {f.relative_to(paths.OPS_HOME)}  {DIM}({title}){RESET}")
-    if archived:
-        print(f"{GREEN}archived{RESET} -> {archived}")
-    return 0
+    data = {"url": url, "title": title, "slug": slug, "path": str(rel),
+            "archived": str(archived) if archived else None}
+
+    def render(_):
+        print(f"{GREEN}saved{RESET} -> {rel}  {DIM}({title}){RESET}")
+        if archived:
+            print(f"{GREEN}archived{RESET} -> {archived}")
+
+    return output.emit(data, "bookmark", human=render)
 
 
 if __name__ == "__main__":

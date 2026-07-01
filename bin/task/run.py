@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""ops task list|add "<title>"|show <id>|move <id> <status>|done <id> — the task system (§7)."""
+"""ops task list|add "<title>"|show <id>|move <id> <status>|done <id> [--dry-run] [--json] —
+the task system (§7)."""
 import re
 import sys
 from pathlib import Path
@@ -26,57 +27,82 @@ def _set_status(f: Path, status: str):
 
 
 def cmd_list():
-    any_ = False
+    rows = []
     for st in ("active", "waiting"):
-        files = sorted((paths.TASKS / st).glob("T-*.md"))
-        if files:
-            any_ = True
-            print(f"{st}/")
-            for f in files:
-                print(f"  {f.stem}  {paths.title_of(f)}")
-    if not any_:
-        print("no active or waiting tasks. add one: ops task add \"<title>\"")
+        for f in sorted((paths.TASKS / st).glob("T-*.md")):
+            rows.append({"id": f.stem, "title": paths.title_of(f), "status": st})
+
+    def render(rs):
+        if not rs:
+            return "no active or waiting tasks. add one: ops task add \"<title>\""
+        out, cur = [], None
+        for r in rs:
+            if r["status"] != cur:
+                cur = r["status"]
+                out.append(f"{cur}/")
+            out.append(f"  {r['id']}  {r['title']}")
+        return "\n".join(out)
+
+    return output.emit_rows(rows, "task", human=render)
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
+    dry = "--dry-run" in argv
+    argv = [a for a in argv if a != "--dry-run"]
     action = argv[0] if argv else "list"
     if action == "list":
-        cmd_list()
+        return cmd_list()
     elif action == "add":
         title = " ".join(argv[1:]).strip()
         if not title:
-            print('usage: ops task add "<title>"', file=sys.stderr); return 2
+            output.fail(output.EXIT_USAGE, 'usage: ops task add "<title>"', verb="task")
+        if dry:
+            tid = filing.next_task_id()
+            data = {"dry_run": True, "would_add": tid, "title": title[:70]}
+            return output.emit(data, "task",
+                               human=lambda _: f"would add {tid}: {title[:70]}  (dry run — nothing written)")
         f = filing.create_task(title, source="manual")
         paths.append_journal(f"task added {f.stem}: {title[:60]}")
-        print(f"added {f.stem} -> {f.relative_to(paths.OPS_HOME)}")
-    elif action in ("show",):
-        f, _ = _find(argv[1]) if len(argv) > 1 else (None, None)
+        data = {"id": f.stem, "path": str(f.relative_to(paths.OPS_HOME)), "title": title[:70]}
+        return output.emit(data, "task",
+                           human=lambda _: f"added {f.stem} -> {f.relative_to(paths.OPS_HOME)}")
+    elif action == "show":
+        f, st = _find(argv[1]) if len(argv) > 1 else (None, None)
         if not f:
-            print(f"task not found: {argv[1] if len(argv)>1 else ''}", file=sys.stderr); return output.EXIT_NOT_FOUND
-        print(f.read_text(encoding="utf-8"))
+            output.fail(output.EXIT_NOT_FOUND,
+                        f"task not found: {argv[1] if len(argv) > 1 else ''}", verb="task")
+        content = f.read_text(encoding="utf-8")
+        data = {"id": f.stem, "status": st, "path": str(f.relative_to(paths.OPS_HOME)), "content": content}
+        return output.emit(data, "task", human=lambda _: print(content))
     elif action in ("move", "done"):
         if action == "done":
             tid, status = (argv[1] if len(argv) > 1 else ""), "done"
         else:
             if len(argv) < 3:
-                print("usage: ops task move <id> <status>", file=sys.stderr); return 2
+                output.fail(output.EXIT_USAGE, "usage: ops task move <id> <status>", verb="task")
             tid, status = argv[1], argv[2]
         if status not in STATUSES:
-            print(f"status must be one of {STATUSES}", file=sys.stderr); return 2
+            output.fail(output.EXIT_USAGE, f"status must be one of {STATUSES}", verb="task")
         f, cur = _find(tid)
         if not f:
-            print(f"task not found: {tid}", file=sys.stderr); return output.EXIT_NOT_FOUND
+            output.fail(output.EXIT_NOT_FOUND, f"task not found: {tid}", verb="task")
+        if dry:
+            data = {"dry_run": True, "id": tid, "from": cur, "to": status}
+            return output.emit(data, "task",
+                               human=lambda _: f"would move {tid}: {cur} -> {status}  (dry run — nothing written)")
         dest = paths.TASKS / status
         dest.mkdir(parents=True, exist_ok=True)
         new = dest / f.name
         f.rename(new)
         _set_status(new, status)
         paths.append_journal(f"task {tid} -> {status}")
-        print(f"{tid}: {cur} -> {status}")
+        data = {"id": tid, "from": cur, "to": status}
+        return output.emit(data, "task", human=lambda _: f"{tid}: {cur} -> {status}")
     else:
-        print("usage: ops task list|add \"<title>\"|show <id>|move <id> <status>|done <id>", file=sys.stderr)
-        return 2
-    return 0
+        output.fail(output.EXIT_USAGE,
+                    "usage: ops task list|add \"<title>\"|show <id>|move <id> <status>|done <id>",
+                    verb="task")
 
 
 if __name__ == "__main__":

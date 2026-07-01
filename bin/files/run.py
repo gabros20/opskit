@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import output, paths  # noqa: E402
 
 YEL, GREEN, DIM, CYAN, RESET = "\033[33m", "\033[32m", "\033[2m", "\033[36m", "\033[0m"
 PERSONAL = ("tax", "szja", "nav", "ado", "adó", "medical", "orvos", "contract", "szerzod", "szerződ",
@@ -130,12 +130,12 @@ def _parse_route(rest):
     return paths.FILES_ROOT / "inbox", None, None, leftover
 
 
-def cmd_ingest(argv):
+def cmd_ingest(argv, dry=False):
     dest_dir, hub_slug, hub_note, rest = _parse_route(argv)
     if hub_slug and hub_note is None:
-        print(f"{YEL}no wiki hub '{hub_slug}'{RESET} — create it first (e.g. `ops new client {hub_slug}`), "
-              f"then re-run. Nothing ingested.", file=sys.stderr)
-        return 1
+        output.fail(output.EXIT_UNEXPECTED,
+                    f"{YEL}no wiki hub '{hub_slug}'{RESET} — create it first (e.g. `ops new client {hub_slug}`), "
+                    f"then re-run. Nothing ingested.", verb="files")
 
     if rest:
         sources = [Path(rest[0]).expanduser()]
@@ -144,25 +144,39 @@ def cmd_ingest(argv):
                    if p.is_file() and p.suffix.lower() not in TEXT_SUFFIXES and p.name != ".gitkeep"] \
             if paths.INBOX.exists() else []
     if not sources:
-        print("nothing to ingest (drop a binary into inbox/, or pass a path)."); return 0
+        return output.emit_rows([], "files",
+                                human=lambda _: "nothing to ingest (drop a binary into inbox/, or pass a path).",
+                                header={"filed": 0, "proposed": 0, "linked": 0, "deduped": 0, "dry_run": dry})
 
+    events, rows = [], []
     filed = proposed = linked = deduped = 0
     for src in sources:
         if not src.exists():
-            print(f"  not found: {src}"); continue
+            events.append(f"  not found: {src}"); continue
         if _is_personal(src.name):
-            print(f"  {YEL}PROPOSE iCloud{RESET}: '{src.name}' looks personal/legal — move it yourself to "
-                  f"iCloud (the wall forbids any verb writing there). Left in place.")
+            events.append(f"  {YEL}PROPOSE iCloud{RESET}: '{src.name}' looks personal/legal — move it yourself to "
+                          f"iCloud (the wall forbids any verb writing there). Left in place.")
+            rows.append({"action": "propose", "name": src.name})
             proposed += 1
             continue
 
         sha = _sha256(src)
         dup = _find_by_hash(sha)
         if dup:
-            print(f"  {DIM}duplicate{RESET}: '{src.name}' == {dup.stem} (same bytes) — not copied again.")
+            events.append(f"  {DIM}duplicate{RESET}: '{src.name}' == {dup.stem} (same bytes) — not copied again.")
+            rows.append({"action": "dedup", "name": src.name, "slug": dup.stem})
             deduped += 1
-            if hub_note and _link_into_hub(hub_note, dup.stem, paths.fm_field(dup, "title") or dup.stem):
-                print(f"    {GREEN}linked{RESET} -> [[{hub_slug}]]"); linked += 1
+            if hub_note and (dry or _link_into_hub(hub_note, dup.stem, paths.fm_field(dup, "title") or dup.stem)):
+                events.append(f"    {GREEN}linked{RESET} -> [[{hub_slug}]]"); linked += 1
+            continue
+
+        where = dest_dir.relative_to(paths.FILES_ROOT)
+        if dry:
+            events.append(f"  {GREEN}would file{RESET}: {src.name} -> ~/files/{where}/")
+            rows.append({"action": "file", "name": src.name, "dest": f"~/files/{where}/"})
+            filed += 1
+            if hub_note:
+                events.append(f"    {GREEN}would link{RESET} -> [[{hub_slug}]]"); linked += 1
             continue
 
         dest_dir.mkdir(parents=True, exist_ok=True)
@@ -172,37 +186,48 @@ def cmd_ingest(argv):
             dest = dest_dir / f"{src.stem}-{i}{src.suffix}"; i += 1
         shutil.move(str(src), str(dest))
         note = _shadow(dest, src.name, sha, hub_slug)
-        where = dest_dir.relative_to(paths.FILES_ROOT)
         paths.append_journal(f"files ingest {src.name} -> {dest}" + (f" [[{hub_slug}]]" if hub_slug else ""))
-        print(f"  {GREEN}filed{RESET}: {src.name} -> ~/files/{where}/  ({note.relative_to(paths.OPS_HOME)})")
+        events.append(f"  {GREEN}filed{RESET}: {src.name} -> ~/files/{where}/  ({note.relative_to(paths.OPS_HOME)})")
+        rows.append({"action": "file", "name": src.name, "dest": f"~/files/{where}/",
+                     "slug": note.stem})
         filed += 1
         if hub_note and _link_into_hub(hub_note, note.stem, src.name):
-            print(f"    {GREEN}linked{RESET} -> [[{hub_slug}]]"); linked += 1
+            events.append(f"    {GREEN}linked{RESET} -> [[{hub_slug}]]"); linked += 1
 
-    tail = f", {linked} linked" if (hub_slug) else ""
-    tail += f", {deduped} de-duped" if deduped else ""
-    print(f"\nfiles ingest: {filed} filed{tail}, {proposed} proposed for iCloud (left in place)")
-    return 0
+    def render(_):
+        for e in events:
+            print(e)
+        tail = f", {linked} linked" if hub_slug else ""
+        tail += f", {deduped} de-duped" if deduped else ""
+        print(f"\nfiles ingest: {filed} filed{tail}, {proposed} proposed for iCloud (left in place)"
+              + (" (dry run)" if dry else ""))
+
+    return output.emit_rows(rows, "files", human=render,
+                            header={"filed": filed, "proposed": proposed, "linked": linked,
+                                    "deduped": deduped, "dry_run": dry})
 
 
 def cmd_link(argv):
     if len(argv) < 2:
-        print("usage: ops files link <file-slug> <hub-slug>", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE, "usage: ops files link <file-slug> <hub-slug>", verb="files")
     file_slug, hub_slug = argv[0], argv[1]
     shadow = paths.WIKI / "files" / f"{file_slug}.md"
     if not shadow.exists():
-        print(f"no shadow note: wiki/files/{file_slug}.md (see `ops files list`)", file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED,
+                    f"no shadow note: wiki/files/{file_slug}.md (see `ops files list`)", verb="files")
     hub = _hub_note(hub_slug)
     if hub is None:
-        print(f"no wiki hub '{hub_slug}'", file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED, f"no wiki hub '{hub_slug}'", verb="files")
     title = paths.fm_field(shadow, "title") or file_slug
     changed = _link_into_hub(hub, file_slug, title)
     # make the back-reference explicit in the shadow note too
     stext = shadow.read_text(encoding="utf-8")
     if f"[[{hub_slug}]]" not in stext:
         shadow.write_text(stext.rstrip("\n") + f"\n\nFiled under [[{hub_slug}]].\n", encoding="utf-8")
-    print(f"{GREEN}linked{RESET} [[{file_slug}]] -> [[{hub_slug}]]" + ("" if changed else " (already linked)"))
-    return 0
+    data = {"file": file_slug, "hub": hub_slug, "already_linked": not changed}
+    return output.emit(data, "files", human=lambda _:
+                       f"{GREEN}linked{RESET} [[{file_slug}]] -> [[{hub_slug}]]"
+                       + ("" if changed else " (already linked)"))
 
 
 def cmd_list(argv):
@@ -215,44 +240,55 @@ def cmd_list(argv):
         hub = paths.fm_field(p, "hub")
         if hub_filter and hub != hub_filter:
             continue
-        rows.append((p.stem, paths.fm_field(p, "title") or p.stem, hub, paths.fm_field(p, "path")))
-    if not rows:
-        print("no assets yet (ingest one: `ops files ingest <path> --client <slug>`)."); return 0
-    print(f"{len(rows)} asset(s)" + (f" under [[{hub_filter}]]" if hub_filter else "") + ":")
-    for slug, title, hub, path in rows:
-        tag = f"  {CYAN}[[{hub}]]{RESET}" if hub else f"  {DIM}(unlinked){RESET}"
-        print(f"  {slug:<28} {DIM}{title[:40]:<40}{RESET}{tag}")
-    return 0
+        rows.append({"slug": p.stem, "title": paths.fm_field(p, "title") or p.stem,
+                     "hub": hub, "path": paths.fm_field(p, "path")})
+
+    def render(rs):
+        if not rs:
+            return "no assets yet (ingest one: `ops files ingest <path> --client <slug>`)."
+        out = [f"{len(rs)} asset(s)" + (f" under [[{hub_filter}]]" if hub_filter else "") + ":"]
+        for r in rs:
+            tag = f"  {CYAN}[[{r['hub']}]]{RESET}" if r["hub"] else f"  {DIM}(unlinked){RESET}"
+            out.append(f"  {r['slug']:<28} {DIM}{r['title'][:40]:<40}{RESET}{tag}")
+        return "\n".join(out)
+
+    return output.emit_rows(rows, "files", human=render, header={"hub": hub_filter})
 
 
 def cmd_open(argv):
     if not argv:
-        print("usage: ops files open <slug>", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE, "usage: ops files open <slug>", verb="files")
     note = paths.WIKI / "files" / f"{argv[0]}.md"
     if not note.exists():
-        print(f"no shadow note: wiki/files/{argv[0]}.md", file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED, f"no shadow note: wiki/files/{argv[0]}.md", verb="files")
     target = paths.fm_field(note, "path")
     if not target:
-        print("shadow note has no path:", file=sys.stderr); return 1
-    print(target)
-    if not os.environ.get("OPS_NO_OPEN") and sys.platform == "darwin" and Path(target).exists():
-        subprocess.run(["open", "-R", target], check=False)
-    return 0
+        output.fail(output.EXIT_UNEXPECTED, "shadow note has no path:", verb="files")
+
+    def render(_):
+        print(target)
+        if not os.environ.get("OPS_NO_OPEN") and sys.platform == "darwin" and Path(target).exists():
+            subprocess.run(["open", "-R", target], check=False)
+
+    return output.emit({"slug": argv[0], "path": target}, "files", human=render)
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
+    dry = "--dry-run" in argv
+    argv = [a for a in argv if a != "--dry-run"]
     action = argv[0] if argv else "ingest"
     if action == "ingest":
-        return cmd_ingest(argv[1:])
+        return cmd_ingest(argv[1:], dry)
     if action == "link":
         return cmd_link(argv[1:])
     if action == "list":
         return cmd_list(argv[1:])
     if action == "open":
         return cmd_open(argv[1:])
-    print("usage: ops files ingest [<path>] [--client|--project|--area <slug> | --research] | "
-          "link <file> <hub> | list [--hub <slug>] | open <slug>", file=sys.stderr)
-    return 2
+    output.fail(output.EXIT_USAGE,
+                "usage: ops files ingest [<path>] [--client|--project|--area <slug> | --research] | "
+                "link <file> <hub> | list [--hub <slug>] | open <slug>", verb="files")
 
 
 if __name__ == "__main__":

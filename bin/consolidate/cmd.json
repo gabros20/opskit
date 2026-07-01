@@ -3,6 +3,27 @@
   "summary": "nightly dream-lite pass: wiki orphans/stale + day digest into the journal",
   "usage": "ops consolidate [--automated]",
   "risk": "safe_write",
-  "reads": ["wiki/", "tasks/", "inbox/", ".git"],
-  "writes": ["journal/"]
+  "reads": [
+    "wiki/",
+    "tasks/",
+    "inbox/",
+    ".git"
+  ],
+  "writes": [
+    "journal/"
+  ],
+  "hints": "Nightly zero-LLM maintenance: wiki orphans/stale + day digest into the journal. Common mistake: scheduling something heavier \u2014 this is read + one journal append.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "journal": "string",
+      "notes": "int",
+      "orphans": "list",
+      "stale": "list",
+      "commits": "int",
+      "done_today": "int",
+      "captures": "int"
+    }
+  },
+  "dry_run": true
 }

@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import output, paths  # noqa: E402
 
 FORMULA = paths.OPS_HOME / "templates" / "tax-formula.md"
 
@@ -26,8 +26,12 @@ def _next_inv_no(out: Path, day: str) -> str:
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
+    dry = "--dry-run" in argv
+    argv = [a for a in argv if a != "--dry-run"]
     if not argv:
-        print('usage: ops invoice <client> --amount <net> [--desc "<text>"]', file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE,
+                    'usage: ops invoice <client> --amount <net> [--desc "<text>"]', verb="invoice")
     slug = paths.slugify(argv[0])
     amount = desc = None
     i = 1
@@ -39,14 +43,15 @@ def main(argv):
         i += 1
     hub = paths.WIKI / "clients" / f"{slug}.md"
     if not hub.exists():
-        print(f"no client '{slug}' (wiki/clients/{slug}.md). Create it: ops new client \"{argv[0]}\"",
-              file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED,
+                    f"no client '{slug}' (wiki/clients/{slug}.md). Create it: ops new client \"{argv[0]}\"",
+                    verb="invoice")
     if amount is None:
-        print("an --amount (net) is required", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE, "an --amount (net) is required", verb="invoice")
     try:
         net = float(amount)
     except ValueError:
-        print(f"--amount must be a number, got {amount!r}", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE, f"--amount must be a number, got {amount!r}", verb="invoice")
 
     rate = float(paths.fm_field(FORMULA, "vat_rate") or 0) if FORMULA.exists() else 0.0
     cur = (paths.fm_field(FORMULA, "currency") or "").strip() if FORMULA.exists() else ""
@@ -58,9 +63,23 @@ def main(argv):
     client_name = paths.fm_field(hub, "title") or argv[0]
     day = date.today().strftime("%Y%m%d")
     out = paths.FILES_ROOT / "clients" / slug / "out"
+    due = (date.today() + timedelta(days=terms)).isoformat()
+
+    if dry:
+        inv = _next_inv_no(out, day)
+        draft = out / f"invoice-{day}-{inv.rsplit('-', 1)[1]}.md"
+        data = {"dry_run": True, "client": client_name, "invoice_no": inv,
+                "net": net, "vat": vat, "gross": gross, "currency": cur,
+                "rate": rate, "would_write": str(draft)}
+
+        def render_dry(_):
+            print(f"would DRAFT invoice {inv} for {client_name}:")
+            print(f"  net {net:.2f} + VAT {vat:.2f} ({rate*100:.0f}%) = gross {gross:.2f} {cur}")
+            print(f"  -> {draft}  (dry run — nothing written)")
+        return output.emit(data, "invoice", human=render_dry)
+
     out.mkdir(parents=True, exist_ok=True)
     inv = _next_inv_no(out, day)
-    due = (date.today() + timedelta(days=terms)).isoformat()
     draft = out / f"invoice-{day}-{inv.rsplit('-', 1)[1]}.md"
     draft.write_text(
         f"# DRAFT invoice {inv}\n\n"
@@ -70,11 +89,16 @@ def main(argv):
         f"- Net:   {net:.2f} {cur}\n- VAT ({rate*100:.0f}%): {vat:.2f} {cur}\n- **Gross: {gross:.2f} {cur}**\n",
         encoding="utf-8")
     paths.append_journal(f"invoice DRAFT {inv} for {slug} ({gross:.2f} {cur})")
-    print(f"DRAFT invoice {inv} for {client_name}:")
-    print(f"  net {net:.2f} + VAT {vat:.2f} ({rate*100:.0f}%) = gross {gross:.2f} {cur}")
-    print(f"  -> {draft}")
-    print(f"  NOT sent — review and send by hand (the system never transmits).")
-    return 0
+    data = {"client": client_name, "invoice_no": inv, "net": net, "vat": vat,
+            "gross": gross, "currency": cur, "rate": rate, "path": str(draft)}
+
+    def render(_):
+        print(f"DRAFT invoice {inv} for {client_name}:")
+        print(f"  net {net:.2f} + VAT {vat:.2f} ({rate*100:.0f}%) = gross {gross:.2f} {cur}")
+        print(f"  -> {draft}")
+        print(f"  NOT sent — review and send by hand (the system never transmits).")
+
+    return output.emit(data, "invoice", human=render)
 
 
 if __name__ == "__main__":

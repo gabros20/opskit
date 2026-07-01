@@ -3,6 +3,20 @@
   "summary": "rebuild the search index over wiki (FTS5 + graph; +LanceDB if OPS_VECTORS=1); --manifest regenerates ops.json",
   "usage": "ops index [--manifest]",
   "risk": "safe_write",
-  "reads": ["wiki/", "bin/*/cmd.json"],
-  "writes": [".index/", "ops.json"]
+  "reads": [
+    "wiki/",
+    "bin/*/cmd.json"
+  ],
+  "writes": [
+    ".index/",
+    "ops.json"
+  ],
+  "hints": "Rebuild the FTS5 + graph search index over wiki (+vectors if OPS_VECTORS). Common mistake: searching before indexing \u2014 an empty index returns no hits.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "indexed": "int"
+    }
+  },
+  "dry_run": true
 }

@@ -3,7 +3,37 @@
   "summary": "DRAFT an invoice for a client (reads tax-formula.md; computes VAT; never sends)",
   "usage": "ops invoice <client> --amount <net> [--desc \"<text>\"]",
   "risk": "draft_only",
-  "args": [{ "name": "client", "required": true }, { "name": "amount", "required": true }],
-  "reads": ["templates/tax-formula.md", "wiki/clients/"],
-  "writes": ["~/files/clients/<slug>/out/", "journal/"]
+  "args": [
+    {
+      "name": "client",
+      "required": true
+    },
+    {
+      "name": "amount",
+      "required": true
+    }
+  ],
+  "reads": [
+    "templates/tax-formula.md",
+    "wiki/clients/"
+  ],
+  "writes": [
+    "~/files/clients/<slug>/out/",
+    "journal/"
+  ],
+  "hints": "DRAFT an invoice (computes VAT); never sends. Common mistake: expecting delivery \u2014 you export and send by hand.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "client": "string",
+      "invoice_no": "string",
+      "net": "number",
+      "vat": "number",
+      "gross": "number",
+      "currency": "string",
+      "rate": "number",
+      "path": "string"
+    }
+  },
+  "dry_run": true
 }

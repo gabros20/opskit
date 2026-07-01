@@ -8,7 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import output, paths  # noqa: E402
 
 
 def _d(s: str):
@@ -19,6 +19,7 @@ def _d(s: str):
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
     today = date.today()
     week_ago = today.toordinal() - 7
     donedir = paths.TASKS / "done"
@@ -53,11 +54,21 @@ def main(argv):
         fh.write("\n".join(block) + "\n")
     paths.append_journal("weekly review")
 
-    print(f"weekly review -> {note.relative_to(paths.OPS_HOME)}")
-    print(f"  shipped: {len(shipped)} | stalled: {len(stalled)} | repo: "
-          f"{'clean' if dirty == 0 else str(dirty)+' dirty'} | swept: {swept}")
-    print("  ask: what did you do by hand twice this week? → skill/verb candidate")
+    data = {
+        "journal": str(note.relative_to(paths.OPS_HOME)),
+        "shipped": len(shipped), "shipped_ids": [f.stem for f in shipped],
+        "stalled": len(stalled), "stalled_ids": [f.stem for f in stalled],
+        "repo_dirty": dirty, "swept": swept,
+    }
+
+    def render(_):
+        print(f"weekly review -> {note.relative_to(paths.OPS_HOME)}")
+        print(f"  shipped: {len(shipped)} | stalled: {len(stalled)} | repo: "
+              f"{'clean' if dirty == 0 else str(dirty)+' dirty'} | swept: {swept}")
+        print("  ask: what did you do by hand twice this week? → skill/verb candidate")
+
+    return output.emit(data, "week", human=render)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    raise SystemExit(main(sys.argv[1:]))

@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import output, paths  # noqa: E402
 
 TEMPLATE = paths.OPS_HOME / "templates" / "project-repo"
 VERB_TEMPLATE = paths.OPS_HOME / "templates" / "verb"
@@ -24,7 +24,7 @@ BIN = Path(__file__).resolve().parents[1]           # verbs live with the CODE (
 RISK_CLASSES = ("read", "safe_write", "draft_only", "confirm", "deny")
 
 
-def _new_verb(rest):
+def _new_verb(rest, dry=False):
     name = rest[0] if rest else ""
     risk, summary = "confirm", ""
     i = 1
@@ -35,25 +35,33 @@ def _new_verb(rest):
             summary = rest[i + 1]; i += 2; continue
         i += 1
     if not re.fullmatch(r"[a-z][a-z0-9-]*", name or ""):
-        print("verb name must be lowercase [a-z0-9-], starting with a letter", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE,
+                    "verb name must be lowercase [a-z0-9-], starting with a letter", verb="new")
     if risk not in RISK_CLASSES:
-        print(f"--risk must be one of {RISK_CLASSES}", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE, f"--risk must be one of {RISK_CLASSES}", verb="new")
     dest = BIN / name
     if dest.exists():
-        print(f"verb '{name}' already exists ({dest})", file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED, f"verb '{name}' already exists ({dest})", verb="new")
     if not VERB_TEMPLATE.is_dir():
-        print(f"missing template: {VERB_TEMPLATE}", file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED, f"missing template: {VERB_TEMPLATE}", verb="new")
+    if dry:
+        return output.emit({"dry_run": True, "type": "verb", "name": name, "risk": risk}, "new",
+                           human=lambda _: f"would scaffold verb '{name}' (bin/{name}/, risk: {risk})  (dry run — nothing written)")
     shutil.copytree(VERB_TEMPLATE, dest)
     _fill(dest, {"{{name}}": name, "{{risk}}": risk,
                  "{{summary}}": summary or f"TODO: describe {name}"})
     from lib.manifest import write_manifest  # regenerate ops.json so `ops help` shows the new verb
     write_manifest()
     paths.append_journal(f"new verb: {name} (risk {risk})")
-    print(f"scaffolded verb '{name}':")
-    print(f"  code:  bin/{name}/run.py  (+ cmd.json, risk: {risk})")
-    print(f"  next:  implement main() in bin/{name}/run.py, then `ops {name}`"
-          + ("" if risk != "confirm" else "  (confirm-class → runs with --yes until you lower risk)"))
-    return 0
+    data = {"type": "verb", "name": name, "risk": risk, "code": f"bin/{name}/run.py"}
+
+    def render(_):
+        print(f"scaffolded verb '{name}':")
+        print(f"  code:  bin/{name}/run.py  (+ cmd.json, risk: {risk})")
+        print(f"  next:  implement main() in bin/{name}/run.py, then `ops {name}`"
+              + ("" if risk != "confirm" else "  (confirm-class → runs with --yes until you lower risk)"))
+
+    return output.emit(data, "new", human=render)
 
 
 def _all_slugs() -> set:
@@ -80,11 +88,15 @@ def _fill(root: Path, repl: dict):
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
+    dry = "--dry-run" in argv
+    argv = [a for a in argv if a != "--dry-run"]
     if len(argv) < 2 or argv[0] not in ("project", "client", "verb"):
-        print('usage: ops new project "<name>" [--kind labs|products|tools] | new client "<name>"\n'
-              '       | new verb <name> [--risk <class>] [--summary "<text>"]', file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE,
+                    'usage: ops new project "<name>" [--kind labs|products|tools] | new client "<name>"\n'
+                    '       | new verb <name> [--risk <class>] [--summary "<text>"]', verb="new")
     if argv[0] == "verb":
-        return _new_verb(argv[1:])
+        return _new_verb(argv[1:], dry)
     typ = argv[0]
     kind = "labs"
     rest = []
@@ -95,30 +107,43 @@ def main(argv):
         rest.append(argv[i]); i += 1
     name = " ".join(rest).strip()
     if not name:
-        print("a name is required", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE, "a name is required", verb="new")
     slug = paths.slugify(name)
     if slug in _all_slugs():
-        print(f"slug '{slug}' already exists — slugs are unique (§10.1)", file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED, f"slug '{slug}' already exists — slugs are unique (§10.1)", verb="new")
 
     if typ == "client":
-        hub = _hub("clients", "client", slug, name)
         tree = paths.FILES_ROOT / "clients" / slug
+        if dry:
+            data = {"dry_run": True, "type": "client", "slug": slug,
+                    "hub": f"wiki/clients/{slug}.md", "tree": str(tree)}
+            return output.emit(data, "new", human=lambda _:
+                               f"would create client '{name}' (wiki/clients/{slug}.md + {tree}/)  (dry run — nothing written)")
+        hub = _hub("clients", "client", slug, name)
         for sub in ("in", "out", "work"):
             (tree / sub).mkdir(parents=True, exist_ok=True)
         paths.append_journal(f"new client: {slug}")
-        print(f"created client '{name}':")
-        print(f"  wiki hub:  {hub.relative_to(paths.OPS_HOME)}")
-        print(f"  material:  {tree}/  (in/ = read-only originals, out/ = deliverables, work/ = drafts)")
-        return 0
+        data = {"type": "client", "slug": slug, "hub": str(hub.relative_to(paths.OPS_HOME)), "tree": str(tree)}
+
+        def render_c(_):
+            print(f"created client '{name}':")
+            print(f"  wiki hub:  {hub.relative_to(paths.OPS_HOME)}")
+            print(f"  material:  {tree}/  (in/ = read-only originals, out/ = deliverables, work/ = drafts)")
+        return output.emit(data, "new", human=render_c)
 
     # project
     if kind not in paths.WORK_KINDS:
-        print(f"--kind must be one of {paths.WORK_KINDS}", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE, f"--kind must be one of {paths.WORK_KINDS}", verb="new")
     if not TEMPLATE.is_dir():
-        print(f"missing template: {TEMPLATE}", file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED, f"missing template: {TEMPLATE}", verb="new")
     repo = paths.WORK_ROOT / kind / slug
     if repo.exists():
-        print(f"repo already exists: {repo}", file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED, f"repo already exists: {repo}", verb="new")
+    if dry:
+        data = {"dry_run": True, "type": "project", "slug": slug, "kind": kind,
+                "hub": f"wiki/projects/{slug}.md", "repo": str(repo)}
+        return output.emit(data, "new", human=lambda _:
+                           f"would create project '{name}' (wiki/projects/{slug}.md + {repo}/, kind: {kind})  (dry run — nothing written)")
     hub = _hub("projects", "project", slug, name)
     repo.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(TEMPLATE, repo)
@@ -129,11 +154,16 @@ def main(argv):
                     "commit", "-qm", f"scaffold {name} via ops new"], check=False,
                    capture_output=True)
     paths.append_journal(f"new project: {slug} ({kind})")
-    print(f"created project '{name}':")
-    print(f"  wiki hub:  {hub.relative_to(paths.OPS_HOME)}")
-    print(f"  repo:      {repo}/  (git-initialized from templates/project-repo)")
-    print(f"  next:      cd {repo} && script/setup   ·   set the hub's remote: field when you push")
-    return 0
+    data = {"type": "project", "slug": slug, "kind": kind,
+            "hub": str(hub.relative_to(paths.OPS_HOME)), "repo": str(repo)}
+
+    def render_p(_):
+        print(f"created project '{name}':")
+        print(f"  wiki hub:  {hub.relative_to(paths.OPS_HOME)}")
+        print(f"  repo:      {repo}/  (git-initialized from templates/project-repo)")
+        print(f"  next:      cd {repo} && script/setup   ·   set the hub's remote: field when you push")
+
+    return output.emit(data, "new", human=render_p)
 
 
 if __name__ == "__main__":

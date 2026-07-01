@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import output, paths  # noqa: E402
 
 
 def _find_repo(slug: str):
@@ -27,23 +27,33 @@ def _find_repo(slug: str):
 
 
 def main(argv):
+    _, argv = output.parse_argv(argv)
+    dry = "--dry-run" in argv
+    argv = [a for a in argv if a != "--dry-run"]
     if not argv:
-        print("usage: ops archive <slug>", file=sys.stderr); return 2
+        output.fail(output.EXIT_USAGE, "usage: ops archive <slug>", verb="archive")
     slug = argv[0]
     repo = _find_repo(slug)
     if not repo:
-        print(f"no ~/work repo named '{slug}'", file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED, f"no ~/work repo named '{slug}'", verb="archive")
 
     year = str(date.today().year)
     dest_dir = paths.WORK_ROOT / "archive" / year
-    dest_dir.mkdir(parents=True, exist_ok=True)
     bundle = dest_dir / f"{slug}.bundle"
+    hub = paths.WIKI / "projects" / f"{slug}.md"
+
+    if dry:
+        data = {"dry_run": True, "slug": slug, "repo": str(repo),
+                "would_bundle": str(bundle), "hub": str(hub) if hub.exists() else None}
+        return output.emit(data, "archive", human=lambda _:
+                           f"would archive '{slug}' -> {bundle}  (dry run — nothing written)")
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
     r = subprocess.run(["git", "-C", str(repo), "bundle", "create", str(bundle), "--all"],
                        capture_output=True, text=True)
     if r.returncode != 0:
-        print(f"bundle failed: {r.stderr.strip()}", file=sys.stderr); return 1
+        output.fail(output.EXIT_UNEXPECTED, f"bundle failed: {r.stderr.strip()}", verb="archive")
 
-    hub = paths.WIKI / "projects" / f"{slug}.md"
     if hub.exists():
         import re
         t = hub.read_text(encoding="utf-8")
@@ -55,11 +65,15 @@ def main(argv):
 
     shutil.rmtree(repo)
     paths.append_journal(f"archived {slug} -> {bundle}")
-    print(f"archived '{slug}':")
-    print(f"  bundle:  {bundle}  (restore: git clone {bundle} <dir>)")
-    print(f"  working tree removed; wiki hub marked status: archived" if hub.exists()
-          else "  working tree removed (no wiki hub found)")
-    return 0
+    data = {"slug": slug, "bundle": str(bundle), "hub_marked": hub.exists()}
+
+    def render(_):
+        print(f"archived '{slug}':")
+        print(f"  bundle:  {bundle}  (restore: git clone {bundle} <dir>)")
+        print(f"  working tree removed; wiki hub marked status: archived" if hub.exists()
+              else "  working tree removed (no wiki hub found)")
+
+    return output.emit(data, "archive", human=render)
 
 
 if __name__ == "__main__":

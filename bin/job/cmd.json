@@ -1,9 +1,33 @@
 {
   "verb": "job",
-  "summary": "list | run <name> | apply — scheduler-neutral jobs (§15); apply renders launchd plists",
+  "summary": "list | run <name> | apply \u2014 scheduler-neutral jobs (\u00a715); apply renders launchd plists",
   "usage": "ops job [list|run <name>|apply]",
   "risk": "safe_write",
-  "args": [{ "name": "action", "required": false, "default": "list" }],
-  "reads": ["jobs/registry.json"],
-  "writes": ["jobs/launchd/", ".logs/jobs/", "journal/"]
+  "args": [
+    {
+      "name": "action",
+      "required": false,
+      "default": "list"
+    }
+  ],
+  "reads": [
+    "jobs/registry.json"
+  ],
+  "writes": [
+    "jobs/launchd/",
+    ".logs/jobs/",
+    "journal/"
+  ],
+  "hints": "Scheduler-neutral jobs: list/run/apply. Only read/safe_write may be scheduled. Common mistake: a job with inline shell logic \u2014 a job calls exactly ONE verb.",
+  "output": {
+    "mode": "rows",
+    "fields": {
+      "name": "string",
+      "schedule": "string",
+      "command": "string",
+      "risk": "string",
+      "warns": "list"
+    }
+  },
+  "dry_run": true
 }

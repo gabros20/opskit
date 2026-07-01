@@ -1,16 +1,24 @@
 """
-manifest.py — the capability manifest (§4.3). Each verb carries a `cmd.json` sidecar; this
-concatenates them into the authoritative list that `ops help` renders from and `ops.json` exposes
-to agents. Agents learn the surface from this — they never hardcode or invent verbs.
+manifest.py — the capability manifest (§4.3, proposal Part 1.2). Each verb carries a `cmd.json`
+sidecar; this concatenates them into `ops.json` v2 — the authoritative surface `ops help` renders
+from and any agent reads to negotiate capabilities. ops.json is the complete I/O contract: schema +
+version + detected capabilities + per-verb output block + hints, so a third party drives ops without
+importing lib. Nothing is persisted that isn't re-detected on every write_manifest() (find_spec).
+Agents learn the surface from this — they never hardcode or invent verbs.
 """
 from __future__ import annotations
+import importlib.util
 import json
+import os
 from pathlib import Path
 
 from . import paths  # type: ignore  # (namespace sibling)
 
 BIN = Path(__file__).resolve().parents[1]   # the verbs live with the CODE (bin/), not under OPS_HOME
 MANIFEST = paths.OPS_HOME / "ops.json"       # ...but ops.json is written to the data root (OPS_HOME)
+VERSION_FILE = BIN.parent / "VERSION"        # engine version lives with the CODE (repo root)
+SCHEMA = "ops.json/2"
+API_VERSION = "1.0"
 
 # display grouping (design §4.1); verbs not listed fall under "OTHER"
 GROUPS = [
@@ -41,10 +49,46 @@ def load_cmds() -> list[dict]:
     return cmds
 
 
+def _ops_version() -> str:
+    try:
+        return VERSION_FILE.read_text(encoding="utf-8").strip()
+    except Exception:
+        return "0.0.0"
+
+
+def _capabilities() -> dict:
+    """Live capability detection (Part 1.2) — re-run on every write, nothing persisted stale."""
+    def spec(mod: str) -> bool:
+        try:
+            return importlib.util.find_spec(mod) is not None
+        except Exception:
+            return False
+    return {
+        "vectors": spec("lancedb"),
+        "rerank": spec("fastembed"),
+        "agent": os.environ.get("OPS_AGENT") or "none",
+        "plugins": [],
+    }
+
+
 def write_manifest() -> Path:
-    """(Re)generate ops.json from the cmd.json sidecars (committed; rebuilt by `ops index`)."""
-    cmds = [{k: v for k, v in c.items() if not k.startswith("_")} for c in load_cmds()]
-    MANIFEST.write_text(json.dumps({"verbs": cmds}, indent=2) + "\n", encoding="utf-8")
+    """(Re)generate ops.json v2 from the cmd.json sidecars (committed; rebuilt by `ops index`).
+    Top level carries schema/version/capabilities; each verb gains `source` (engine) — the output
+    block and hints ride through from cmd.json as-is."""
+    cmds = []
+    for c in load_cmds():
+        d = {k: v for k, v in c.items() if not k.startswith("_")}
+        d.setdefault("source", "engine")
+        cmds.append(d)
+    doc = {
+        "schema": SCHEMA,
+        "ops_version": _ops_version(),
+        "api_version": API_VERSION,
+        "json_envelope": 1,
+        "capabilities": _capabilities(),
+        "verbs": cmds,
+    }
+    MANIFEST.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     return MANIFEST
 
 
@@ -61,6 +105,12 @@ def render(verb: str | None = None) -> str:
             for a in c["args"]:
                 req = "required" if a.get("required") else f"optional (default: {a.get('default','-')})"
                 lines.append(f"    {a['name']:<12} {req}")
+        if c.get("hints"):
+            lines.append(f"  hints: {c['hints']}")
+        out_block = c.get("output")
+        if out_block:
+            fields = ", ".join(out_block.get("fields", {}))
+            lines.append(f"  --json: {out_block.get('mode','scalar')} · fields: {fields}")
         if not c.get("_built", True):
             lines.append("  status: DESIGNED — not built yet")
         return "\n".join(lines)

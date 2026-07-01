@@ -3,6 +3,24 @@
   "summary": "dashboard: active/waiting tasks, inbox, last index, repo state",
   "usage": "ops status",
   "risk": "read",
-  "reads": ["tasks/", "inbox/", "wiki/", ".index/"],
-  "writes": []
+  "reads": [
+    "tasks/",
+    "inbox/",
+    "wiki/",
+    ".index/"
+  ],
+  "writes": [],
+  "hints": "One-screen dashboard: tasks, inbox, index freshness, git state. Read-class. Common mistake: confusing it with `ops start` (which writes the journal).",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "ops_home": "string",
+      "active": "int",
+      "waiting": "int",
+      "inbox": "int",
+      "wiki": "int",
+      "index_age_min": "int",
+      "git_dirty": "int"
+    }
+  }
 }

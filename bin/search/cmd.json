@@ -3,7 +3,26 @@
   "summary": "ranked file#heading hits (keyword + graph [+ vectors/rerank])",
   "usage": "ops search \"<query>\"",
   "risk": "read",
-  "args": [{ "name": "query", "required": true }],
-  "reads": [".index/", "wiki/"],
-  "writes": [".logs/queries.jsonl"]
+  "args": [
+    {
+      "name": "query",
+      "required": true
+    }
+  ],
+  "reads": [
+    ".index/",
+    "wiki/"
+  ],
+  "writes": [
+    ".logs/queries.jsonl"
+  ],
+  "hints": "Ranked file#heading hits (keyword + graph, +vectors if OPS_VECTORS). Common mistake: running before `ops index`, or too narrow a query \u2014 broaden and reindex.",
+  "output": {
+    "mode": "rows",
+    "fields": {
+      "path": "string",
+      "heading": "string",
+      "score": "number"
+    }
+  }
 }

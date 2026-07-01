@@ -3,6 +3,20 @@
   "summary": "verify ~/ops is committed + pushed; nag (exit 1) if at risk. Never pushes for you",
   "usage": "ops backup",
   "risk": "read",
-  "reads": [".git"],
-  "writes": []
+  "reads": [
+    ".git"
+  ],
+  "writes": [],
+  "hints": "Check whether ~/ops is committed + pushed; exit 1 = at risk. Common mistake: expecting it to push \u2014 it never transmits, it only nags.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "git_repo": "bool",
+      "branch": "string",
+      "upstream": "string",
+      "dirty": "int",
+      "unpushed": "int",
+      "at_risk": "bool"
+    }
+  }
 }
