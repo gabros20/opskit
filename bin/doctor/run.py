@@ -99,6 +99,29 @@ def main(argv):
         else:
             fail(f"folder: {d}/ MISSING (run: ops doctor --init)")
 
+    # 2b. Obsidian config pack (Part 3.1): with --init, seed .obsidian/ from templates/obsidian/.
+    # .obsidian/ is USER-OWNED (never in engine.txt); refuse-don't-overwrite keeps a customized
+    # config safe. URIs open, writes go through verbs — the pack only sets link/attachment policy.
+    pack = paths.OPS_HOME / "templates" / "obsidian"
+    dest = paths.OPS_HOME / ".obsidian"
+    if pack.is_dir():
+        srcs = sorted(pack.glob("*.json"))
+        if init:
+            copied = kept = 0
+            for s in srcs:
+                d = dest / s.name
+                if d.exists():
+                    kept += 1
+                    continue
+                d.parent.mkdir(parents=True, exist_ok=True)
+                d.write_text(s.read_text(encoding="utf-8"), encoding="utf-8")
+                copied += 1
+            ok(f"obsidian: config pack (.obsidian/: {copied} copied, {kept} kept)")
+        elif not (dest / "app.json").exists():
+            warn("obsidian: config pack not installed (run: ops doctor --init to seed .obsidian/)")
+        else:
+            ok("obsidian: .obsidian/ config present")
+
     # 3. manifest <-> bin  (hidden verbs, e.g. __complete, are intentionally absent from ops.json)
     def _hidden(v):
         f = BIN / v / "cmd.json"
@@ -157,7 +180,9 @@ def main(argv):
     if tracked:
         env = [t for t in tracked if Path(t).name.startswith(".env") or t.endswith(".env")]
         (fail if env else ok)(f"no tracked .env files" if not env else f"SECRET RISK: tracked {env}")
-        wiki_bin = [t for t in tracked if t.startswith("wiki/") and not t.endswith((".md", ".gitkeep"))]
+        # .canvas (JSON Canvas) and .base (Obsidian Bases) are plaintext view layers ops emits (Part 3)
+        wiki_bin = [t for t in tracked if t.startswith("wiki/")
+                    and not t.endswith((".md", ".gitkeep", ".canvas", ".base"))]
         (fail if wiki_bin else ok)("wiki is plaintext-only" if not wiki_bin else f"binaries tracked in wiki: {wiki_bin}")
     else:
         warn("not a git repo (or nothing tracked) — skipped secret/binary scan")
@@ -206,6 +231,34 @@ def main(argv):
                 warn(f"  churn: {c}")
         else:
             ok("frontmatter is Obsidian-Properties stable")
+
+    # 9. Obsidian lints (Part 3.1): tags lowercase-hyphenated + wikilinks in the body, not frontmatter
+    if wiki.is_dir():
+        tag_re = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+        bad_tags, fm_links = [], []
+        for md in wiki.rglob("*.md"):
+            try:
+                text = md.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            rel = md.relative_to(paths.OPS_HOME)
+            for tg in paths.fm_list(text, "tags"):
+                if tg and not tag_re.match(tg):
+                    bad_tags.append(f"{rel}: '{tg}'")
+            if any("[[" in ln for ln in paths._fm_block(text)):
+                fm_links.append(str(rel))
+        if bad_tags:
+            warn(f"{len(bad_tags)} tag(s) not lowercase-hyphenated (Obsidian treats #Tag != #tag):")
+            for b in bad_tags[:5]:
+                warn(f"  tag: {b}")
+        else:
+            ok("frontmatter tags are lowercase-hyphenated")
+        if fm_links:
+            warn(f"{len(fm_links)} note(s) with [[wikilinks]] in frontmatter (Obsidian renders them only in the body):")
+            for b in fm_links[:5]:
+                warn(f"  fm-link: {b}")
+        else:
+            ok("wikilinks are in note bodies only")
 
     nfail = sum(1 for lv, _ in checks if lv == "fail")
     nwarn = sum(1 for lv, _ in checks if lv == "warn")

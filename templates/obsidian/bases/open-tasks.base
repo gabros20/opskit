@@ -1,0 +1,21 @@
+filters:
+  and:
+    - 'type == "task"'
+    - 'status != "done"'
+properties:
+  status:
+    displayName: Status
+  created:
+    displayName: Created
+views:
+  - type: table
+    name: Open tasks
+    order:
+      - file.name
+      - status
+      - created
+    sort:
+      - property: status
+        direction: ASC
+      - property: created
+        direction: ASC

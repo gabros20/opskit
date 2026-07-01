@@ -20,5 +20,6 @@ requirements.txt
 docs/design
 docs/DECISIONS.md
 docs/how-it-works.html
+docs/obsidian-compat.md
 .gitignore
 script

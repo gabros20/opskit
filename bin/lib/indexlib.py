@@ -16,6 +16,7 @@ import json
 import os
 import re
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -26,6 +27,11 @@ DB = INDEX_DIR / "ops.sqlite"
 
 LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
+
+# Paths an external editor scatters that are NEVER content (proposal Part 3.1): Obsidian config +
+# its local trash. Any file whose relative path has one of these components is skipped by the
+# indexer (they live at the vault root, outside `wiki/`, but the guard is explicit + cheap).
+IGNORE_PARTS = {".obsidian", ".trash", ".smart-env"}
 
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))  # let sibling `embed`/`vectorstore` import in both contexts
@@ -76,9 +82,23 @@ def connect() -> sqlite3.Connection:
         CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(path, heading, body, slug UNINDEXED);
         CREATE TABLE IF NOT EXISTS links(src TEXT, dst TEXT);
         CREATE TABLE IF NOT EXISTS embedded(path TEXT PRIMARY KEY, model TEXT);
+        CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
         """
     )
     return con
+
+
+def _meta_get(con, key: str) -> str | None:
+    r = con.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+    return r[0] if r else None
+
+
+def _meta_set(con, key: str, value: str) -> None:
+    con.execute("INSERT OR REPLACE INTO meta(key, value) VALUES(?,?)", (key, value))
+
+
+def _ignored(rel: str) -> bool:
+    return any(part in IGNORE_PARTS for part in Path(rel).parts)
 
 
 def _chunks(text: str) -> list[tuple[str, str]]:
@@ -107,16 +127,27 @@ def _embed_text(content: str, limit: int = 2000) -> str:
     return content.replace("---", " ")[:limit].strip()
 
 
-def index(root: Path | str = CONTENT, verbose: bool = True) -> int:
+def index(root: Path | str = CONTENT, verbose: bool = True, changed_only: bool = False) -> int:
     """Build/refresh the index. Resumable + batched so a large vault's multi-hour embedding
     backfill survives interruption (each FTS commit and each embed batch is durable; a re-run
     skips already-done files by hash + embedded-model, and continues where it left off).
 
     Sharding is transparent: it recurses the tree, so `notes/<aa>/<slug>.md` filesystem fanout
     (and per-area sub-repos pointed at via the content root) index without special handling.
+
+    `changed_only` (proposal Part 3.1 — `ops index --changed`): the external-edit fast path for a
+    vault Obsidian is also editing. Instead of hashing every file, skip any file whose mtime is at
+    or before the last recorded build time (assumed unchanged) — the full `ops index` still does the
+    complete hash pass, so this is a pure accelerator. `.obsidian/`, `.trash/`, `.smart-env/` are
+    ignored either way.
     """
     root = Path(root)
     con = connect()
+    started = time.time()
+    last_ts = None
+    if changed_only:
+        raw = _meta_get(con, "last_index_ts")
+        last_ts = float(raw) if raw else None
     vec_on = _vectors_on()
     emb, vs = _vec_modules() if vec_on else (None, None)
     if vec_on and not (emb and vs):
@@ -131,7 +162,15 @@ def index(root: Path | str = CONTENT, verbose: bool = True) -> int:
     seen, changed, worklist = set(), 0, []
     for p in sorted(root.rglob("*.md")):
         rel = str(p.relative_to(root))
+        if _ignored(rel):
+            continue
         seen.add(rel)
+        if changed_only and last_ts is not None:
+            try:
+                if p.stat().st_mtime <= last_ts:
+                    continue  # unchanged since the last build — fast-path skip (still in `seen`)
+            except OSError:
+                pass
         content = p.read_text(encoding="utf-8")
         h = hashlib.sha1(content.encode()).hexdigest()
         row = con.execute("SELECT hash FROM files WHERE path=?", (rel,)).fetchone()
@@ -162,6 +201,7 @@ def index(root: Path | str = CONTENT, verbose: bool = True) -> int:
             con.execute("DELETE FROM embedded WHERE path=?", (rel,))
             if vec_on:
                 vs.delete_path(rel)
+    _meta_set(con, "last_index_ts", repr(started))  # build stamp for the next --changed fast path
     con.commit()
 
     # --- pass 2: embed the worklist in batches (one Ollama call per batch; durable per batch) ---

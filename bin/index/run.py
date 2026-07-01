@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""ops index [--manifest] [--dry-run] [--json] — (re)build the search index from the content tree
-(§10.2, stage 1). --manifest instead only regenerates ops.json from the cmd.json sidecars."""
+"""ops index [--changed] [--manifest] [--dry-run] [--json] — (re)build the search index from the
+content tree (§10.2, stage 1). --changed is the external-edit fast path (mtime vs the last build,
+ignoring .obsidian/.trash — Part 3.1). --manifest instead only regenerates ops.json."""
 import sys
 from pathlib import Path
 
@@ -22,12 +23,13 @@ def main(argv):
                            human=lambda _: f"manifest regenerated -> {p.name}")
 
     from lib import indexlib
+    changed = "--changed" in argv
     if dry:
         n = len(list(indexlib.CONTENT.rglob("*.md"))) if indexlib.CONTENT.exists() else 0
         return output.emit({"dry_run": True, "would_index": n}, "index",
                            human=lambda _: f"would index {n} note(s) under {indexlib.CONTENT}  (dry run — nothing written)")
 
-    n = indexlib.index(verbose=not output.json_mode())
+    n = indexlib.index(verbose=not output.json_mode(), changed_only=changed)
     if output.json_mode():
         return output.emit({"indexed": n}, "index")
     return output.EXIT_OK

@@ -1,0 +1,21 @@
+filters:
+  and:
+    - or:
+        - 'type == "project"'
+        - 'type == "client"'
+    - 'status == "active"'
+properties:
+  status:
+    displayName: Status
+  updated:
+    displayName: Updated
+views:
+  - type: table
+    name: Active projects
+    order:
+      - file.name
+      - status
+      - updated
+    sort:
+      - property: updated
+        direction: DESC

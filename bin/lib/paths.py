@@ -85,6 +85,62 @@ def fm_field(path: Path, key: str) -> str:
         return ""
 
 
+def _fm_block(text: str) -> list[str]:
+    """The lines strictly INSIDE a leading `---`…`---` YAML frontmatter block ([] if none)."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return []
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    return lines[1:end] if end is not None else []
+
+
+def _unquote(v: str) -> str:
+    v = v.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+        return v[1:-1]
+    return v
+
+
+def frontmatter(source) -> dict:
+    """Parse the YAML frontmatter into a dict, TOLERATING Obsidian's Properties normalization
+    (proposal Part 3.1, anti-roadmap #12): key reorder (position-independent), flow lists
+    `key: [a, b]` AND block lists (`key:` then `  - a` lines), and quoted scalars. Scalars → str,
+    lists → list[str]. Read-only — never rewrites the file. Accepts a Path or the raw text.
+    Stdlib only (no PyYAML dependency, which is optional/absent on the zero-install path)."""
+    text = source.read_text(encoding="utf-8") if isinstance(source, Path) else str(source)
+    out: dict = {}
+    cur_key = None
+    for ln in _fm_block(text):
+        if not ln.strip():
+            continue
+        stripped = ln.lstrip()
+        if stripped.startswith("- ") and cur_key is not None and isinstance(out.get(cur_key), list):
+            out[cur_key].append(_unquote(stripped[2:]))
+            continue
+        m = re.match(r"^([A-Za-z0-9_\-. ]+):\s*(.*)$", ln)
+        if not m:
+            continue
+        key, val = m.group(1).strip(), m.group(2).strip()
+        cur_key = key
+        if val == "":
+            out[key] = []          # tentative: a block list may follow; stays [] if not
+        elif re.match(r"^\[.*\]$", val):
+            inner = val[1:-1].strip()
+            out[key] = [_unquote(x) for x in inner.split(",") if x.strip()] if inner else []
+        else:
+            out[key] = _unquote(val)
+    return out
+
+
+def fm_list(source, key: str) -> list[str]:
+    """Read a frontmatter list field (`tags`, `aliases`, …), tolerating flow OR block form ([] if
+    absent). Convenience over frontmatter()."""
+    v = frontmatter(source).get(key)
+    if isinstance(v, list):
+        return v
+    return [v] if isinstance(v, str) and v else []
+
+
 def title_of(path: Path) -> str:
     """First markdown heading, else the slug."""
     try:

@@ -1,0 +1,17 @@
+filters:
+  and:
+    - 'type == "note"'
+    - 'status != "done"'
+    - 'updated < (now() - "180d")'
+properties:
+  updated:
+    displayName: Last updated
+views:
+  - type: table
+    name: Stale notes
+    order:
+      - file.name
+      - updated
+    sort:
+      - property: updated
+        direction: ASC

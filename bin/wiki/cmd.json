@@ -1,6 +1,6 @@
 {
   "verb": "wiki",
-  "summary": "open <slug> | edit <slug> | new <type> <name> | backlinks <slug> | stale | orphans | list",
+  "summary": "open <slug> [--obsidian] | edit | new <type> <name> | backlinks | stale | orphans | canvas <hub|#tag> | list",
   "usage": "ops wiki <action> [args]",
   "risk": "safe_write",
   "args": [
@@ -17,7 +17,7 @@
     "wiki/",
     "journal/"
   ],
-  "hints": "Navigate/grow the wiki: open/edit/new/backlinks/stale/orphans/list. Common mistake: a duplicate slug on `new` \u2014 slugs are unique.",
+  "hints": "Navigate/grow the wiki: open/edit/new/backlinks/stale/orphans/canvas/list. `open --obsidian` (or OPS_OPEN=obsidian) opens the note in Obsidian via a local obsidian:// URI. `canvas <hub|#tag>` writes a deterministic wiki/canvas/<slug>.canvas (JSON Canvas). Common mistake: a duplicate slug on `new` \u2014 slugs are unique.",
   "output": {
     "mode": "rows",
     "fields": {

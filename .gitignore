@@ -18,6 +18,13 @@ jobs/launchd/
 # macOS noise
 .DS_Store
 
+# Obsidian (Frontend Zero, Part 3.1) — .obsidian/ config is user-owned and version-controlled, but its
+# machine/cache state is not; the local trash and Smart Connections cache are never source of truth.
+.obsidian/workspace*.json
+.obsidian/cache
+.trash/
+.smart-env/
+
 # Claude Code writes internal files into skills dirs + its own runtime dirs — keep the adapter, ignore the rest
 skills/**/.system/
 .claude/projects/

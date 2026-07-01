@@ -1,23 +1,104 @@
 #!/usr/bin/env python3
 """
-ops wiki open <slug> | edit <slug> | new <type> <name> | backlinks <slug> | stale [days] | orphans | list
-  [--dry-run] [--json]
+ops wiki open <slug> [--obsidian] | edit <slug> | new <type> <name> | backlinks <slug> |
+  stale [days] | orphans | canvas <hub|#tag> [--depth N] [--stdout] | list  [--dry-run] [--json]
 — navigate and grow the knowledge wiki (§10). Slugs resolve by basename ([[wikilinks]] style).
+`open --obsidian` (or OPS_OPEN=obsidian) prints an obsidian:// URI and opens it on macOS (Part 3.1);
+`canvas` emits a deterministic JSON Canvas over the wikilink graph (Part 3.2).
 """
+import json
+import math
 import os
 import subprocess
 import sys
 from datetime import date
 from pathlib import Path
+from urllib.parse import quote
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import notetype, output, paths, render  # noqa: E402
+
+CANVAS_DIR = "canvas"  # emitted under wiki/canvas/
 
 
 def _notes():
     if not paths.WIKI.exists():
         return {}
-    return {p.stem: p for p in sorted(paths.WIKI.rglob("*.md"))}
+    return {p.stem: p for p in sorted(paths.WIKI.rglob("*.md")) if p.suffix == ".md"}
+
+
+def _obsidian_uri(p: Path) -> str:
+    """obsidian://open URI for a note — local IPC to OPEN only, never a write (Part 3.1)."""
+    rel = p.relative_to(paths.OPS_HOME).as_posix()
+    if rel.endswith(".md"):
+        rel = rel[:-3]
+    vault = os.environ.get("OPS_OBSIDIAN_VAULT") or paths.OPS_HOME.name
+    return f"obsidian://open?vault={quote(vault, safe='')}&file={quote(rel, safe='/')}"
+
+
+def _adjacency(notes):
+    """Outbound + inbound wikilink edges among notes (targets outside the vault are dropped)."""
+    out = {s: set() for s in notes}
+    for slug, p in notes.items():
+        for t in paths.link_targets(p.read_text(encoding="utf-8")):
+            if t in notes and t != slug:
+                out[slug].add(t)
+    inbound = {s: set() for s in notes}
+    for s, tgts in out.items():
+        for t in tgts:
+            inbound[t].add(s)
+    return out, inbound
+
+
+def _canvas_model(notes, hub, tagset, depth):
+    """Deterministic (dist, ordered-slugs, edges) around a hub (1-hop default) or a tag set."""
+    out, inbound = _adjacency(notes)
+    if hub is not None:
+        dist, frontier = {hub: 0}, {hub}
+        for d in range(1, depth + 1):
+            nxt = set()
+            for s in frontier:
+                for nb in out[s] | inbound[s]:
+                    if nb not in dist:
+                        dist[nb] = d
+                        nxt.add(nb)
+            frontier = nxt
+        nodeset = set(dist)
+    else:
+        nodeset = set(tagset)
+        dist = {s: 1 for s in nodeset}
+    edges = sorted({(s, t) for s in nodeset for t in out[s] if t in nodeset})
+    return dist, sorted(nodeset), edges
+
+
+def _canvas_layout(dist, ordered, hub, w, h):
+    """Slug-ordered ring-per-distance (with a hub) or grid (tag mode) — byte-deterministic."""
+    pos = {}
+    if hub is not None:
+        rings = {}
+        for s in ordered:
+            rings.setdefault(dist[s], []).append(s)
+        for d, members in rings.items():
+            if d == 0:
+                pos[members[0]] = (0, 0)
+                continue
+            r, n = 420 * d, len(members)
+            for i, s in enumerate(sorted(members)):
+                theta = 2 * math.pi * i / n
+                pos[s] = (round(r * math.cos(theta)), round(r * math.sin(theta)))
+    else:
+        cols = max(1, math.ceil(math.sqrt(len(ordered))))
+        for i, s in enumerate(ordered):
+            pos[s] = ((i % cols) * (w + 60), (i // cols) * (h + 80))
+    return pos
+
+
+def _canvas_doc(notes, ordered, edges, pos, w, h):
+    nodes = [{"id": s, "type": "file",
+              "file": notes[s].relative_to(paths.OPS_HOME).as_posix(),
+              "x": pos[s][0], "y": pos[s][1], "width": w, "height": h} for s in ordered]
+    eds = [{"id": f"{a}--{b}", "fromNode": a, "toNode": b} for a, b in edges]
+    return {"nodes": nodes, "edges": eds}
 
 
 def _choose(notes, label):
@@ -48,7 +129,15 @@ def _graph(notes):
 def main(argv):
     _, argv = output.parse_argv(argv)
     dry = "--dry-run" in argv
-    argv = [a for a in argv if a != "--dry-run"]
+    obsidian = ("--obsidian" in argv) or (os.environ.get("OPS_OPEN") == "obsidian")
+    to_stdout = "--stdout" in argv
+    depth = 1
+    if "--depth" in argv:
+        i = argv.index("--depth")
+        if i + 1 < len(argv) and argv[i + 1].isdigit():
+            depth = max(1, int(argv[i + 1]))
+            del argv[i + 1]
+    argv = [a for a in argv if a not in ("--dry-run", "--obsidian", "--stdout", "--depth")]
     action = argv[0] if argv else "list"
     notes = _notes()
 
@@ -61,6 +150,15 @@ def main(argv):
         p = notes.get(slug)
         if not p:
             output.fail(output.EXIT_NOT_FOUND, f"no note '{slug}'", verb="wiki")
+        if obsidian:
+            uri = _obsidian_uri(p)
+            data = {"slug": slug, "path": str(p.relative_to(paths.OPS_HOME)), "uri": uri}
+
+            def open_obsidian(_):
+                if not os.environ.get("OPS_NO_OPEN") and sys.platform == "darwin":
+                    subprocess.run(["open", uri], check=False)  # local IPC: OPEN only, never write
+                return uri
+            return output.emit(data, "wiki", human=open_obsidian)
         data = {"slug": slug, "path": str(p.relative_to(paths.OPS_HOME))}
         return output.emit(data, "wiki", human=lambda _: render.open_note(p))
 
@@ -145,6 +243,42 @@ def main(argv):
                               *[f"  {r['slug']}" for r in rs]])
         return output.emit_rows(rows, "wiki", human=render_orph)
 
+    elif action == "canvas":
+        target = argv[1] if len(argv) > 1 else ""
+        if not target:
+            output.fail(output.EXIT_USAGE,
+                        "usage: ops wiki canvas <hub-slug|#tag> [--depth N] [--stdout]", verb="wiki")
+        hub = target if target in notes else None
+        tagset = set()
+        if hub is None:
+            tag = target[1:] if target.startswith("#") else target
+            tagset = {s for s, p in notes.items() if tag in paths.fm_list(p, "tags")}
+            if not tagset:
+                output.fail(output.EXIT_NOT_FOUND, f"no note or tag '{target}'", verb="wiki")
+            base = paths.slugify(tag)
+        else:
+            base = hub
+        W, H = 260, 120
+        dist, ordered, edges = _canvas_model(notes, hub, tagset, depth)
+        pos = _canvas_layout(dist, ordered, hub, W, H)
+        doc = _canvas_doc(notes, ordered, edges, pos, W, H)
+        text = json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
+        if to_stdout:
+            data = {"slug": base, "nodes": len(ordered), "edges": len(edges), "canvas": doc}
+            return output.emit(data, "wiki", human=lambda _: sys.stdout.write(text) and None)
+        rel = Path("wiki") / CANVAS_DIR / f"{base}.canvas"
+        if dry:
+            data = {"dry_run": True, "would_create": str(rel), "nodes": len(ordered), "edges": len(edges)}
+            return output.emit(data, "wiki",
+                               human=lambda _: f"would create -> {rel}  ({len(ordered)} nodes, {len(edges)} edges)  (dry run — nothing written)")
+        outp = paths.OPS_HOME / rel
+        outp.parent.mkdir(parents=True, exist_ok=True)
+        outp.write_text(text, encoding="utf-8")
+        paths.append_journal(f"wiki canvas: {base} ({len(ordered)} nodes)")
+        data = {"path": str(rel), "slug": base, "nodes": len(ordered), "edges": len(edges)}
+        return output.emit(data, "wiki",
+                           human=lambda _: f"created -> {rel}  ({len(ordered)} nodes, {len(edges)} edges)")
+
     elif action == "list":
         by_type = {}
         for p in notes.values():
@@ -158,7 +292,8 @@ def main(argv):
         return output.emit_rows(rows, "wiki", human=render_list, header={"notes": total})
     else:
         output.fail(output.EXIT_USAGE,
-                    "usage: ops wiki open <slug>|edit <slug>|new <type> <name>|backlinks <slug>|stale [days]|orphans|list",
+                    "usage: ops wiki open <slug> [--obsidian]|edit <slug>|new <type> <name>|"
+                    "backlinks <slug>|stale [days]|orphans|canvas <hub|#tag> [--depth N] [--stdout]|list",
                     verb="wiki")
 
 

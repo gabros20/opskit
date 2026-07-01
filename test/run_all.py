@@ -43,6 +43,7 @@ SUITES = [
     ("multi-root verb resolution: plugins + OPS_PATH (2.1/0.2)", "run_resolver.py"),
     ("frozen SDK + ops plugin: api.py + trust ceiling (2.2/2.3)", "run_plugin.py"),
     ("agent transport: ops mcp stdio server (2.4)", "run_mcp.py"),
+    ("obsidian frontend zero + canvas/bases (3.1/3.2)", "run_obsidian.py"),
     ("install funnel: script/get (5.4)", "run_get.py"),
     ("new: scaffold project/client (§4/§12)", "run_new.py"),
     ("repo: ~/work fleet (§4/§12)", "run_repo.py"),

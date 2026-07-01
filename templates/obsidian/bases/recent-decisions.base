@@ -1,0 +1,19 @@
+filters:
+  and:
+    - 'type == "decision"'
+properties:
+  created:
+    displayName: Decided
+  status:
+    displayName: Status
+views:
+  - type: table
+    name: Recent decisions
+    order:
+      - file.name
+      - created
+      - status
+    sort:
+      - property: created
+        direction: DESC
+    limit: 50

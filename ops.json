@@ -281,8 +281,8 @@
     },
     {
       "verb": "index",
-      "summary": "rebuild the search index over wiki (FTS5 + graph; +LanceDB if OPS_VECTORS=1); --manifest regenerates ops.json",
-      "usage": "ops index [--manifest]",
+      "summary": "rebuild the search index over wiki (FTS5 + graph; +LanceDB if OPS_VECTORS=1); --changed = mtime fast path; --manifest regenerates ops.json",
+      "usage": "ops index [--changed] [--manifest]",
       "risk": "safe_write",
       "reads": [
         "wiki/",
@@ -292,7 +292,7 @@
         ".index/",
         "ops.json"
       ],
-      "hints": "Rebuild the FTS5 + graph search index over wiki (+vectors if OPS_VECTORS). Common mistake: searching before indexing \u2014 an empty index returns no hits.",
+      "hints": "Rebuild the FTS5 + graph search index over wiki (+vectors if OPS_VECTORS). `--changed` is the fast path after external Obsidian edits (reindex only files touched since the last build). Common mistake: searching before indexing \u2014 an empty index returns no hits.",
       "output": {
         "mode": "scalar",
         "fields": {
@@ -695,7 +695,7 @@
     },
     {
       "verb": "wiki",
-      "summary": "open <slug> | edit <slug> | new <type> <name> | backlinks <slug> | stale | orphans | list",
+      "summary": "open <slug> [--obsidian] | edit | new <type> <name> | backlinks | stale | orphans | canvas <hub|#tag> | list",
       "usage": "ops wiki <action> [args]",
       "risk": "safe_write",
       "args": [
@@ -712,7 +712,7 @@
         "wiki/",
         "journal/"
       ],
-      "hints": "Navigate/grow the wiki: open/edit/new/backlinks/stale/orphans/list. Common mistake: a duplicate slug on `new` \u2014 slugs are unique.",
+      "hints": "Navigate/grow the wiki: open/edit/new/backlinks/stale/orphans/canvas/list. `open --obsidian` (or OPS_OPEN=obsidian) opens the note in Obsidian via a local obsidian:// URI. `canvas <hub|#tag>` writes a deterministic wiki/canvas/<slug>.canvas (JSON Canvas). Common mistake: a duplicate slug on `new` \u2014 slugs are unique.",
       "output": {
         "mode": "rows",
         "fields": {
