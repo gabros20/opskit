@@ -63,6 +63,26 @@ and fast — and the safety wall (below) is rooted in this layout.
 
 This repo is a **template, not your data.** You make your own copy; one script wires the machine.
 
+**One-liner (the bootstrap funnel).** `script/get` checks prereqs (`git`, `python3`), clones the
+vault to `~/ops`, and hands off to the same idempotent `script/setup` below — no sudo, and it refuses
+to overwrite an existing install. Read it before you pipe it (that's the point of publishing it):
+```sh
+# inspect first — pin TLS, verify the published hash, read it, THEN run it
+curl --proto '=https' --tlsv1.2 -fsSL \
+  https://raw.githubusercontent.com/gabros20/personal-operating-system/main/script/get -o get.sh
+shasum -a 256 get.sh   # compare against get.sh.sha256 published beside it
+sh get.sh
+```
+
+**Kick the tyres first (`--demo`).** Clone into a throwaway tmp dir seeded with example notes — the
+roots, the `ops` symlink, and completion all land *inside* that one dir, so `capture`/`search`/`week`
+work immediately and a single `rm -rf` walks away, touching nothing else:
+```sh
+sh get.sh --demo        # prints the vault path and the one directory to delete
+```
+
+**Prefer to do it by hand?** The template flow below is exactly what `script/get` automates:
+
 1. **Get your own copy.** On GitHub → **Use this template → Create a new repository** (your account,
    fresh history). Clone it to `~/ops` — the path matters, the safety wall is rooted there:
    ```sh
@@ -93,6 +113,11 @@ auto-detected — nothing is required to run `ops`:
 - Fuzzy note-picking: [`fzf`](https://github.com/junegunn/fzf) (else `ops wiki open` with no slug just lists notes).
 - Better bookmark extraction: [`trafilatura`](https://github.com/adbar/trafilatura) (`pip install trafilatura`) turns a
   URL into real main-content Markdown; without it `ops bookmark` uses a built-in crude strip. Stays local — no cloud reader.
+
+**Platform notes.** *Homebrew:* if a tap ever ships, it is **only ever a tiny bootstrapper** that runs
+`script/get` (the chezmoi model) — never a formula that clones your notes into a brew-owned prefix, the
+opposite of a user-owned vault. *Windows:* use **WSL2** (a normal Linux install inside it); there is no
+native PowerShell path.
 
 ---
 
@@ -178,6 +203,17 @@ agents read `AGENTS.md` natively; only Claude needs the bridge (already shipped)
 > `ops doctor` checks the wiring: that `CLAUDE.md` bridges `AGENTS.md`, the skill exists, and any
 > adapter symlinks/configs resolve. A broken adapter is how an agent silently starts improvising — so
 > it's a first-class health check.
+
+**MCP transport (`ops mcp`).** For hosts that speak [MCP](https://modelcontextprotocol.io), `ops mcp`
+is a **stateless stdio server** — the host spawns it per session, it dies with it (no daemon, no HTTP,
+no resident state). Its tool list is generated from `ops.json`, so *every* verb (and every installed
+plugin) shows up automatically with schemas and hints; each tool call shells out to `ops <verb> --json`,
+so the guardrail and `.logs/` stay the single enforcement path. A confirm-class call without `--yes`
+comes back as a structured "needs `--yes`" result with the exact re-run — the server never auto-confirms.
+Wire it up once:
+```sh
+ops mcp --setup    # prints:  claude mcp add ops -- /abs/path/to/ops mcp
+```
 
 ---
 

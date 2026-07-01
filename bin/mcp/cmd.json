@@ -1,0 +1,9 @@
+{
+  "verb": "mcp",
+  "summary": "internal: stateless stdio MCP server exposing every ops verb as an agent tool",
+  "usage": "ops mcp   (spawned by an agent host; `ops mcp --setup` prints the install line)",
+  "risk": "read",
+  "hidden": true,
+  "reads": ["ops.json"],
+  "writes": []
+}

@@ -42,6 +42,8 @@ SUITES = [
     ("machine contract: --json + ops.json v2 + dry-run (1.1/1.2/0.5)", "run_json.py"),
     ("multi-root verb resolution: plugins + OPS_PATH (2.1/0.2)", "run_resolver.py"),
     ("frozen SDK + ops plugin: api.py + trust ceiling (2.2/2.3)", "run_plugin.py"),
+    ("agent transport: ops mcp stdio server (2.4)", "run_mcp.py"),
+    ("install funnel: script/get (5.4)", "run_get.py"),
     ("new: scaffold project/client (§4/§12)", "run_new.py"),
     ("repo: ~/work fleet (§4/§12)", "run_repo.py"),
     ("files: binary-assets plane (§9)", "run_files.py"),

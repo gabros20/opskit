@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# script/get — the install funnel (proposal Part 5.4). A hardened, INSPECTABLE curl|sh bootstrap
+# (the rustup pattern). It does the least possible: check prereqs, clone the vault, then hand off to
+# the ONE idempotent setup path (script/setup). No sudo, ever; refuses to overwrite an install.
+#
+# Inspect before you run (never pipe a script you haven't read):
+#
+#   curl --proto '=https' --tlsv1.2 -fsSL \
+#     https://raw.githubusercontent.com/gabros20/personal-operating-system/main/script/get -o get.sh
+#   shasum -a 256 get.sh          # compare against the published get.sh.sha256 for the same ref
+#   less get.sh                    # read it
+#   sh get.sh                      # then, and only then, run it
+#
+# (`--proto '=https' --tlsv1.2` pins TLS ≥1.2 over HTTPS-only, so a downgrade/redirect can't feed you
+# a different transport; publishing get.sh.sha256 next to the raw file lets you verify byte integrity.
+# We never auto-verify our own hash — that would be theatre; verification is the reader's, pre-run.)
+#
+# Usage:
+#   script/get [--demo] [--dry-run] [--dir PATH] [--repo URL] [--yes]
+#     --demo      clone into a THROWAWAY tmp dir seeded with example notes; capture/search/week work
+#                 immediately. Prints the one directory to delete to walk away. Touches nothing else.
+#     --dry-run   print every step, change nothing (no clone, no setup).
+#     --dir PATH  install location (default: $HOME/ops; env OPS_GET_DIR).
+#     --repo URL  clone source        (default: the upstream template; env OPS_GET_REPO).
+#     --yes       pass through to setup (non-interactive).
+#
+# Homebrew stance: a formula would clone vault CONTENT into a brew-owned prefix — the exact opposite
+# of a user-owned repo. If we ever ship a tap it is ONLY a tiny bootstrapper that runs THIS script
+# (the chezmoi model), never a formula that owns your notes. Windows: use WSL2 (documented; no native
+# PowerShell path).
+set -euo pipefail
+
+REPO_URL="${OPS_GET_REPO:-https://github.com/gabros20/personal-operating-system.git}"
+TARGET="${OPS_GET_DIR:-$HOME/ops}"
+DEMO=0; DRY=0; YES=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --demo) DEMO=1 ;;
+    --dry-run) DRY=1 ;;
+    --dir) shift; TARGET="$1" ;;
+    --repo) shift; REPO_URL="$1" ;;
+    --yes|-y) YES=1 ;;
+    -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown flag: $1" >&2; exit 2 ;;
+  esac; shift
+done
+
+say() { printf '\033[1m%s\033[0m\n' "$*"; }
+run() { printf '  + %s\n' "$*"; [ "$DRY" = 1 ] || eval "$*"; }
+need() { command -v "$1" >/dev/null 2>&1 || { echo "get: missing prerequisite '$1' — install it and re-run" >&2; exit 1; }; }
+
+say "ops get — bootstrap a vault (clone + hand off to script/setup)"
+need git
+need python3
+echo "  git:     $(command -v git)"
+echo "  python3: $(command -v python3)"
+echo
+
+# --demo: everything lands under one throwaway dir (the roots too, via OPS_ROOTS_HOME), so a single
+# `rm -rf` walks away. No PATH symlink, no completion install, no commit — pure sandbox.
+if [ "$DEMO" = 1 ]; then
+  if [ -n "${OPS_GET_DIR:-}" ]; then
+    DEMO_DIR="$TARGET"
+    [ -e "$DEMO_DIR" ] && [ -n "$(ls -A "$DEMO_DIR" 2>/dev/null)" ] && { echo "get: --demo dir '$DEMO_DIR' is not empty" >&2; exit 1; }
+  else
+    DEMO_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ops-demo.XXXXXX")"
+  fi
+  VAULT="$DEMO_DIR/ops"
+  say "1. clone into a throwaway demo vault"
+  run "git clone --depth 1 -q '$REPO_URL' '$VAULT'"
+  say "2. setup (sandboxed: roots, PATH, completion all inside the demo dir)"
+  SETUP_ENV="OPS_ROOTS_HOME='$DEMO_DIR' OPS_BIN_DIR='$DEMO_DIR/.bin' OPS_COMP_DIR='$DEMO_DIR/.comp' OPS_HOME='$VAULT'"
+  run "env $SETUP_ENV '$VAULT/script/setup' --full --yes --no-commit --upstream '$REPO_URL'"
+  say "3. seed example notes so search/week have something to show"
+  run "env OPS_HOME='$VAULT' '$VAULT/ops' capture 'demo: try ops search, ops week, ops task add'"
+  if [ "$DRY" != 1 ]; then
+    mkdir -p "$VAULT/wiki/notes"
+    cat > "$VAULT/wiki/notes/demo-welcome.md" <<'NOTE'
+---
+type: note
+title: Demo welcome
+status: active
+tags: [demo, starter]
+aliases: [demo]
+---
+# Demo welcome
+
+This is a throwaway demo vault. Try:
+
+- `ops search demo` — ranked hits across your notes
+- `ops week` — the weekly review
+- `ops task add "kick the tyres"` — add a task
+
+Delete the one directory printed below to walk away — nothing else on your machine was touched.
+NOTE
+  fi
+  run "env OPS_HOME='$VAULT' '$VAULT/ops' index"
+  echo
+  say "demo ready. everything is under ONE directory:"
+  echo "  vault:  $VAULT"
+  echo "  try:    OPS_HOME='$VAULT' '$VAULT/ops' search demo"
+  echo "          OPS_HOME='$VAULT' '$VAULT/ops' week"
+  say "walk away (deletes the whole demo, touches nothing else):"
+  echo "  rm -rf '$DEMO_DIR'"
+  exit 0
+fi
+
+# Real install: refuse to overwrite an existing vault (never clobber the user's content).
+if [ -e "$TARGET" ] && [ -n "$(ls -A "$TARGET" 2>/dev/null)" ]; then
+  echo "get: '$TARGET' already exists and is not empty — refusing to overwrite." >&2
+  echo "     to update an existing vault use: '$TARGET/script/update'" >&2
+  echo "     or install elsewhere with:       script/get --dir /path/to/vault" >&2
+  exit 1
+fi
+
+say "1. clone the vault"
+echo "  from:  $REPO_URL"
+echo "  into:  $TARGET"
+run "git clone -q '$REPO_URL' '$TARGET'"
+
+say "2. hand off to the one setup path (script/setup)"
+SETUP_ARGS=""
+[ "$YES" = 1 ] && SETUP_ARGS="--yes"
+[ "$DRY" = 1 ] && SETUP_ARGS="$SETUP_ARGS --dry-run"
+if [ "$DRY" = 1 ] && [ ! -x "$TARGET/script/setup" ]; then
+  echo "  + $TARGET/script/setup $SETUP_ARGS   (skipped: nothing cloned in --dry-run)"
+else
+  run "'$TARGET/script/setup' $SETUP_ARGS"
+fi
+
+echo
+say "done. setup printed your next steps (point origin at your GitHub, then push — get never transmits)."
