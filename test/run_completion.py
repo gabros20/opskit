@@ -98,6 +98,7 @@ def main() -> int:
     check("renderer dims frontmatter", "\033[2mtype: note\033[0m" in out, out[:80])
     check("renderer accents [[wikilinks]]", "[[link]]" in out and "\033[36m" in out, out)
     check("fzf_pick returns None when non-interactive/no fzf", render.fzf_pick(["a", "b"]) is None)
+    check("renderer shows image embeds as a terminal ref", "🖼" in render.render_markdown("![alt](/x/y.png)"))
 
     # ---- wiki open: raw when piped (tests + pipelines get plain Markdown) ----
     with tempfile.TemporaryDirectory() as td:

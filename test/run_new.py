@@ -2,6 +2,7 @@
 """run_new.py — exercises `ops new project` and `ops new client` against temp ~/ops + sibling roots
 (OPS_HOME + OPS_ROOTS_HOME), asserting wiki hubs, the ~/work repo scaffold, and slug uniqueness."""
 from __future__ import annotations
+import json
 import os
 import shutil
 import subprocess
@@ -54,7 +55,37 @@ def main() -> int:
         r = run(ops, roots, "project", "Acme Webapp")
         check("new refuses a duplicate slug", r.returncode == 1 and "already exists" in (r.stdout + r.stderr), r.stderr)
 
-    print(f"{BOLD}new verb (scaffold project/client) — {len(results)} checks{RESET}\n")
+        # ---- new verb: the scaffolder (issue #1 gap E). Verbs live with the CODE, so this writes
+        # into the real bin/ — use throwaway names and clean up in finally. ----
+        made = ["zzscaffoldtest", "zzscaffoldtwo"]
+        try:
+            r = run(ops, roots, "verb", "zzscaffoldtest", "--summary", "temp test verb", "--risk", "read")
+            d = REPO / "bin" / "zzscaffoldtest"
+            check("new verb scaffolds bin/<name>/{run.py,cmd.json}",
+                  (d / "run.py").exists() and (d / "cmd.json").exists(), r.stdout + r.stderr)
+            if (d / "cmd.json").exists():
+                cj = json.loads((d / "cmd.json").read_text())
+                check("scaffolded cmd.json carries verb + declared risk",
+                      cj.get("verb") == "zzscaffoldtest" and cj.get("risk") == "read", str(cj))
+            if (d / "run.py").exists():
+                stub = (d / "run.py").read_text()
+                check("scaffolded run.py has placeholders filled", "{{" not in stub and "zzscaffoldtest" in stub, stub[:80])
+            opsjson = json.loads((ops / "ops.json").read_text()) if (ops / "ops.json").exists() else {"verbs": []}
+            check("new verb regenerates the manifest (ops.json)",
+                  any(v["verb"] == "zzscaffoldtest" for v in opsjson["verbs"]), "")
+            run(ops, roots, "verb", "zzscaffoldtwo")   # no --risk → must default to confirm (§5)
+            d2 = REPO / "bin" / "zzscaffoldtwo"
+            cj2 = json.loads((d2 / "cmd.json").read_text()) if (d2 / "cmd.json").exists() else {}
+            check("new verb defaults to confirm-class (§5)", cj2.get("risk") == "confirm", str(cj2))
+            r = run(ops, roots, "verb", "Bad Name")
+            check("new verb rejects an invalid name", r.returncode == 2, r.stderr)
+            r = run(ops, roots, "verb", "wiki")
+            check("new verb refuses an existing verb", r.returncode == 1, r.stderr)
+        finally:
+            for n in made:
+                shutil.rmtree(REPO / "bin" / n, ignore_errors=True)
+
+    print(f"{BOLD}new verb (scaffold project/client/verb) — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
     for name, ok, detail in results:
         mark = f"{GREEN}PASS{RESET}" if ok else f"{RED}FAIL{RESET}"

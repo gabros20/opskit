@@ -223,8 +223,8 @@
     },
     {
       "verb": "new",
-      "summary": "scaffold a project (wiki hub + ~/work repo) or client (wiki hub + ~/files tree)",
-      "usage": "ops new project \"<name>\" [--kind labs|products|tools] | new client \"<name>\"",
+      "summary": "scaffold a project (wiki hub + ~/work repo), client (wiki hub + ~/files tree), or verb (bin/<name>/ stub)",
+      "usage": "ops new project \"<name>\" [--kind labs|products|tools] | new client \"<name>\" | new verb <name> [--risk <class>] [--summary \"<text>\"]",
       "risk": "safe_write",
       "args": [
         {
@@ -238,12 +238,15 @@
       ],
       "reads": [
         "templates/project-repo/",
+        "templates/verb/",
         "wiki/"
       ],
       "writes": [
         "wiki/",
         "~/work/",
         "~/files/clients/",
+        "bin/ (new verb)",
+        "ops.json",
         "journal/"
       ]
     },

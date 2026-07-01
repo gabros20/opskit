@@ -1,0 +1,9 @@
+{
+  "verb": "{{name}}",
+  "summary": "{{summary}}",
+  "usage": "ops {{name}} [args]",
+  "risk": "{{risk}}",
+  "args": [],
+  "reads": [],
+  "writes": []
+}

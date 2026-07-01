@@ -28,6 +28,8 @@ TASK_SUBS = {"list": "list tasks", "add": "add a task", "show": "show one task",
 TASK_STATUSES = {"inbox": "", "active": "", "waiting": "", "done": ""}
 FILES_SUBS = {"ingest": "binary → ~/files + shadow note", "link": "attach an asset to a hub",
               "list": "the asset catalogue", "open": "reveal the file in Finder"}
+NEW_SUBS = {"project": "wiki hub + ~/work repo", "client": "wiki hub + ~/files tree",
+            "verb": "scaffold a new bin/<name>/ command"}
 
 
 def _clean(s: str) -> str:
@@ -106,6 +108,9 @@ def main(prior: list[str]) -> int:
                 _emit(_task_ids())
             else:
                 _emit(TASK_STATUSES.items())
+    elif verb == "new":
+        if len(prior) == 1:
+            _emit(NEW_SUBS.items())
     elif verb == "files":
         if len(prior) == 1:
             _emit(FILES_SUBS.items())

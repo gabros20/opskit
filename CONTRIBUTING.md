@@ -19,6 +19,11 @@ All suites must stay green. CI (`.github/workflows/ci.yml`) runs `run_all.py` on
 A new verb costs exactly one directory. Nothing else to wire — `ops help`, the manifest, the
 guardrail, and every agent learn it from the same place.
 
+**Fast path:** `ops new verb <name> [--risk <class>] [--summary "…"]` stamps out steps 1–2 and
+regenerates the manifest (step 4) from `templates/verb/`. It defaults the new verb to `confirm`-class
+per §5 — you lower the risk deliberately once it's implemented. Then just fill in `main()`. The manual
+steps, for reference:
+
 1. **`bin/<verb>/run.py`** — the implementation. Import shared helpers from `lib`:
    ```python
    import sys; from pathlib import Path

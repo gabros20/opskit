@@ -31,6 +31,7 @@ PERSONAL = ("tax", "szja", "nav", "ado", "adó", "medical", "orvos", "contract",
             "legal", "passport", "utlevel", "útlevel", "birth", "szulet", "szület", "insurance",
             "biztosit", "biztosít", "marriage", "hazas", "házas", "will", "vegrendel")
 TEXT_SUFFIXES = {".md", ".txt"}
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".tiff", ".heic"}
 HUB_KIND = {"--client": "clients", "--project": "projects", "--area": "areas"}
 
 
@@ -94,10 +95,15 @@ def _shadow(dest: Path, title: str, sha: str, hub_slug: str | None) -> Path:
     f = d / f"{slug}.md"
     hub_fm = f"hub: {hub_slug}\n" if hub_slug else ""
     hub_body = f"\nFiled under [[{hub_slug}]].\n" if hub_slug else ""
-    f.write_text(f"---\ntype: file\ntitle: {title}\nstatus: active\nsource: ingest\n"
+    is_image = dest.suffix.lower() in IMAGE_SUFFIXES
+    # images stay binaries in ~/files (the wiki is plaintext-only), but the shadow note EMBEDS them so
+    # an editor that resolves the path previews inline; other files get a plain reference.
+    asset = (f"![{title}]({dest})\n" if is_image
+             else f"Shadow note for a binary in `~/files` (not stored in git). File: `{dest}`.\n")
+    kind_fm = "kind: image\n" if is_image else ""
+    f.write_text(f"---\ntype: file\n{kind_fm}title: {title}\nstatus: active\nsource: ingest\n"
                  f"ingested: {paths.today()}\npath: {dest}\nsha256: {sha}\n{hub_fm}tags: []\n---\n# {title}\n\n"
-                 f"Shadow note for a binary in `~/files` (not stored in git). File: `{dest}`.\n{hub_body}",
-                 encoding="utf-8")
+                 f"{asset}{hub_body}", encoding="utf-8")
     return f
 
 

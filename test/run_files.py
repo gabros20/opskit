@@ -88,6 +88,15 @@ def main() -> int:
         r = run(ops, roots, "link", "spec", "acme")
         check("files link is idempotent", r.returncode == 0 and "already linked" in r.stdout, r.stdout)
 
+        # ---- images: ingested as binaries (wiki stays plaintext) but EMBEDDED for preview (gap C) ----
+        (src / "logo.png").write_bytes(b"\x89PNG\r\n fake image bytes")
+        r = run(ops, roots, "ingest", str(src / "logo.png"), "--client", "acme")
+        shadow_img = ops / "wiki" / "files" / "logo.md"
+        check("image ingested to ~/files (not wiki)", (roots / "files" / "clients" / "acme" / "in" / "logo.png").exists()
+              and not any((ops / "wiki").rglob("*.png")), r.stdout + r.stderr)
+        check("image shadow note embeds ![](path) + kind: image", shadow_img.exists()
+              and "kind: image" in shadow_img.read_text() and "![logo.png](" in shadow_img.read_text(), shadow_img.read_text() if shadow_img.exists() else "")
+
     print(f"{BOLD}files verb (binary-assets plane) — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
     for name, ok, detail in results:

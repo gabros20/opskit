@@ -107,7 +107,7 @@ Fridays. Everything else is discoverable via `ops help`. The full surface:
 | **Flow** | `capture` · `triage` · `start` · `close` · `week` |
 | **Knowledge** | `search` · `wiki` (open / edit / new / backlinks / stale / orphans) · `bookmark` (URL → note) |
 | **Tasks** | `task` (list / add / show / move / done — folder = status) |
-| **Work** | `new` (scaffold project/client) · `repo` (fleet health/clone/adopt) · `archive` · `files` (ingest/route/link binaries) · `sweep` (Desktop/Downloads decay) |
+| **Work** | `new` (scaffold project/client/**verb**) · `repo` (fleet health/clone/adopt) · `archive` · `files` (ingest/route/link binaries) · `sweep` (Desktop/Downloads decay) |
 | **Business** | `invoice` (draft only — never sends) |
 | **Jobs** | `job` (list / run / apply — schedule the nightly verbs via launchd) |
 

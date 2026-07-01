@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """
 ops new project "<name>" [--kind labs|products|tools] | new client "<name>"
-— scaffold a unit of work (§4.1, §12.3). A PROJECT gets a wiki hub AND a ~/work repo scaffolded from
-templates/project-repo/ (git-initialized). A CLIENT gets a wiki hub AND a ~/files/clients/<slug>/
-material tree. Slugs are globally unique and IDENTICAL across wiki ↔ ~/work ↔ ~/files (§2).
+    | new verb <name> [--risk <class>] [--summary "<text>"]
+— scaffold a unit of work (§4.1, §12.3) or a new command. A PROJECT gets a wiki hub AND a ~/work repo
+scaffolded from templates/project-repo/ (git-initialized). A CLIENT gets a wiki hub AND a
+~/files/clients/<slug>/ material tree. A VERB stamps out bin/<name>/{run.py,cmd.json} from
+templates/verb/ (defaulting to confirm-class, per §5) and regenerates the manifest — turning "add a
+verb" into a one-command, guardrailed act instead of hand-wiring the surface. Slugs are globally
+unique and IDENTICAL across wiki ↔ ~/work ↔ ~/files (§2).
 """
+import re
 import shutil
 import subprocess
 import sys
@@ -14,6 +19,41 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import paths  # noqa: E402
 
 TEMPLATE = paths.OPS_HOME / "templates" / "project-repo"
+VERB_TEMPLATE = paths.OPS_HOME / "templates" / "verb"
+BIN = Path(__file__).resolve().parents[1]           # verbs live with the CODE (bin/), not OPS_HOME
+RISK_CLASSES = ("read", "safe_write", "draft_only", "confirm", "deny")
+
+
+def _new_verb(rest):
+    name = rest[0] if rest else ""
+    risk, summary = "confirm", ""
+    i = 1
+    while i < len(rest):
+        if rest[i] == "--risk" and i + 1 < len(rest):
+            risk = rest[i + 1]; i += 2; continue
+        if rest[i] == "--summary" and i + 1 < len(rest):
+            summary = rest[i + 1]; i += 2; continue
+        i += 1
+    if not re.fullmatch(r"[a-z][a-z0-9-]*", name or ""):
+        print("verb name must be lowercase [a-z0-9-], starting with a letter", file=sys.stderr); return 2
+    if risk not in RISK_CLASSES:
+        print(f"--risk must be one of {RISK_CLASSES}", file=sys.stderr); return 2
+    dest = BIN / name
+    if dest.exists():
+        print(f"verb '{name}' already exists ({dest})", file=sys.stderr); return 1
+    if not VERB_TEMPLATE.is_dir():
+        print(f"missing template: {VERB_TEMPLATE}", file=sys.stderr); return 1
+    shutil.copytree(VERB_TEMPLATE, dest)
+    _fill(dest, {"{{name}}": name, "{{risk}}": risk,
+                 "{{summary}}": summary or f"TODO: describe {name}"})
+    from lib.manifest import write_manifest  # regenerate ops.json so `ops help` shows the new verb
+    write_manifest()
+    paths.append_journal(f"new verb: {name} (risk {risk})")
+    print(f"scaffolded verb '{name}':")
+    print(f"  code:  bin/{name}/run.py  (+ cmd.json, risk: {risk})")
+    print(f"  next:  implement main() in bin/{name}/run.py, then `ops {name}`"
+          + ("" if risk != "confirm" else "  (confirm-class → runs with --yes until you lower risk)"))
+    return 0
 
 
 def _all_slugs() -> set:
@@ -40,9 +80,11 @@ def _fill(root: Path, repl: dict):
 
 
 def main(argv):
-    if len(argv) < 2 or argv[0] not in ("project", "client"):
-        print('usage: ops new project "<name>" [--kind labs|products|tools] | new client "<name>"',
-              file=sys.stderr); return 2
+    if len(argv) < 2 or argv[0] not in ("project", "client", "verb"):
+        print('usage: ops new project "<name>" [--kind labs|products|tools] | new client "<name>"\n'
+              '       | new verb <name> [--risk <class>] [--summary "<text>"]', file=sys.stderr); return 2
+    if argv[0] == "verb":
+        return _new_verb(argv[1:])
     typ = argv[0]
     kind = "labs"
     rest = []

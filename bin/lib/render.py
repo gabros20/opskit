@@ -28,6 +28,7 @@ LINK = "\033[36m"
 CODE = "\033[38;5;108m"
 
 _H = re.compile(r"^(#{1,6})\s+(.*)$")
+_IMG = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")   # ![alt](path) — terminal can't show pixels; show a ref
 _LINK = re.compile(r"\[\[([^\]]+)\]\]")
 _BOLD = re.compile(r"\*\*([^*]+)\*\*")
 _ICODE = re.compile(r"`([^`]+)`")
@@ -65,6 +66,7 @@ def render_markdown(text: str) -> str:
             style = f"{B}{ACCENT}" if level <= 2 else B
             out.append(f"{style}{txt}{RESET}")
             continue
+        line = _IMG.sub(lambda x: f"{DIM}🖼 {x.group(1) or 'image'} → {x.group(2)}{RESET}", line)
         line = _LINK.sub(lambda x: f"{LINK}[[{x.group(1)}]]{RESET}", line)
         line = _BOLD.sub(lambda x: f"{B}{x.group(1)}{RESET}", line)
         line = _ICODE.sub(lambda x: f"{CODE}{x.group(1)}{RESET}", line)

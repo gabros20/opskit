@@ -22,6 +22,12 @@ per-type body template) lives in `templates/wiki/` (`types.json` + `<type>.md`).
 config, not code: add an entry to `types.json` (and optionally a `<type>.md` template), and it's
 immediately usable by `ops wiki new <type>` and tab-completion. See `bin/lib/notetype.py`.
 
+## Images & binaries
+The wiki is **plaintext-only** (`ops doctor` enforces it — no binaries tracked under `wiki/`). So
+images, PDFs, and other binaries live in `~/files`, referenced by a **shadow note** (`ops files
+ingest`). For images, the shadow note embeds the file with `![title](path)` so an editor that resolves
+the path previews it inline; the terminal renderer shows a `🖼` reference. Bytes never enter git.
+
 ## Slugs & files
 - Filenames are stable, human-readable slugs (`stripe-webhook-retries.md`), **globally unique**
   across folders — because `[[bare-slug]]` links resolve by basename, two notes sharing a basename
