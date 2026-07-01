@@ -107,7 +107,7 @@ Fridays. Everything else is discoverable via `ops help`. The full surface:
 | **Flow** | `capture` · `triage` · `start` · `close` · `week` |
 | **Knowledge** | `search` · `wiki` (open / edit / new / backlinks / stale / orphans) · `bookmark` (URL → note) |
 | **Tasks** | `task` (list / add / show / move / done — folder = status) |
-| **Work** | `new` (scaffold project/client) · `repo` (fleet health/clone/adopt) · `archive` · `files` (ingest binaries) · `sweep` (Desktop/Downloads decay) |
+| **Work** | `new` (scaffold project/client) · `repo` (fleet health/clone/adopt) · `archive` · `files` (ingest/route/link binaries) · `sweep` (Desktop/Downloads decay) |
 | **Business** | `invoice` (draft only — never sends) |
 | **Jobs** | `job` (list / run / apply — schedule the nightly verbs via launchd) |
 
@@ -120,6 +120,8 @@ ops wiki edit rrf              # open it in $EDITOR
 ops wiki backlinks rrf         # what links here
 ops bookmark https://… --archive   # save a URL as a note (title fetched); snapshot to ~/files
 ops new project "Acme Webapp" --kind products   # scaffold a ~/work repo + wiki hub
+ops files ingest brief.pdf --client acme   # → ~/files/clients/acme/in/ + shadow note, linked from the hub
+ops files list                 # the asset catalogue (which hub each file belongs to)
 ops doctor                     # is everything healthy?
 ```
 

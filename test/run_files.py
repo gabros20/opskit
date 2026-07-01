@@ -46,6 +46,48 @@ def main() -> int:
         r = run(ops, roots, "open", "acme-brief", extra={"OPS_NO_OPEN": "1"})
         check("files open resolves the path from the shadow note", str(filed) in r.stdout, r.stdout)
 
+    # ---- routing into a hub + bidirectional linking + de-dup + management (issue #1 gap A) ----
+    with tempfile.TemporaryDirectory() as td:
+        ops, roots = Path(td) / "ops", Path(td) / "home"
+        (ops / "wiki" / "clients").mkdir(parents=True); (ops / "journal").mkdir()
+        hub = ops / "wiki" / "clients" / "acme.md"
+        hub.write_text("---\ntype: client\ntitle: Acme\nstatus: active\n---\n# Acme\n\n## Timeline\n- 2026-01-01 created\n")
+        src = Path(td) / "src"; src.mkdir()
+        (src / "brief.pdf").write_bytes(b"BRIEF-BYTES-v1")
+        (src / "brief2.pdf").write_bytes(b"BRIEF-BYTES-v1")   # identical bytes, different name
+        (src / "spec.pdf").write_bytes(b"SPEC-BYTES")
+
+        r = run(ops, roots, "ingest", str(src / "brief.pdf"), "--client", "acme")
+        into = roots / "files" / "clients" / "acme" / "in" / "brief.pdf"
+        shadow = ops / "wiki" / "files" / "brief.md"
+        check("ingest --client routes into ~/files/<hub>/in/", into.exists(), r.stdout + r.stderr)
+        check("shadow note records hub + sha256", shadow.exists()
+              and "hub: acme" in shadow.read_text() and "sha256:" in shadow.read_text(), r.stdout)
+        check("hub note gets a ## Files backlink", "## Files" in hub.read_text() and "[[brief]]" in hub.read_text(), hub.read_text())
+
+        r = run(ops, roots, "ingest", str(src / "brief2.pdf"), "--client", "acme")
+        check("identical bytes are de-duped (no second copy)", "duplicate" in r.stdout
+              and not (roots / "files" / "clients" / "acme" / "in" / "brief2.pdf").exists(), r.stdout)
+        check("de-dup keeps a single shadow note", len(list((ops / "wiki" / "files").glob("*.md"))) == 1)
+
+        r = run(ops, roots, "ingest", str(src / "spec.pdf"), "--client", "ghost")
+        check("ingest to a missing hub errors (nothing filed)", r.returncode == 1 and "no wiki hub" in r.stderr, r.stderr)
+
+        r = run(ops, roots, "ingest", str(src / "spec.pdf"), "--research")
+        check("ingest --research routes into ~/files/research/", (roots / "files" / "research" / "spec.pdf").exists(), r.stdout + r.stderr)
+
+        r = run(ops, roots, "list")
+        check("files list shows the catalogue with hub tags", "brief" in r.stdout and "[[acme]]" in r.stdout, r.stdout)
+        r = run(ops, roots, "list", "--hub", "acme")
+        check("files list --hub filters to one hub", "brief" in r.stdout and "spec" not in r.stdout, r.stdout)
+
+        # link an already-ingested (research) asset to the hub after the fact
+        r = run(ops, roots, "link", "spec", "acme")
+        check("files link attaches an asset to a hub", r.returncode == 0
+              and "[[spec]]" in hub.read_text() and "[[acme]]" in (ops / "wiki" / "files" / "spec.md").read_text(), r.stdout + r.stderr)
+        r = run(ops, roots, "link", "spec", "acme")
+        check("files link is idempotent", r.returncode == 0 and "already linked" in r.stdout, r.stdout)
+
     print(f"{BOLD}files verb (binary-assets plane) — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
     for name, ok, detail in results:

@@ -129,8 +129,8 @@
     },
     {
       "verb": "files",
-      "summary": "binary assets: ingest [<path>] (\u2192 ~/files + shadow note; iCloud proposed, not written) | open <slug>",
-      "usage": "ops files ingest [<path>] | open <slug>",
+      "summary": "binary assets: ingest [<path>] [--client|--project|--area <slug>|--research] | link <file> <hub> | list | open <slug>",
+      "usage": "ops files ingest [<path>] [--client|--project|--area <slug> | --research] | link <file> <hub> | list [--hub <slug>] | open <slug>",
       "risk": "safe_write",
       "args": [
         {
@@ -141,11 +141,12 @@
       ],
       "reads": [
         "inbox/",
-        "wiki/files/"
+        "wiki/"
       ],
       "writes": [
         "~/files/",
         "wiki/files/",
+        "wiki/ (hub links)",
         "journal/"
       ]
     },

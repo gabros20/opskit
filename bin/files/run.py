@@ -1,11 +1,22 @@
 #!/usr/bin/env python3
 """
-ops files ingest [<path>] | open <slug> — the binary-assets plane (§9). ingest routes binaries out
-of inbox/ into ~/files with a wiki SHADOW NOTE pointing at each (so the knowledge graph references
-material it never stores). Work material is auto-filed (safe_write); anything that looks
-personal/legal/family is only PROPOSED for iCloud and left in place — the §5 wall, made operational.
-open reveals a file in Finder via its shadow note.
+ops files ingest [<path>] [--client|--project|--area <slug> | --research] | link <file> <hub>
+        | list [--hub <slug>] | open <slug>  — the binary-assets plane (§9).
+
+ingest routes a binary out of inbox/ into ~/files and writes a wiki SHADOW NOTE (wiki/files/<slug>.md)
+that points at it — the graph references material it never stores. Routing (the §9 MAP):
+  --client X / --project X / --area X  → ~/files/<kind>/X/in/  and the file is LINKED from that hub
+  --research                           → ~/files/research/
+  (none)                               → ~/files/inbox/        (unrouted; link later with `files link`)
+When routed to a hub, the shadow note is added under the hub's `## Files` section (bidirectional link).
+Re-ingesting the same bytes is de-duped by sha256 (no name-2 copies) and just (re)links the existing
+shadow note. Personal/legal/family docs are only PROPOSED for iCloud and left in place — the §5 wall.
+
+link  attaches an already-ingested asset to a hub note after the fact.
+list  shows the asset catalogue (optionally one hub's files).
+open  reveals a file in Finder via its shadow note.
 """
+import hashlib
 import os
 import shutil
 import subprocess
@@ -15,12 +26,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import paths  # noqa: E402
 
-YEL, GREEN, DIM, RESET = "\033[33m", "\033[32m", "\033[2m", "\033[0m"
-# names that signal irreplaceable personal/legal/family docs → propose iCloud, never auto-file (§5)
+YEL, GREEN, DIM, CYAN, RESET = "\033[33m", "\033[32m", "\033[2m", "\033[36m", "\033[0m"
 PERSONAL = ("tax", "szja", "nav", "ado", "adó", "medical", "orvos", "contract", "szerzod", "szerződ",
             "legal", "passport", "utlevel", "útlevel", "birth", "szulet", "szület", "insurance",
             "biztosit", "biztosít", "marriage", "hazas", "házas", "will", "vegrendel")
 TEXT_SUFFIXES = {".md", ".txt"}
+HUB_KIND = {"--client": "clients", "--project": "projects", "--area": "areas"}
 
 
 def _is_personal(name: str) -> bool:
@@ -28,7 +39,52 @@ def _is_personal(name: str) -> bool:
     return any(k in n for k in PERSONAL)
 
 
-def _shadow(dest: Path, title: str) -> Path:
+def _sha256(p: Path) -> str:
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _shadows() -> list[Path]:
+    d = paths.WIKI / "files"
+    return sorted(d.glob("*.md")) if d.exists() else []
+
+
+def _find_by_hash(sha: str):
+    for p in _shadows():
+        if paths.fm_field(p, "sha256") == sha:
+            return p
+    return None
+
+
+def _hub_note(slug: str):
+    """Resolve a hub slug to its wiki note (any folder), or None."""
+    hits = [p for p in paths.WIKI.rglob(f"{slug}.md")] if paths.WIKI.exists() else []
+    return hits[0] if hits else None
+
+
+def _link_into_hub(hub: Path, shadow_slug: str, title: str) -> bool:
+    """Add `- [[shadow_slug]] — title` under the hub's `## Files` section (idempotent)."""
+    text = hub.read_text(encoding="utf-8")
+    line = f"- [[{shadow_slug}]] — {title}"
+    if line in text:
+        return False
+    if "## Files" in text:
+        out, done = [], False
+        for ln in text.splitlines():
+            out.append(ln)
+            if ln.strip() == "## Files" and not done:
+                out.append(line); done = True
+        text = "\n".join(out) + ("\n" if text.endswith("\n") else "")
+    else:
+        text = text.rstrip("\n") + f"\n\n## Files\n{line}\n"
+    hub.write_text(text, encoding="utf-8")
+    return True
+
+
+def _shadow(dest: Path, title: str, sha: str, hub_slug: str | None) -> Path:
     d = paths.WIKI / "files"; d.mkdir(parents=True, exist_ok=True)
     base = paths.slugify(Path(title).stem)
     existing = {p.stem for p in paths.WIKI.rglob("*.md")}
@@ -36,24 +92,55 @@ def _shadow(dest: Path, title: str) -> Path:
     while slug in existing:
         slug, i = f"{base}-{i}", i + 1
     f = d / f"{slug}.md"
+    hub_fm = f"hub: {hub_slug}\n" if hub_slug else ""
+    hub_body = f"\nFiled under [[{hub_slug}]].\n" if hub_slug else ""
     f.write_text(f"---\ntype: file\ntitle: {title}\nstatus: active\nsource: ingest\n"
-                 f"ingested: {paths.today()}\npath: {dest}\ntags: []\n---\n# {title}\n\n"
-                 f"Shadow note for a binary in `~/files`. The file itself is at `{dest}` "
-                 f"(not stored in git).\n", encoding="utf-8")
+                 f"ingested: {paths.today()}\npath: {dest}\nsha256: {sha}\n{hub_fm}tags: []\n---\n# {title}\n\n"
+                 f"Shadow note for a binary in `~/files` (not stored in git). File: `{dest}`.\n{hub_body}",
+                 encoding="utf-8")
     return f
 
 
+def _parse_route(rest):
+    """Return (dest_dir, hub_slug, hub_note, leftover_args). Exits via message on a bad hub."""
+    hub_kind = hub_slug = None
+    research = False
+    leftover = []
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        if a in HUB_KIND and i + 1 < len(rest):
+            hub_kind, hub_slug = HUB_KIND[a], rest[i + 1]; i += 2; continue
+        if a == "--research":
+            research = True; i += 1; continue
+        leftover.append(a); i += 1
+
+    if hub_slug:
+        dest_dir = paths.FILES_ROOT / hub_kind / hub_slug / "in"
+        hub_note = _hub_note(hub_slug)
+        return dest_dir, hub_slug, hub_note, leftover
+    if research:
+        return paths.FILES_ROOT / "research", None, None, leftover
+    return paths.FILES_ROOT / "inbox", None, None, leftover
+
+
 def cmd_ingest(argv):
-    if argv:
-        sources = [Path(argv[0]).expanduser()]
+    dest_dir, hub_slug, hub_note, rest = _parse_route(argv)
+    if hub_slug and hub_note is None:
+        print(f"{YEL}no wiki hub '{hub_slug}'{RESET} — create it first (e.g. `ops new client {hub_slug}`), "
+              f"then re-run. Nothing ingested.", file=sys.stderr)
+        return 1
+
+    if rest:
+        sources = [Path(rest[0]).expanduser()]
     else:
         sources = [p for p in paths.INBOX.iterdir()
                    if p.is_file() and p.suffix.lower() not in TEXT_SUFFIXES and p.name != ".gitkeep"] \
             if paths.INBOX.exists() else []
     if not sources:
         print("nothing to ingest (drop a binary into inbox/, or pass a path)."); return 0
-    dest_dir = paths.FILES_ROOT / "inbox"
-    filed = proposed = 0
+
+    filed = proposed = linked = deduped = 0
     for src in sources:
         if not src.exists():
             print(f"  not found: {src}"); continue
@@ -62,17 +149,73 @@ def cmd_ingest(argv):
                   f"iCloud (the wall forbids any verb writing there). Left in place.")
             proposed += 1
             continue
+
+        sha = _sha256(src)
+        dup = _find_by_hash(sha)
+        if dup:
+            print(f"  {DIM}duplicate{RESET}: '{src.name}' == {dup.stem} (same bytes) — not copied again.")
+            deduped += 1
+            if hub_note and _link_into_hub(hub_note, dup.stem, paths.fm_field(dup, "title") or dup.stem):
+                print(f"    {GREEN}linked{RESET} -> [[{hub_slug}]]"); linked += 1
+            continue
+
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / src.name
         i = 2
         while dest.exists():
             dest = dest_dir / f"{src.stem}-{i}{src.suffix}"; i += 1
         shutil.move(str(src), str(dest))
-        note = _shadow(dest, src.name)
-        paths.append_journal(f"files ingest {src.name} -> {dest}")
-        print(f"  {GREEN}filed{RESET}: {src.name} -> ~/files/inbox/  ({note.relative_to(paths.OPS_HOME)})")
+        note = _shadow(dest, src.name, sha, hub_slug)
+        where = dest_dir.relative_to(paths.FILES_ROOT)
+        paths.append_journal(f"files ingest {src.name} -> {dest}" + (f" [[{hub_slug}]]" if hub_slug else ""))
+        print(f"  {GREEN}filed{RESET}: {src.name} -> ~/files/{where}/  ({note.relative_to(paths.OPS_HOME)})")
         filed += 1
-    print(f"\nfiles ingest: {filed} filed, {proposed} proposed for iCloud (left in place)")
+        if hub_note and _link_into_hub(hub_note, note.stem, src.name):
+            print(f"    {GREEN}linked{RESET} -> [[{hub_slug}]]"); linked += 1
+
+    tail = f", {linked} linked" if (hub_slug) else ""
+    tail += f", {deduped} de-duped" if deduped else ""
+    print(f"\nfiles ingest: {filed} filed{tail}, {proposed} proposed for iCloud (left in place)")
+    return 0
+
+
+def cmd_link(argv):
+    if len(argv) < 2:
+        print("usage: ops files link <file-slug> <hub-slug>", file=sys.stderr); return 2
+    file_slug, hub_slug = argv[0], argv[1]
+    shadow = paths.WIKI / "files" / f"{file_slug}.md"
+    if not shadow.exists():
+        print(f"no shadow note: wiki/files/{file_slug}.md (see `ops files list`)", file=sys.stderr); return 1
+    hub = _hub_note(hub_slug)
+    if hub is None:
+        print(f"no wiki hub '{hub_slug}'", file=sys.stderr); return 1
+    title = paths.fm_field(shadow, "title") or file_slug
+    changed = _link_into_hub(hub, file_slug, title)
+    # make the back-reference explicit in the shadow note too
+    stext = shadow.read_text(encoding="utf-8")
+    if f"[[{hub_slug}]]" not in stext:
+        shadow.write_text(stext.rstrip("\n") + f"\n\nFiled under [[{hub_slug}]].\n", encoding="utf-8")
+    print(f"{GREEN}linked{RESET} [[{file_slug}]] -> [[{hub_slug}]]" + ("" if changed else " (already linked)"))
+    return 0
+
+
+def cmd_list(argv):
+    hub_filter = None
+    if "--hub" in argv:
+        j = argv.index("--hub")
+        hub_filter = argv[j + 1] if j + 1 < len(argv) else None
+    rows = []
+    for p in _shadows():
+        hub = paths.fm_field(p, "hub")
+        if hub_filter and hub != hub_filter:
+            continue
+        rows.append((p.stem, paths.fm_field(p, "title") or p.stem, hub, paths.fm_field(p, "path")))
+    if not rows:
+        print("no assets yet (ingest one: `ops files ingest <path> --client <slug>`)."); return 0
+    print(f"{len(rows)} asset(s)" + (f" under [[{hub_filter}]]" if hub_filter else "") + ":")
+    for slug, title, hub, path in rows:
+        tag = f"  {CYAN}[[{hub}]]{RESET}" if hub else f"  {DIM}(unlinked){RESET}"
+        print(f"  {slug:<28} {DIM}{title[:40]:<40}{RESET}{tag}")
     return 0
 
 
@@ -95,9 +238,14 @@ def main(argv):
     action = argv[0] if argv else "ingest"
     if action == "ingest":
         return cmd_ingest(argv[1:])
+    if action == "link":
+        return cmd_link(argv[1:])
+    if action == "list":
+        return cmd_list(argv[1:])
     if action == "open":
         return cmd_open(argv[1:])
-    print("usage: ops files ingest [<path>] | open <slug>", file=sys.stderr)
+    print("usage: ops files ingest [<path>] [--client|--project|--area <slug> | --research] | "
+          "link <file> <hub> | list [--hub <slug>] | open <slug>", file=sys.stderr)
     return 2
 
 
