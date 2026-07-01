@@ -7,7 +7,11 @@ accented [[wikilinks]]). When stdout is NOT a TTY (piped, captured by a test, re
 or OPS_RENDER=raw, we print the raw Markdown untouched — piping should always yield plain text.
 
   OPS_RENDER=raw   force raw Markdown (also the default when stdout is not a terminal)
-  OPS_RENDER=plain force the built-in renderer (never shell out to glow/bat)
+  OPS_RENDER=plain force the built-in ANSI renderer (even when piped — used for the fzf preview)
+
+fzf_pick() is the Tier-2 fuzzy picker: when a verb is called with no target and we're interactive
+and `fzf` is installed, let the user fuzzy-select from a list (with a live preview). Absent fzf or a
+non-interactive shell, it returns None so the caller can fall back to a plain listing.
 """
 from __future__ import annotations
 import os
@@ -71,12 +75,32 @@ def render_markdown(text: str) -> str:
 def open_note(path: Path) -> None:
     """Show a note the best way available; raw Markdown when piped/redirected."""
     text = path.read_text(encoding="utf-8")
-    if not _tty():
+    mode = os.environ.get("OPS_RENDER")
+    if mode == "raw":
         sys.stdout.write(text if text.endswith("\n") else text + "\n")
         return
-    if os.environ.get("OPS_RENDER") != "plain":
-        if shutil.which("glow"):
-            subprocess.run(["glow", "-p", str(path)]); return
-        if shutil.which("bat"):
-            subprocess.run(["bat", "--style=plain", "-l", "md", "--paging=auto", str(path)]); return
+    if mode == "plain":  # forced built-in render — even when piped (the fzf preview relies on this)
+        sys.stdout.write(render_markdown(text))
+        return
+    if not sys.stdout.isatty():
+        sys.stdout.write(text if text.endswith("\n") else text + "\n")
+        return
+    if shutil.which("glow"):
+        subprocess.run(["glow", "-p", str(path)]); return
+    if shutil.which("bat"):
+        subprocess.run(["bat", "--style=plain", "-l", "md", "--paging=auto", str(path)]); return
     sys.stdout.write(render_markdown(text))
+
+
+def fzf_pick(items, preview: str | None = None, prompt: str = "> "):
+    """Fuzzy-select one of `items` with fzf; return the choice, or None to fall back.
+    Returns None when not interactive or fzf is absent — the caller then lists plainly.
+    `preview` is a shell command; fzf substitutes {} with the focused line."""
+    if not items or not sys.stdin.isatty() or not sys.stdout.isatty() or not shutil.which("fzf"):
+        return None
+    argv = ["fzf", "--ansi", "--reverse", "--height", "50%", "--prompt", prompt]
+    if preview:
+        argv += ["--preview", preview, "--preview-window", "right:62%:wrap"]
+    r = subprocess.run(argv, input="\n".join(items), capture_output=True, text=True)
+    choice = r.stdout.strip()
+    return choice or None

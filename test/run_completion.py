@@ -97,6 +97,7 @@ def main() -> int:
     check("renderer emits ANSI for a heading", "\033[1m" in out and "Title" in out and "#" not in out.split("Title")[0][-3:], out[:60])
     check("renderer dims frontmatter", "\033[2mtype: note\033[0m" in out, out[:80])
     check("renderer accents [[wikilinks]]", "[[link]]" in out and "\033[36m" in out, out)
+    check("fzf_pick returns None when non-interactive/no fzf", render.fzf_pick(["a", "b"]) is None)
 
     # ---- wiki open: raw when piped (tests + pipelines get plain Markdown) ----
     with tempfile.TemporaryDirectory() as td:
@@ -106,14 +107,29 @@ def main() -> int:
         check("wiki open (piped) is raw Markdown", "# Beta" in r.stdout and "\033[" not in r.stdout, r.stdout)
         r = run(h, "wiki", "open", "beta", env_extra={"OPS_RENDER": "raw"})
         check("wiki open OPS_RENDER=raw stays raw", "# Beta" in r.stdout, r.stdout)
+        r = run(h, "wiki", "open", "beta", env_extra={"OPS_RENDER": "plain"})
+        check("wiki open OPS_RENDER=plain renders ANSI even piped (fzf preview)",
+              "\033[" in r.stdout and "Beta" in r.stdout, r.stdout)
         r = run(h, "wiki", "open", "nope")
         check("wiki open unknown slug → error", r.returncode == 1 and "no note" in r.stderr, r.stderr)
+        # ---- Tier-2: no-slug falls back to a plain listing (fzf picker needs an interactive tty) ----
+        note(h, "notes/alpha.md", "note", "Alpha")
+        r = run(h, "wiki", "open")
+        check("wiki open (no slug) lists notes, exit 0", r.returncode == 0
+              and "alpha" in r.stdout and "beta" in r.stdout and "note(s)" in r.stdout, r.stdout)
+        r = run(h, "wiki", "edit")
+        check("wiki edit (no slug) lists notes, exit 0", r.returncode == 0 and "beta" in r.stdout, r.stdout)
         # wiki edit shells out to $EDITOR on the right file
         r = run(h, "wiki", "edit", "beta", env_extra={"OPS_EDITOR": "echo EDIT"})
         check("wiki edit opens $EDITOR on the note", r.returncode == 0
               and "EDIT" in r.stdout and str(h / "wiki" / "notes" / "beta.md") in r.stdout, r.stdout + r.stderr)
         r = run(h, "wiki", "edit", "nope")
         check("wiki edit unknown slug → error", r.returncode == 1, r.stderr)
+    with tempfile.TemporaryDirectory() as td:
+        empty = Path(td)
+        (empty / "wiki").mkdir()
+        r = run(empty, "wiki", "open")
+        check("wiki open (no slug, empty wiki) is graceful", r.returncode == 0 and "no notes yet" in r.stdout, r.stdout)
 
     # ---- the shipped zsh completion file ----
     comp_file = REPO / "script" / "completions" / "_ops"

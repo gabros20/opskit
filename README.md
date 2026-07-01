@@ -6,7 +6,7 @@ a terminal, on a schedule, or through any AI agent. No server, no cloud, no lock
 Markdown files in your own git repo; you can read them, grep them, and walk away from this tool at any
 time with nothing stranded.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · 21 verbs · 23 test suites · CI · macOS / Linux · Python 3 + git
+[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · 21 verbs · 24 test suites · CI · macOS / Linux · Python 3 + git
 
 > 🖱️ **Want the 2-minute tour first?** Open **[`docs/how-it-works.html`](docs/how-it-works.html)** —
 > a single self-contained interactive walkthrough (no install, just open it in a browser). Click
@@ -68,8 +68,9 @@ This repo is a **template, not your data.** You make your own copy; one script w
    ```sh
    git clone git@github.com:<you>/ops.git ~/ops && cd ~/ops
    ```
-2. **Run setup** — puts `ops` on your PATH, creates the sibling roots `~/work` + `~/files`, tracks the
-   template as a fetch-only `upstream`, runs a health check, and makes the first commit. It never pushes.
+2. **Run setup** — puts `ops` on your PATH, installs zsh tab-completion, creates the sibling roots
+   `~/work` + `~/files`, tracks the template as a fetch-only `upstream`, runs a health check, and makes
+   the first commit. It never pushes.
    ```sh
    ./script/setup --lean
    ```
@@ -99,7 +100,7 @@ Fridays. Everything else is discoverable via `ops help`. The full surface:
 |---|---|
 | **System** | `help` · `status` · `doctor` (self-check) · `backup` (commit/push nag) · `index` · `consolidate` |
 | **Flow** | `capture` · `triage` · `start` · `close` · `week` |
-| **Knowledge** | `search` · `wiki` (open / new / backlinks / stale / orphans) |
+| **Knowledge** | `search` · `wiki` (open / edit / new / backlinks / stale / orphans) |
 | **Tasks** | `task` (list / add / show / move / done — folder = status) |
 | **Work** | `new` (scaffold project/client) · `repo` (fleet health/clone/adopt) · `archive` · `files` (ingest binaries) · `sweep` (Desktop/Downloads decay) |
 | **Business** | `invoice` (draft only — never sends) |
@@ -109,12 +110,33 @@ Fridays. Everything else is discoverable via `ops help`. The full surface:
 ops help                       # the whole surface, rendered from each verb's manifest
 ops help triage                # usage for one verb
 ops wiki new note "An idea"    # a structured note (frontmatter + slug, right folder)
+ops wiki open rrf              # read a note, rendered in the terminal
+ops wiki edit rrf              # open it in $EDITOR
 ops wiki backlinks rrf         # what links here
 ops new project "Acme Webapp" --kind products   # scaffold a ~/work repo + wiki hub
 ops doctor                     # is everything healthy?
 ```
 
 You never have to remember file paths or formats — the verb owns placement; you provide the content.
+
+### You don't have to memorize the verbs
+
+Two conveniences make the terminal forgiving, both **zero-dependency** and both degrading gracefully:
+
+- **Tab-completion (zsh).** `ops <Tab>` lists every verb *with its summary*; `ops wiki <Tab>`
+  completes subcommands; `ops wiki open <Tab>` completes your **actual note slugs**; `ops task done
+  <Tab>` completes your **live task IDs**. Candidates are pulled live from your content, so they never
+  drift. `script/setup` installs it; to wire it by hand:
+  ```sh
+  mkdir -p ~/.zsh/completions && ln -sf ~/ops/script/completions/_ops ~/.zsh/completions/_ops
+  # in ~/.zshrc, before `compinit`:   fpath=(~/.zsh/completions $fpath)
+  ```
+- **Readable notes.** `ops wiki open <slug>` renders Markdown in the terminal — headings, dimmed
+  frontmatter, highlighted `[[links]]`. It auto-upgrades to [`glow`](https://github.com/charmbracelet/glow)
+  or `bat` if either is installed, and prints raw Markdown when piped (`OPS_RENDER=raw` forces it).
+- **Fuzzy-pick (optional).** Run `ops wiki open` (or `edit`) with **no slug** and, if
+  [`fzf`](https://github.com/junegunn/fzf) is installed, you get a fuzzy picker with a live rendered
+  preview — the "I don't remember the slug" escape hatch. Without `fzf` it just lists your notes.
 
 ---
 
@@ -220,7 +242,7 @@ The other roots (`~/work`, `~/files`, `~/dotfiles`) are created next to this one
 
 All **21 verbs of the design surface are built, guardrail-gated, and tested.** The retrieval engine,
 the enforced guardrail, the installer (`script/setup`/`update`), and the jobs scheduler all work
-end-to-end. **23 offline test suites** (run in CI) cover the verbs, the guardrail model, the agent indirection, retrieval, and the flows.
+end-to-end. **24 offline test suites** (run in CI) cover the verbs, the guardrail model, the agent indirection, retrieval, terminal ergonomics (completion + rendering), and the flows.
 
 ```sh
 python3 test/run_all.py                          # every offline suite (stdlib only, no network)

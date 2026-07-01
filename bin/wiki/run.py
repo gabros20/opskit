@@ -23,6 +23,22 @@ def _notes():
     return {p.stem: p for p in sorted(paths.WIKI.rglob("*.md"))}
 
 
+def _choose(notes, label):
+    """No slug given: fuzzy-pick with fzf (live preview), else list what's available. §Tier-2."""
+    items = sorted(notes)
+    if not items:
+        print("no notes yet — capture and triage, or: ops wiki new note \"…\""); return None
+    ops_bin = paths.OPS_HOME / "ops"
+    preview = f'OPS_RENDER=plain "{ops_bin}" wiki open {{}}'
+    sel = render.fzf_pick(items, preview=preview, prompt=f"{label} note> ")
+    if sel and sel in notes:
+        return sel
+    print(f"{len(items)} note(s) — pass a slug (e.g. `ops wiki {label} <slug>`):")
+    for s in items:
+        print(f"  {s}")
+    return None
+
+
 def _graph(notes):
     inbound = {s: set() for s in notes}
     for slug, p in notes.items():
@@ -38,6 +54,10 @@ def main(argv):
 
     if action == "open":
         slug = argv[1] if len(argv) > 1 else ""
+        if not slug:
+            slug = _choose(notes, "open")
+            if not slug:
+                return 0
         p = notes.get(slug)
         if not p:
             print(f"no note '{slug}'", file=sys.stderr); return 1
@@ -45,6 +65,10 @@ def main(argv):
 
     elif action == "edit":
         slug = argv[1] if len(argv) > 1 else ""
+        if not slug:
+            slug = _choose(notes, "edit")
+            if not slug:
+                return 0
         p = notes.get(slug)
         if not p:
             print(f"no note '{slug}'", file=sys.stderr); return 1
