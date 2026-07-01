@@ -1,0 +1,18 @@
+#compdef ops
+# ops — dynamic zsh completion (Tier-1 ergonomics). This file is intentionally tiny and stable:
+# all the knowledge lives in Python. It asks `ops __complete` for the candidates that fit the words
+# typed so far, so completion tracks the real surface (verbs from ops.json) AND your live content
+# (note slugs, task ids) with zero drift.
+#
+# Install (script/setup does this for you):
+#   mkdir -p ~/.zsh/completions && ln -sf ~/ops/script/completions/_ops ~/.zsh/completions/_ops
+#   # in ~/.zshrc, before `compinit`:  fpath=(~/.zsh/completions $fpath)
+#
+# Try it:  ops <Tab>   ·   ops wiki <Tab>   ·   ops wiki open <Tab>   ·   ops task done <Tab>
+
+local -a prior cands
+# words[1] is "ops"; take everything after it up to (not including) the word being typed.
+prior=(${words[2,CURRENT-1]})
+cands=("${(@f)$(ops __complete "${prior[@]}" 2>/dev/null)}")
+(( ${#cands} )) || return 1
+_describe -t ops-commands 'ops' cands

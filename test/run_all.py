@@ -34,6 +34,7 @@ SUITES = [
     ("agent indirection (§6)", "run_agentlib.py"),
     ("daily/weekly rhythm (§16)", "run_loops.py"),
     ("health verbs: doctor, wiki (§14/§10)", "run_health.py"),
+    ("terminal ergonomics: completion + renderer", "run_completion.py"),
     ("maintenance: backup, consolidate (§14/§15)", "run_maintenance.py"),
     ("setup/update flow (§2/§17)", "run_setup.py"),
     ("new: scaffold project/client (§4/§12)", "run_new.py"),

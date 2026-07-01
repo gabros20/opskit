@@ -48,8 +48,14 @@ def main(argv):
         else:
             fail(f"folder: {d}/ MISSING (run: ops doctor --init)")
 
-    # 3. manifest <-> bin
-    verbs_on_disk = {p.parent.name for p in BIN.glob("*/run.py")}
+    # 3. manifest <-> bin  (hidden verbs, e.g. __complete, are intentionally absent from ops.json)
+    def _hidden(v):
+        f = BIN / v / "cmd.json"
+        try:
+            return bool(json.loads(f.read_text(encoding="utf-8")).get("hidden"))
+        except Exception:
+            return False
+    verbs_on_disk = {p.parent.name for p in BIN.glob("*/run.py") if not _hidden(p.parent.name)}
     for v in sorted(verbs_on_disk):
         if not (BIN / v / "cmd.json").exists():
             warn(f"verb '{v}' has run.py but no cmd.json (won't show in ops help)")

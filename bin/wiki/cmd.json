@@ -1,6 +1,6 @@
 {
   "verb": "wiki",
-  "summary": "open <slug> | new <type> <name> | backlinks <slug> | stale | orphans | list",
+  "summary": "open <slug> | edit <slug> | new <type> <name> | backlinks <slug> | stale | orphans | list",
   "usage": "ops wiki <action> [args]",
   "risk": "safe_write",
   "args": [{ "name": "action", "required": false, "default": "list" }],

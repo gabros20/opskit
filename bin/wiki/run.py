@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-ops wiki open <slug> | new <type> <name> | backlinks <slug> | stale [days] | orphans | list
+ops wiki open <slug> | edit <slug> | new <type> <name> | backlinks <slug> | stale [days] | orphans | list
 — navigate and grow the knowledge wiki (§10). Slugs resolve by basename ([[wikilinks]] style).
 """
+import os
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import paths, render  # noqa: E402
 
 TYPE_DIR = {"note": "notes", "client": "clients", "project": "projects", "area": "areas",
             "person": "people", "tool": "tools", "runbook": "runbooks", "decision": "notes",
@@ -39,8 +41,19 @@ def main(argv):
         p = notes.get(slug)
         if not p:
             print(f"no note '{slug}'", file=sys.stderr); return 1
-        print(f"# {p.relative_to(paths.OPS_HOME)}\n")
-        print(p.read_text(encoding="utf-8"))
+        render.open_note(p)
+
+    elif action == "edit":
+        slug = argv[1] if len(argv) > 1 else ""
+        p = notes.get(slug)
+        if not p:
+            print(f"no note '{slug}'", file=sys.stderr); return 1
+        editor = os.environ.get("OPS_EDITOR") or os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
+        try:
+            rc = subprocess.run([*editor.split(), str(p)]).returncode
+        except FileNotFoundError:
+            print(f"editor not found: {editor} (set $EDITOR)", file=sys.stderr); return 1
+        return rc
 
     elif action == "new":
         if len(argv) < 3:
@@ -104,7 +117,7 @@ def main(argv):
         for t, n in sorted(by_type.items()):
             print(f"  {t}: {n}")
     else:
-        print("usage: ops wiki open <slug>|new <type> <name>|backlinks <slug>|stale [days]|orphans|list",
+        print("usage: ops wiki open <slug>|edit <slug>|new <type> <name>|backlinks <slug>|stale [days]|orphans|list",
               file=sys.stderr); return 2
     return 0
 

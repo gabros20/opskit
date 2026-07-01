@@ -14,6 +14,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 UPSTREAM_URL="https://github.com/gabros20/personal-operating-system.git"
 ROOTS_HOME="${OPS_ROOTS_HOME:-$HOME}"          # where ~/work, ~/files are created (override for tests)
 BIN_DIR="${OPS_BIN_DIR:-$HOME/.local/bin}"      # where the `ops` symlink goes
+COMP_DIR="${OPS_COMP_DIR:-$HOME/.zsh/completions}"  # where the zsh completion symlink goes
 LEAN="ask"; YES=0; DRY=0; COMMIT=1
 
 while [ $# -gt 0 ]; do
@@ -42,6 +43,11 @@ say "1. put 'ops' on PATH"
 run "mkdir -p '$BIN_DIR'"
 run "ln -sf '$ROOT/ops' '$BIN_DIR/ops'"
 case ":$PATH:" in *":$BIN_DIR:"*) : ;; *) echo "  note:  $BIN_DIR is not on PATH — add it to your shell rc" ;; esac
+
+say "1b. shell completion (zsh — tab-complete verbs, note slugs, task ids)"
+run "mkdir -p '$COMP_DIR'"
+run "ln -sf '$ROOT/script/completions/_ops' '$COMP_DIR/_ops'"
+echo "  note:  add to ~/.zshrc (before 'compinit'):  fpath=($COMP_DIR \$fpath)"
 
 say "2. create the sibling roots (never inside this repo)"
 for r in work files; do

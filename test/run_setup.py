@@ -25,17 +25,18 @@ def git(repo, *a):
 def main() -> int:
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
-        vault, home, bindir = tmp / "ops", tmp / "home", tmp / "bin"
+        vault, home, bindir, compdir = tmp / "ops", tmp / "home", tmp / "bin", tmp / "comp"
         cl = subprocess.run(["git", "clone", "-q", str(REPO), str(vault)], capture_output=True, text=True)
         if cl.returncode != 0:
             print("git clone failed:", cl.stderr); return 1
         env = {**os.environ, "OPS_ROOTS_HOME": str(home), "OPS_BIN_DIR": str(bindir),
-               "OPS_HOME": str(vault)}
+               "OPS_COMP_DIR": str(compdir), "OPS_HOME": str(vault)}
 
         # dry-run changes nothing
         subprocess.run([str(vault / "script" / "setup"), "--lean", "--yes", "--dry-run",
                         "--upstream", UPSTREAM], capture_output=True, text=True, env=env)
         check("dry-run creates no symlink", not (bindir / "ops").exists())
+        check("dry-run installs no completion", not (compdir / "_ops").exists())
         check("dry-run leaves test/ intact", bool(git(vault, "ls-files", "test/").stdout.strip()))
 
         # real run
@@ -45,6 +46,8 @@ def main() -> int:
         check("setup completes", ok, r.stdout + r.stderr)
         check("ops put on PATH (symlink)", (bindir / "ops").is_symlink()
               and os.readlink(bindir / "ops") == str(vault / "ops"))
+        check("zsh completion installed (symlink)", (compdir / "_ops").is_symlink()
+              and os.readlink(compdir / "_ops") == str(vault / "script" / "completions" / "_ops"))
         check("sibling roots created", (home / "work").is_dir() and (home / "files").is_dir())
         check("sibling roots are NOT inside the repo", not (vault / "work").exists())
         check("upstream remote set", git(vault, "remote", "get-url", "upstream").stdout.strip() == UPSTREAM)

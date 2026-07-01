@@ -25,10 +25,15 @@ GROUPS = [
 
 
 def load_cmds() -> list[dict]:
+    """Visible verbs, from the cmd.json sidecars. `"hidden": true` verbs (e.g. __complete, an
+    internal shell-completion helper) are omitted from the surface, `ops help`, and ops.json —
+    but still exist on disk, so the guardrail reads their risk directly."""
     cmds = []
     for cmd in sorted(BIN.glob("*/cmd.json")):
         try:
             d = json.loads(cmd.read_text(encoding="utf-8"))
+            if d.get("hidden"):
+                continue
             d["_built"] = (cmd.parent / "run.py").exists()
             cmds.append(d)
         except Exception:
