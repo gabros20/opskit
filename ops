@@ -8,8 +8,15 @@ export OPS_HOME="$OPS"
 VERB="${1:-help}"; shift || true
 case "$VERB" in -h|--help) VERB=help;; esac
 
+# guardrail (§5): unknown-verb detection (did-you-mean), risk gate, and logging — before anything
+# runs. Exit codes propagate per the protocol (Part 0.3): 0 ok · 2 usage · 3 confirm · 4 not-found ·
+# 5 deny. The `|| exit 1` of old flattened 3/4/5 into 1, so agents couldn't tell them apart.
+set +e
+python3 "$OPS/bin/lib/guardrail.py" "$VERB" "$@"
+gr=$?
+set -e
+[ "$gr" -eq 0 ] || exit "$gr"
+
 CMD="$OPS/bin/$VERB/run.py"
-[ -f "$CMD" ] || { echo "unknown verb: $VERB (try: ops help)" >&2; exit 1; }
-# guardrail (§5): enforce the verb's risk class + log the invocation, before anything runs.
-python3 "$OPS/bin/lib/guardrail.py" "$VERB" "$@" || exit 1
+[ -f "$CMD" ] || { echo "ops: verb '$VERB' has no run.py" >&2; exit 4; }
 exec python3 "$CMD" "$@"

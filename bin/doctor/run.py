@@ -5,12 +5,14 @@ adapters, no tracked secrets/binaries, index freshness. --init creates any missi
 Exit 1 if any check FAILs (WARN does not fail).
 """
 import json
+import os
+import re
 import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths  # noqa: E402
+from lib import guardrail, paths  # noqa: E402
 
 GREEN, RED, YEL, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 BIN = Path(__file__).resolve().parents[1]
@@ -22,6 +24,54 @@ checks = []  # (level, msg)
 def ok(m): checks.append(("ok", m))
 def warn(m): checks.append(("warn", m))
 def fail(m): checks.append(("fail", m))
+
+
+def _real(p) -> str:
+    try:
+        return str(Path(p).resolve())
+    except Exception:
+        return str(p)
+
+
+def _find_git_dirs(root: Path, cap: int = 500) -> list[str]:
+    """`.git` dirs under `root`, without descending into `.git` or dependency trees (Part 0.4)."""
+    found = []
+    for dirpath, dirnames, _ in os.walk(root):
+        if ".git" in dirnames:
+            found.append(os.path.join(dirpath, ".git"))
+        dirnames[:] = [d for d in dirnames
+                       if d not in (".git", "node_modules", ".venv", "venv", "__pycache__")]
+        if len(found) >= cap:
+            break
+    return found
+
+
+def _fm_churn(path: Path) -> str:
+    """Reason string if the note's YAML frontmatter is a shape Obsidian's Properties normalizer would
+    rewrite (flow-vs-block lists, tab indentation, duplicate keys); '' if stable (Part 0.4)."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return ""
+    if not lines or lines[0].strip() != "---":
+        return ""
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    if end is None:
+        return "unterminated frontmatter"
+    seen = set()
+    for ln in lines[1:end]:
+        if ln[:1] == "\t":
+            return "tab indentation in frontmatter"
+        m = re.match(r"^([A-Za-z0-9_\-]+):\s*(.*)$", ln)
+        if not m:
+            continue
+        key, val = m.group(1), m.group(2).strip()
+        if key in seen:
+            return f"duplicate key '{key}'"
+        seen.add(key)
+        if val not in ("[]", "") and re.match(r"^\[.+\]$", val):
+            return f"inline list '{key}' normalizes to a block list"
+    return ""
 
 
 def main(argv):
@@ -114,6 +164,47 @@ def main(argv):
     # 6. index
     db = paths.OPS_HOME / ".index" / "ops.sqlite"
     (ok if db.exists() else warn)("index built" if db.exists() else "index not built (run: ops index)")
+
+    # 7. sync-wall (Part 0.4): a .git tree must NEVER live under iCloud/Dropbox/Syncthing
+    ops_real = _real(paths.OPS_HOME)
+    if guardrail.under_sync_dir(ops_real):
+        fail(f"~/ops resolves under a cloud-sync tree ({ops_real}) — never sync a .git (data loss)")
+    else:
+        ok("~/ops is not under a cloud-sync tree")
+    if paths.WORK_ROOT.is_dir():
+        synced = [g for g in _find_git_dirs(paths.WORK_ROOT) if guardrail.under_sync_dir(_real(g))]
+        (fail if synced else ok)(
+            f"{len(synced)} work repo .git under a cloud-sync tree: {synced[:3]}" if synced
+            else "no ~/work repo .git is under a cloud-sync tree")
+
+    # 7b. durability: prefer >=2 push remotes on ~/ops (a second off-machine mirror)
+    remotes = paths.git("remote", "-v")
+    if remotes.strip():
+        push = {}
+        for ln in remotes.splitlines():
+            parts = ln.split()
+            if len(parts) >= 3 and parts[2] == "(push)" and "DISABLED" not in parts[1]:
+                push[parts[0]] = parts[1]
+        (ok if len(push) >= 2 else warn)(
+            f"{len(push)} push remote(s) configured" if len(push) >= 2
+            else f"only {len(push)} push remote(s) — add a second off-machine mirror for durability")
+
+    # 8. frontmatter round-trip: notes Obsidian's Properties normalizer would churn (Part 0.4)
+    wiki = paths.OPS_HOME / "wiki"
+    if wiki.is_dir():
+        churn = []
+        for md in wiki.rglob("*.md"):
+            why = _fm_churn(md)
+            if why:
+                churn.append(f"{md.relative_to(paths.OPS_HOME)}: {why}")
+            if len(churn) >= 50:
+                break
+        if churn:
+            warn(f"{len(churn)} note(s) whose frontmatter Obsidian Properties would rewrite:")
+            for c in churn[:5]:
+                warn(f"  churn: {c}")
+        else:
+            ok("frontmatter is Obsidian-Properties stable")
 
     nfail = sum(1 for lv, _ in checks if lv == "fail")
     nwarn = sum(1 for lv, _ in checks if lv == "warn")

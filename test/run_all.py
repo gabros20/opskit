@@ -38,6 +38,7 @@ SUITES = [
     ("note types + bookmarks (issue #1 D+F)", "run_notetypes.py"),
     ("maintenance: backup, consolidate (§14/§15)", "run_maintenance.py"),
     ("setup/update flow (§2/§17)", "run_setup.py"),
+    ("trust wave: exit codes + update merge + doctor (0.1/0.3/0.4)", "run_trust.py"),
     ("new: scaffold project/client (§4/§12)", "run_new.py"),
     ("repo: ~/work fleet (§4/§12)", "run_repo.py"),
     ("files: binary-assets plane (§9)", "run_files.py"),

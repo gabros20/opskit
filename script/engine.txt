@@ -9,6 +9,7 @@
 # One path per line; blank lines and #comments ignored.
 
 ops
+VERSION
 bin
 skills
 AGENTS.md

@@ -10,7 +10,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import notetype, paths, render  # noqa: E402
+from lib import notetype, output, paths, render  # noqa: E402
 
 
 def _notes():
@@ -56,7 +56,7 @@ def main(argv):
                 return 0
         p = notes.get(slug)
         if not p:
-            print(f"no note '{slug}'", file=sys.stderr); return 1
+            print(f"no note '{slug}'", file=sys.stderr); return output.EXIT_NOT_FOUND
         render.open_note(p)
 
     elif action == "edit":
@@ -67,7 +67,7 @@ def main(argv):
                 return 0
         p = notes.get(slug)
         if not p:
-            print(f"no note '{slug}'", file=sys.stderr); return 1
+            print(f"no note '{slug}'", file=sys.stderr); return output.EXIT_NOT_FOUND
         editor = os.environ.get("OPS_EDITOR") or os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
         try:
             rc = subprocess.run([*editor.split(), str(p)]).returncode
@@ -95,7 +95,7 @@ def main(argv):
     elif action == "backlinks":
         slug = argv[1] if len(argv) > 1 else ""
         if slug not in notes:
-            print(f"no note '{slug}'", file=sys.stderr); return 1
+            print(f"no note '{slug}'", file=sys.stderr); return output.EXIT_NOT_FOUND
         ins = sorted(_graph(notes)[slug])
         print(f"{len(ins)} backlink(s) to [[{slug}]]:")
         for s in ins:

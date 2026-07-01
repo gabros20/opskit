@@ -19,6 +19,17 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Exit-code protocol (Part 0.3) — single source of truth is lib/output.py; imported so the guardrail
+# CLI and dispatcher speak the same codes. Falls back to the literals when loaded in isolation (the
+# parity test execs this file standalone).
+try:
+    _LIB = os.path.dirname(os.path.abspath(__file__))
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from output import EXIT_OK, EXIT_USAGE, EXIT_CONFIRM, EXIT_NOT_FOUND, EXIT_DENY  # noqa: F401
+except Exception:
+    EXIT_OK, EXIT_USAGE, EXIT_CONFIRM, EXIT_NOT_FOUND, EXIT_DENY = 0, 2, 3, 4, 5
+
 HOME = os.environ.get("OPS_TEST_HOME", os.environ.get("HOME", "/Users/tamas"))
 OPS_HOME = Path(os.environ.get("OPS_HOME", Path(__file__).resolve().parents[2]))
 BIN = Path(__file__).resolve().parents[1]
@@ -31,6 +42,12 @@ DOTFILES = f"{HOME}/dotfiles"
 WALLED_OFF_MARKERS = [
     f"{HOME}/Library/Mobile Documents", f"{HOME}/iCloud Drive",
     "Mobile Documents", "iCloud", f"{HOME}/Pictures/Photos Library.photoslibrary", f"{HOME}/Pictures",
+]
+# Cloud-sync trees a .git must never live inside (doctor sync-wall, Part 0.4) — extends the location
+# wall with the sync clients; Syncthing's own maintainers warn never to sync a .git tree.
+SYNC_DIR_MARKERS = [
+    "Mobile Documents", "iCloud", "Dropbox", "Syncthing", ".sync",
+    "OneDrive", "Google Drive", "GoogleDrive",
 ]
 ALLOW, CONFIRM, DENY = "allow", "confirm", "deny"
 _ORDER = {ALLOW: 0, CONFIRM: 1, DENY: 2}
@@ -77,6 +94,13 @@ def _under(path, root):
 def _walled(path):
     pl = path.lower()
     return any(m.lower() in pl for m in WALLED_OFF_MARKERS)
+
+
+def under_sync_dir(path: str) -> bool:
+    """True if `path` resolves inside a known cloud-sync tree (iCloud/Dropbox/Syncthing/…). Used by
+    doctor's sync-wall (Part 0.4) — a .git tree must never live under one."""
+    pl = (path or "").lower()
+    return any(m.lower() in pl for m in SYNC_DIR_MARKERS)
 
 
 def _in_originals(path):
@@ -167,26 +191,43 @@ def _known_verbs() -> set:
     return {p.parent.name for p in BIN.glob("*/cmd.json")} | {p.parent.name for p in BIN.glob("*/run.py")}
 
 
-def risk_of(verb: str) -> str | None:
-    """Read a verb's declared risk from its cmd.json; None if undeclared (→ default confirm)."""
+def _cmd_field(verb: str, key: str):
+    """Read one field from a verb's cmd.json; None on any failure."""
     f = BIN / verb / "cmd.json"
     if not f.exists():
         return None
     try:
-        return json.loads(f.read_text(encoding="utf-8")).get("risk")
+        return json.loads(f.read_text(encoding="utf-8")).get(key)
     except Exception:
         return None
 
 
+def risk_of(verb: str) -> str | None:
+    """Read a verb's declared risk from its cmd.json; None if undeclared (→ default confirm)."""
+    return _cmd_field(verb, "risk")
+
+
+def _declares_dry_run(verb: str) -> bool:
+    """True if the verb's cmd.json declares `"dry_run": true` (proposal Part 0.5)."""
+    return bool(_cmd_field(verb, "dry_run"))
+
+
 def gate(verb: str, args: list[str], risk: str | None = None) -> Decision:
     """Dispatcher per-verb gate: enforce the declared risk class (new verbs default to confirm).
-    `risk` override is for tests; in normal use it's read from the verb's cmd.json."""
+    `risk` override is for tests; in normal use it's read from the verb's cmd.json.
+
+    Dry-run rule (Part 0.5): a verb that declares `"dry_run": true`, invoked with `--dry-run`, is
+    downgraded to a read — a true dry-run IS a read — so confirm-class verbs stay explorable without
+    `--yes`."""
     if verb not in _known_verbs():
         return Decision(DENY, f"unknown/invented verb: '{verb}' (not in ops.json)", "deny")
     risk = risk or risk_of(verb) or "confirm"  # §5: new/undeclared verbs default to confirm
     yes = ("--yes" in args) or ("-y" in args)
+    dry = "--dry-run" in args
     if risk == "deny":
         return Decision(DENY, f"'{verb}' is deny-class — never run", "deny")
+    if dry and _declares_dry_run(verb) and risk in ("confirm", "safe_write"):
+        return Decision(ALLOW, f"--dry-run downgrades {risk} to read (no side effect)", "read")
     if risk == "confirm" and not yes:
         return Decision(CONFIRM, f"'{verb}' is confirm-class — re-run with --yes to proceed", "confirm")
     return Decision(ALLOW, f"{risk}", risk)
@@ -203,12 +244,39 @@ def _log(verb, args, d: Decision):
         pass
 
 
-if __name__ == "__main__":
-    verb = sys.argv[1] if len(sys.argv) > 1 else "help"
-    args = sys.argv[2:]
+def _remediation(verb: str, args: list[str]) -> str:
+    """The exact re-run line a confirm-class refusal should print — self-teaching, not a class name."""
+    parts = ["ops", verb, *args]
+    if "--yes" not in args and "-y" not in args:
+        parts.append("--yes")
+    return "re-run: " + " ".join(parts)
+
+
+def exit_code_for(d: Decision) -> int:
+    """Map a gate verdict to the shared exit-code protocol (Part 0.3): confirm→3, deny→5."""
+    return {ALLOW: EXIT_OK, CONFIRM: EXIT_CONFIRM, DENY: EXIT_DENY}[d.verdict]
+
+
+def main_cli(argv: list[str]) -> int:
+    """Dispatcher-side gate: unknown verb → not-found (4) with a did-you-mean; else the risk gate,
+    logged, with confirm→3 (printing the exact remediation) and deny→5."""
+    import difflib
+    verb = argv[0] if argv else "help"
+    args = argv[1:]
+    known = _known_verbs()
+    if verb not in known:
+        near = difflib.get_close_matches(verb, sorted(known), n=3, cutoff=0.6)
+        hint = f" did you mean: {', '.join(near)}?" if near else " (run: ops help)"
+        print(f"ops: unknown verb '{verb}'.{hint}", file=sys.stderr)
+        return EXIT_NOT_FOUND
     d = gate(verb, args)
     _log(verb, args, d)
-    if d.verdict != ALLOW:
+    if d.verdict == CONFIRM:
+        print(f"guardrail: {d}\n  {_remediation(verb, args)}", file=sys.stderr)
+    elif d.verdict == DENY:
         print(f"guardrail: {d}", file=sys.stderr)
-        sys.exit(1)
-    sys.exit(0)
+    return exit_code_for(d)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main_cli(sys.argv[1:]))

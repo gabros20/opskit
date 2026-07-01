@@ -25,16 +25,70 @@ git -C "$ROOT" remote | grep -qx "$REMOTE" || { echo "no '$REMOTE' remote — ru
 printf '\033[1mfetching %s\033[0m\n' "$REMOTE"
 git -C "$ROOT" fetch -q "$REMOTE"
 
-printf '\033[1mrefreshing engine paths from %s/%s\033[0m\n' "$REMOTE" "$BRANCH"
-while IFS= read -r path; do
-  case "$path" in ''|\#*) continue ;; esac
-  if git -C "$ROOT" cat-file -e "$REMOTE/$BRANCH:$path" 2>/dev/null; then
-    git -C "$ROOT" checkout -q "$REMOTE/$BRANCH" -- "$path" && echo "  ~ $path"
+# 3-way merge (Part 0.1): plain `git checkout upstream -- path` silently DISCARDS local engine edits.
+# .ops-engine-ref records the last-synced upstream commit; per engine FILE: unmodified since that ref
+# → fast-path checkout; locally modified → `git merge-file` (base=ref, theirs=upstream, ours=working
+# tree), staged, with conflict markers surfaced. First run (no ref) falls back + warns loudly.
+UPSTREAM_SHA="$(git -C "$ROOT" rev-parse "$REMOTE/$BRANCH")"
+REFFILE="$ROOT/.ops-engine-ref"
+REF=""; [ -f "$REFFILE" ] && REF="$(tr -d '[:space:]' < "$REFFILE")"
+CONFLICTS=()
+
+g() { git -C "$ROOT" "$@"; }
+
+fast_path() {  # checkout upstream over a locally-unmodified (or absent) file — stages it
+  g checkout -q "$REMOTE/$BRANCH" -- "$1" && echo "  ~ $1"
+}
+
+merge_file() {  # 3-way merge upstream changes into our working file; base = ref version (may be empty)
+  local f="$1" ref_hash="$2" theirs_hash="$3" base theirs
+  base="$(mktemp)"; theirs="$(mktemp)"
+  [ -n "$ref_hash" ] && g cat-file blob "$ref_hash" > "$base" || : > "$base"
+  g cat-file blob "$theirs_hash" > "$theirs"
+  if git merge-file -q -L "ours (local)" -L "base (last sync)" -L "upstream" "$ROOT/$f" "$base" "$theirs"; then
+    g add -- "$f"; echo "  merged $f"
+  else
+    g add -- "$f"; echo "  CONFLICT $f — resolve the <<<<<<< markers"; CONFLICTS+=("$f")
   fi
-done < "$ROOT/script/engine.txt"
+  rm -f "$base" "$theirs"
+}
+
+if [ -z "$REF" ]; then
+  printf '\033[33mwarning: no .ops-engine-ref — first sync cannot 3-way merge; local engine edits may be overwritten. Recording the ref for next time.\033[0m\n' >&2
+  printf '\033[1mrefreshing engine paths from %s/%s\033[0m\n' "$REMOTE" "$BRANCH"
+  while IFS= read -r path; do
+    case "$path" in ''|\#*) continue ;; esac
+    g cat-file -e "$REMOTE/$BRANCH:$path" 2>/dev/null && fast_path "$path"
+  done < "$ROOT/script/engine.txt"
+else
+  printf '\033[1mmerging engine paths from %s/%s (base %s)\033[0m\n' "$REMOTE" "$BRANCH" "${REF:0:8}"
+  while IFS= read -r path; do
+    case "$path" in ''|\#*) continue ;; esac
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      theirs_hash="$(g rev-parse "$REMOTE/$BRANCH:$f" 2>/dev/null)" || continue
+      if [ ! -e "$ROOT/$f" ]; then fast_path "$f"; continue; fi          # absent locally → take upstream
+      ours_hash="$(g hash-object "$ROOT/$f")"
+      [ "$ours_hash" = "$theirs_hash" ] && continue                       # already identical → skip
+      ref_hash="$(g rev-parse "$REF:$f" 2>/dev/null || true)"
+      if [ -n "$ref_hash" ] && [ "$ours_hash" = "$ref_hash" ]; then
+        fast_path "$f"                                                    # unmodified since ref → fast
+      else
+        merge_file "$f" "$ref_hash" "$theirs_hash"                        # diverged → 3-way merge
+      fi
+    done < <(g ls-tree -r --name-only "$REMOTE/$BRANCH" -- "$path")
+  done < "$ROOT/script/engine.txt"
+fi
+
+echo "$UPSTREAM_SHA" > "$REFFILE"; g add -- .ops-engine-ref   # advance + stage the sync ref
 
 "$ROOT/ops" help >/dev/null 2>&1 || true   # regenerate ops.json from any new cmd.json
 echo
+if [ "${#CONFLICTS[@]}" -gt 0 ]; then
+  printf '\033[1m\033[33m%d file(s) have merge conflicts — resolve before committing:\033[0m\n' "${#CONFLICTS[@]}"
+  for c in "${CONFLICTS[@]}"; do echo "  ! $c"; done
+  echo
+fi
 if git -C "$ROOT" diff --cached --quiet; then
   printf '\033[1malready up to date.\033[0m\n'
 else

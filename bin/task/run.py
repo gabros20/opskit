@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import paths, filing  # noqa: E402
+from lib import paths, filing, output  # noqa: E402
 
 STATUSES = filing.STATUSES
 
@@ -52,7 +52,7 @@ def main(argv):
     elif action in ("show",):
         f, _ = _find(argv[1]) if len(argv) > 1 else (None, None)
         if not f:
-            print(f"task not found: {argv[1] if len(argv)>1 else ''}", file=sys.stderr); return 1
+            print(f"task not found: {argv[1] if len(argv)>1 else ''}", file=sys.stderr); return output.EXIT_NOT_FOUND
         print(f.read_text(encoding="utf-8"))
     elif action in ("move", "done"):
         if action == "done":
@@ -65,7 +65,7 @@ def main(argv):
             print(f"status must be one of {STATUSES}", file=sys.stderr); return 2
         f, cur = _find(tid)
         if not f:
-            print(f"task not found: {tid}", file=sys.stderr); return 1
+            print(f"task not found: {tid}", file=sys.stderr); return output.EXIT_NOT_FOUND
         dest = paths.TASKS / status
         dest.mkdir(parents=True, exist_ok=True)
         new = dest / f.name

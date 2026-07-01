@@ -112,7 +112,7 @@ def main() -> int:
         check("wiki open OPS_RENDER=plain renders ANSI even piped (fzf preview)",
               "\033[" in r.stdout and "Beta" in r.stdout, r.stdout)
         r = run(h, "wiki", "open", "nope")
-        check("wiki open unknown slug → error", r.returncode == 1 and "no note" in r.stderr, r.stderr)
+        check("wiki open unknown slug → not-found (4)", r.returncode == 4 and "no note" in r.stderr, r.stderr)
         # ---- Tier-2: no-slug falls back to a plain listing (fzf picker needs an interactive tty) ----
         note(h, "notes/alpha.md", "note", "Alpha")
         r = run(h, "wiki", "open")
@@ -125,7 +125,7 @@ def main() -> int:
         check("wiki edit opens $EDITOR on the note", r.returncode == 0
               and "EDIT" in r.stdout and str(h / "wiki" / "notes" / "beta.md") in r.stdout, r.stdout + r.stderr)
         r = run(h, "wiki", "edit", "nope")
-        check("wiki edit unknown slug → error", r.returncode == 1, r.stderr)
+        check("wiki edit unknown slug → not-found (4)", r.returncode == 4, r.stderr)
     with tempfile.TemporaryDirectory() as td:
         empty = Path(td)
         (empty / "wiki").mkdir()
