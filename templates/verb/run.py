@@ -10,16 +10,24 @@ SCAFFOLDED by `ops new verb`. This is a stub — implement main(). Keep the cont
   • Declared risk is `{{risk}}` in cmd.json. New verbs default to `confirm`, so the guardrail makes a
     human re-run with --yes until you deliberately lower it. Read skills/operate-ops/SKILL.md and an
     existing bin/<verb>/run.py before extending. Regenerate the surface with `ops index --manifest`.
+
+This is a PLUGIN verb (plugins/local/{{name}}/) — user-owned, survives `script/update`. It reaches
+the engine's shared lib via OPS_HOME (the dispatcher always exports it); it re-enters through
+`ops {{name}}`, so the guardrail + logs still gate it — never import lib to skip the dispatcher.
 """
+import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Plugin verbs live outside bin/, so locate the engine's lib via OPS_HOME (dispatcher-exported);
+# fall back to the plugins/<pack>/<verb>/ layout depth if run outside the dispatcher.
+_BIN = Path(os.environ.get("OPS_HOME") or Path(__file__).resolve().parents[3]) / "bin"
+sys.path.insert(0, str(_BIN))
 from lib import paths  # noqa: E402,F401  (most verbs need paths — keep or drop)
 
 
 def main(argv):
-    print("ops {{name}}: not implemented yet — edit bin/{{name}}/run.py")
+    print("ops {{name}}: not implemented yet — edit plugins/local/{{name}}/run.py")
     return 0
 
 

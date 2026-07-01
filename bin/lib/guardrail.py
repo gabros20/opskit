@@ -30,6 +30,15 @@ try:
 except Exception:
     EXIT_OK, EXIT_USAGE, EXIT_CONFIRM, EXIT_NOT_FOUND, EXIT_DENY = 0, 2, 3, 4, 5
 
+# Verb resolution (Part 2.1): the resolver is the single source of truth for the verb set and
+# cmd.json lookup, so plugin verbs (plugins/<pack>/, $OPS_PATH) are gated identically to engine ones.
+# Falls back to a bin/-only glob if loaded in isolation (the parity test execs this file standalone
+# with only stdlib on the path — resolver still imports there, but keep the guard defensive).
+try:
+    import resolver as _resolver  # noqa: E402
+except Exception:
+    _resolver = None
+
 HOME = os.environ.get("OPS_TEST_HOME", os.environ.get("HOME", "/Users/tamas"))
 OPS_HOME = Path(os.environ.get("OPS_HOME", Path(__file__).resolve().parents[2]))
 BIN = Path(__file__).resolve().parents[1]
@@ -188,13 +197,15 @@ def classify(action: dict) -> Decision:
 
 
 def _known_verbs() -> set:
+    if _resolver is not None:
+        return _resolver.known_verbs()
     return {p.parent.name for p in BIN.glob("*/cmd.json")} | {p.parent.name for p in BIN.glob("*/run.py")}
 
 
 def _cmd_field(verb: str, key: str):
-    """Read one field from a verb's cmd.json; None on any failure."""
-    f = BIN / verb / "cmd.json"
-    if not f.exists():
+    """Read one field from a verb's RESOLVED cmd.json (engine wins over plugins); None on failure."""
+    f = _resolver.cmd_json_path(verb) if _resolver is not None else (BIN / verb / "cmd.json")
+    if not f or not f.exists():
         return None
     try:
         return json.loads(f.read_text(encoding="utf-8")).get(key)

@@ -4,9 +4,10 @@ ops new project "<name>" [--kind labs|products|tools] | new client "<name>"
     | new verb <name> [--risk <class>] [--summary "<text>"]
 — scaffold a unit of work (§4.1, §12.3) or a new command. A PROJECT gets a wiki hub AND a ~/work repo
 scaffolded from templates/project-repo/ (git-initialized). A CLIENT gets a wiki hub AND a
-~/files/clients/<slug>/ material tree. A VERB stamps out bin/<name>/{run.py,cmd.json} from
+~/files/clients/<slug>/ material tree. A VERB stamps out plugins/local/<name>/{run.py,cmd.json} from
 templates/verb/ (defaulting to confirm-class, per §5) and regenerates the manifest — turning "add a
-verb" into a one-command, guardrailed act instead of hand-wiring the surface. Slugs are globally
+verb" into a one-command, guardrailed act instead of hand-wiring the surface. User verbs land in the
+user-owned plugins/ tree (Part 2.1), never in bin/ (the `script/update` boundary). Slugs are globally
 unique and IDENTICAL across wiki ↔ ~/work ↔ ~/files (§2).
 """
 import re
@@ -16,11 +17,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import output, paths  # noqa: E402
+from lib import output, paths, resolver  # noqa: E402
 
 TEMPLATE = paths.OPS_HOME / "templates" / "project-repo"
 VERB_TEMPLATE = paths.OPS_HOME / "templates" / "verb"
-BIN = Path(__file__).resolve().parents[1]           # verbs live with the CODE (bin/), not OPS_HOME
 RISK_CLASSES = ("read", "safe_write", "draft_only", "confirm", "deny")
 
 
@@ -39,26 +39,33 @@ def _new_verb(rest, dry=False):
                     "verb name must be lowercase [a-z0-9-], starting with a letter", verb="new")
     if risk not in RISK_CLASSES:
         output.fail(output.EXIT_USAGE, f"--risk must be one of {RISK_CLASSES}", verb="new")
-    dest = BIN / name
+    # Part 0.2 — user verbs scaffold into plugins/local/ (user-owned, survives `script/update`),
+    # NEVER into bin/ (the engine checkout boundary). Engine names stay reserved (Part 2.1).
+    if resolver.is_engine_verb(name):
+        output.fail(output.EXIT_UNEXPECTED, f"'{name}' is a reserved engine verb — choose another name", verb="new")
+    dest = paths.OPS_HOME / "plugins" / "local" / name
+    rel = f"plugins/local/{name}"
     if dest.exists():
-        output.fail(output.EXIT_UNEXPECTED, f"verb '{name}' already exists ({dest})", verb="new")
+        output.fail(output.EXIT_UNEXPECTED, f"plugin verb '{name}' already exists ({rel})", verb="new")
     if not VERB_TEMPLATE.is_dir():
         output.fail(output.EXIT_UNEXPECTED, f"missing template: {VERB_TEMPLATE}", verb="new")
     if dry:
-        return output.emit({"dry_run": True, "type": "verb", "name": name, "risk": risk}, "new",
-                           human=lambda _: f"would scaffold verb '{name}' (bin/{name}/, risk: {risk})  (dry run — nothing written)")
+        return output.emit({"dry_run": True, "type": "verb", "name": name, "risk": risk, "code": f"{rel}/run.py"}, "new",
+                           human=lambda _: f"would scaffold verb '{name}' ({rel}/, risk: {risk})  (dry run — nothing written)")
+    dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(VERB_TEMPLATE, dest)
     _fill(dest, {"{{name}}": name, "{{risk}}": risk,
                  "{{summary}}": summary or f"TODO: describe {name}"})
     from lib.manifest import write_manifest  # regenerate ops.json so `ops help` shows the new verb
     write_manifest()
     paths.append_journal(f"new verb: {name} (risk {risk})")
-    data = {"type": "verb", "name": name, "risk": risk, "code": f"bin/{name}/run.py"}
+    data = {"type": "verb", "name": name, "risk": risk, "code": f"{rel}/run.py"}
 
     def render(_):
         print(f"scaffolded verb '{name}':")
-        print(f"  code:  bin/{name}/run.py  (+ cmd.json, risk: {risk})")
-        print(f"  next:  implement main() in bin/{name}/run.py, then `ops {name}`"
+        print(f"  code:   {rel}/run.py  (+ cmd.json, risk: {risk})")
+        print(f"  source: plugin:local — user-owned, survives `script/update` (never in engine.txt)")
+        print(f"  next:   implement main() in {rel}/run.py, then `ops {name}`"
               + ("" if risk != "confirm" else "  (confirm-class → runs with --yes until you lower risk)"))
 
     return output.emit(data, "new", human=render)

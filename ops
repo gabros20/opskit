@@ -17,6 +17,8 @@ gr=$?
 set -e
 [ "$gr" -eq 0 ] || exit "$gr"
 
-CMD="$OPS/bin/$VERB/run.py"
-[ -f "$CMD" ] || { echo "ops: verb '$VERB' has no run.py" >&2; exit 4; }
+# Multi-root resolution (Part 2.1): engine bin/ (reserved) → plugins/<pack>/ → $OPS_PATH. The resolver
+# is the single source of truth; the dispatcher just asks it for the run.py to exec.
+CMD="$(python3 "$OPS/bin/lib/resolver.py" "$VERB" 2>/dev/null || true)"
+[ -n "$CMD" ] && [ -f "$CMD" ] || { echo "ops: verb '$VERB' has no run.py" >&2; exit 4; }
 exec python3 "$CMD" "$@"

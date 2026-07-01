@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 
 from . import paths  # type: ignore  # (namespace sibling)
+from . import resolver  # type: ignore  # multi-root verb resolution (Part 2.1)
 
 BIN = Path(__file__).resolve().parents[1]   # the verbs live with the CODE (bin/), not under OPS_HOME
 MANIFEST = paths.OPS_HOME / "ops.json"       # ...but ops.json is written to the data root (OPS_HOME)
@@ -33,16 +34,19 @@ GROUPS = [
 
 
 def load_cmds() -> list[dict]:
-    """Visible verbs, from the cmd.json sidecars. `"hidden": true` verbs (e.g. __complete, an
-    internal shell-completion helper) are omitted from the surface, `ops help`, and ops.json —
-    but still exist on disk, so the guardrail reads their risk directly."""
+    """Visible verbs, from the cmd.json sidecars across every root (engine bin/ + plugins/<pack>/ +
+    $OPS_PATH — Part 2.1), each tagged with `_source` ('engine' | 'plugin:<pack>'). `"hidden": true`
+    verbs (e.g. __complete, an internal shell-completion helper) are omitted from the surface, `ops
+    help`, and ops.json — but still exist on disk, so the guardrail reads their risk directly.
+    Shadowed plugin verbs (name reserved by the engine) are already excluded by resolver.iter_cmds."""
     cmds = []
-    for cmd in sorted(BIN.glob("*/cmd.json")):
+    for cmd, source in resolver.iter_cmds():
         try:
             d = json.loads(cmd.read_text(encoding="utf-8"))
             if d.get("hidden"):
                 continue
             d["_built"] = (cmd.parent / "run.py").exists()
+            d["_source"] = source
             cmds.append(d)
         except Exception:
             pass
@@ -67,7 +71,7 @@ def _capabilities() -> dict:
         "vectors": spec("lancedb"),
         "rerank": spec("fastembed"),
         "agent": os.environ.get("OPS_AGENT") or "none",
-        "plugins": [],
+        "plugins": resolver.plugin_names(),
     }
 
 
@@ -77,8 +81,9 @@ def write_manifest() -> Path:
     block and hints ride through from cmd.json as-is."""
     cmds = []
     for c in load_cmds():
+        src = c.get("_source", "engine")
         d = {k: v for k, v in c.items() if not k.startswith("_")}
-        d.setdefault("source", "engine")
+        d["source"] = src
         cmds.append(d)
     doc = {
         "schema": SCHEMA,
@@ -99,7 +104,7 @@ def render(verb: str | None = None) -> str:
         if not c:
             return f"unknown verb: {verb} (try: ops help)"
         lines = [f"ops {c['verb']} — {c.get('summary','')}", f"  usage: {c.get('usage','')}",
-                 f"  risk:  {c.get('risk','?')}"]
+                 f"  risk:  {c.get('risk','?')}", f"  source: {c.get('_source','engine')}"]
         if c.get("args"):
             lines.append("  args:")
             for a in c["args"]:
@@ -129,9 +134,17 @@ def render(verb: str | None = None) -> str:
             out += rows
             out.append("")
     extra = [c for v, c in cmds.items() if v not in placed]
-    if extra:
+    other = [c for c in extra if not str(c.get("_source", "engine")).startswith("plugin:")]
+    plugins = [c for c in extra if str(c.get("_source", "engine")).startswith("plugin:")]
+    if other:
         out.append("OTHER")
-        out += [f"  ops {c['verb']:<10} {c.get('summary','')}" for c in extra]
+        out += [f"  ops {c['verb']:<10} {c.get('summary','')}" for c in other]
         out.append("")
+    if plugins:
+        out.append("PLUGINS")
+        out += [f"  ops {c['verb']:<10} {c.get('summary','')}  [{c.get('_source','')}]" for c in plugins]
+        out.append("")
+    for v, pack in resolver.shadowed():
+        out.append(f"warning: plugin '{pack}' verb '{v}' is IGNORED — '{v}' is a reserved engine verb")
     out.append("`ops help <verb>` for one verb. Search stages: OPS_VECTORS=1 (LanceDB), OPS_RERANK=1 (rerank).")
     return "\n".join(out)
