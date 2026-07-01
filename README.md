@@ -86,8 +86,11 @@ Now `ops` works from anywhere. Pull engine improvements later without touching y
 ./script/update    # checks out ONLY engine files (bin/, skills/, docs…) from upstream; your content is never touched
 ```
 
-**Requirements:** macOS or Linux, `git`, Python 3.10+. Semantic search (stages 2–3) is optional and
-adds [Ollama](https://ollama.com) + `pip install -r requirements.txt`.
+**Requirements:** macOS or Linux, `git`, Python 3.10+. Everything below is optional and
+auto-detected — nothing is required to run `ops`:
+- Semantic search (stages 2–3): [Ollama](https://ollama.com) + `pip install -r requirements.txt`.
+- Prettier note rendering: [`glow`](https://github.com/charmbracelet/glow) or `bat` (else a built-in renderer).
+- Fuzzy note-picking: [`fzf`](https://github.com/junegunn/fzf) (else `ops wiki open` with no slug just lists notes).
 
 ---
 
@@ -222,14 +225,14 @@ ops job apply     # render launchd jobs: index hourly, consolidate + close night
 ```
 ops                  # the dispatcher: ops <verb>  (symlinked onto your PATH by setup)
 AGENTS.md  CLAUDE.md  # the agent contract (CLAUDE.md bridges to AGENTS.md)
-bin/                 # the verbs — lib/ (shared) + one folder per verb (run.py + cmd.json)
+bin/                 # the verbs — lib/ (shared: paths, guardrail, render…) + one folder per verb
 skills/operate-ops/  # the operating manual any agent loads
 wiki/                # KNOWLEDGE — your durable notes (see wiki/conventions.md)
 tasks/               # folder = status: inbox/ active/ waiting/ done/
 journal/  inbox/     # daily log · capture zone
 templates/           # scaffolds: project-repo/, tax-formula.md
 jobs/registry.json   # scheduled-job definitions (ops job apply → launchd)
-script/              # setup · update · engine.txt (the framework/content boundary)
+script/              # setup · update · engine.txt (framework/content boundary) · completions/ (zsh)
 docs/                # how-it-works.html · design/ (the spec) · DECISIONS.md (ADRs)
 test/                # validation harness (dev-only; dropped from a lean vault)
 ```
