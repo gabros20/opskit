@@ -1,0 +1,15 @@
+{
+  "name": "greeter",
+  "version": "0.1.0",
+  "min_ops_version": "4.0.0",
+  "api": ">=1,<2",
+  "verbs": [
+    {
+      "verb": "hello",
+      "risk": "safe_write",
+      "reads": ["wiki"],
+      "writes": ["wiki/notes"],
+      "summary": "write a greeting note"
+    }
+  ]
+}

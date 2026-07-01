@@ -1,0 +1,20 @@
+{
+  "INBOX": "value:PosixPath",
+  "OPS_API_VERSION": "value:str",
+  "OPS_HOME": "value:PosixPath",
+  "WIKI": "value:PosixPath",
+  "append_journal": "callable (line: 'str') -> 'Path'",
+  "classify": "callable (action: 'dict') -> 'Decision'",
+  "emit": "callable (data: 'dict', verb: 'str', human=None) -> 'int'",
+  "emit_rows": "callable (rows, verb: 'str', human=None, header: 'dict | None' = None) -> 'int'",
+  "fail": "callable (code: 'int', message: 'str', hint: 'str | None' = None, verb: 'str | None' = None) -> 'None'",
+  "fm_field": "callable (path: 'Path', key: 'str') -> 'str'",
+  "is_type": "callable (typ: 'str') -> 'bool'",
+  "link_targets": "callable (text: 'str') -> 'list[str]'",
+  "load_types": "callable () -> 'dict'",
+  "render_note": "callable (typ: 'str', *, title: 'str', status: 'str' = 'active', body: 'str' = '', created: 'str | None' = None, url: 'str' = '', slug: 'str' = '') -> 'str'",
+  "run_agent": "callable (prompt: str, scope: str = 'read', timeout: int = 60)",
+  "slugify": "callable (s: 'str', n: 'int' = 60) -> 'str'",
+  "today": "callable () -> 'str'",
+  "type_dir": "callable (typ: 'str') -> 'str'"
+}

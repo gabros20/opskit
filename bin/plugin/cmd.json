@@ -1,0 +1,24 @@
+{
+  "verb": "plugin",
+  "summary": "install/list/trust/update/remove plugin packs (untrusted until you trust them)",
+  "usage": "ops plugin add <owner/repo|path>[@tag] --yes | list | trust <name> --yes | update <name> --yes | remove <name> --yes",
+  "risk": "safe_write",
+  "reads": ["plugins", "plugins/plugins.lock.json"],
+  "writes": ["plugins", "plugins/plugins.lock.json"],
+  "args": [
+    {"name": "action", "required": false, "default": "list"},
+    {"name": "target", "required": false, "default": "-"}
+  ],
+  "hints": "Installs a pack under plugins/<name>/, but its verbs are capped at confirm until `ops plugin trust <name> --yes` — self-declared risk never takes effect at install. add/update/remove/trust need --yes; list is read-only. Common mistake: expecting a freshly added pack to run at its declared risk.",
+  "output": {
+    "mode": "rows",
+    "fields": {
+      "name": "string",
+      "version": "string",
+      "trusted": "bool",
+      "verbs": "list",
+      "source": "string",
+      "commit": "string"
+    }
+  }
+}

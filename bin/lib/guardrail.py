@@ -223,6 +223,34 @@ def _declares_dry_run(verb: str) -> bool:
     return bool(_cmd_field(verb, "dry_run"))
 
 
+def _plugin_lock() -> dict:
+    """The `{pack: entry}` map from plugins/plugins.lock.json (empty on any failure)."""
+    try:
+        f = OPS_HOME / "plugins" / "plugins.lock.json"
+        return json.loads(f.read_text(encoding="utf-8")).get("plugins", {})
+    except Exception:
+        return {}
+
+
+def _plugin_ceiling(verb: str) -> str | None:
+    """The trust ceiling for a verb from an EXTERNALLY-installed pack (proposal Part 2.2): 'confirm'
+    if the verb belongs to a pack recorded in plugins.lock.json that has not been trusted — a pack's
+    self-declared risk NEVER takes effect at install. Returns None for engine verbs, for user-placed
+    packs with no lock entry (plugins/local, $OPS_PATH — the user put them there directly), and for
+    explicitly trusted packs (their declared risk then stands). The transmit-block + path-wall in
+    classify() apply to every verb regardless, so a trusted pack is still walled."""
+    if _resolver is None:
+        return None
+    src = _resolver.source_of(verb)
+    if not src or not src.startswith("plugin:"):
+        return None
+    pack = src.split(":", 1)[1]
+    entry = _plugin_lock().get(pack)
+    if entry is None or entry.get("trusted"):
+        return None
+    return "confirm"
+
+
 def gate(verb: str, args: list[str], risk: str | None = None) -> Decision:
     """Dispatcher per-verb gate: enforce the declared risk class (new verbs default to confirm).
     `risk` override is for tests; in normal use it's read from the verb's cmd.json.
@@ -237,8 +265,13 @@ def gate(verb: str, args: list[str], risk: str | None = None) -> Decision:
     dry = "--dry-run" in args
     if risk == "deny":
         return Decision(DENY, f"'{verb}' is deny-class — never run", "deny")
-    if dry and _declares_dry_run(verb) and risk in ("confirm", "safe_write"):
+    # Trust ceiling (Part 2.2): an untrusted external pack's verb can't self-declare its way below
+    # confirm, and can't use --dry-run to bypass it (we can't trust the pack to honour dry-run).
+    capped = _plugin_ceiling(verb) == "confirm"
+    if not capped and dry and _declares_dry_run(verb) and risk in ("confirm", "safe_write"):
         return Decision(ALLOW, f"--dry-run downgrades {risk} to read (no side effect)", "read")
+    if capped and risk in ("read", "safe_write"):
+        risk = "confirm"
     if risk == "confirm" and not yes:
         return Decision(CONFIRM, f"'{verb}' is confirm-class — re-run with --yes to proceed", "confirm")
     return Decision(ALLOW, f"{risk}", risk)
