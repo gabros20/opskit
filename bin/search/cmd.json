@@ -7,6 +7,10 @@
     {
       "name": "query",
       "required": true
+    },
+    {
+      "name": "--author",
+      "required": false
     }
   ],
   "reads": [
@@ -16,7 +20,7 @@
   "writes": [
     ".logs/queries.jsonl"
   ],
-  "hints": "Ranked file#heading hits with an FTS5 snippet excerpt (keyword + graph, +vectors if OPS_VECTORS). `--open` jumps to the top hit via `ops open`; bare `ops search` in a tty with fzf opens a live search session. Common mistake: running before `ops index`, or too narrow a query \u2014 broaden and reindex.",
+  "hints": "Ranked file#heading hits with an FTS5 snippet excerpt (keyword + graph, +vectors if OPS_VECTORS). `--author human` excludes agent + derived material; `--author agent` keeps only agent notes (provenance planes). `--open` jumps to the top hit via `ops open`; bare `ops search` in a tty with fzf opens a live search session. Common mistake: running before `ops index`, or too narrow a query \u2014 broaden and reindex.",
   "output": {
     "mode": "rows",
     "fields": {

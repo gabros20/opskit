@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-ops files ingest [<path>] [--client|--project|--area <slug> | --research] | link <file> <hub>
-        | list [--hub <slug>] | open <slug>  — the binary-assets plane (§9).
+ops files ingest [<path>] [--client|--project|--area <slug> | --research] [--extract]
+        | extract <slug> [--reextract] [--heavy] [--lang <x>] [--diarize] [--describe]
+        | link <file> <hub> | list [--hub <slug>] | open <slug>  — the binary-assets plane (§9).
 
 ingest routes a binary out of inbox/ into ~/files and writes a wiki SHADOW NOTE (wiki/files/<slug>.md)
 that points at it — the graph references material it never stores. Routing (the §9 MAP):
@@ -12,12 +13,21 @@ When routed to a hub, the shadow note is added under the hub's `## Files` sectio
 Re-ingesting the same bytes is de-duped by sha256 (no name-2 copies) and just (re)links the existing
 shadow note. Personal/legal/family docs are only PROPOSED for iCloud and left in place — the §5 wall.
 
+extract  (proposal Part 4.1) emits a SIBLING derived note wiki/files/<slug>.extract.md from the source
+  bytes — the original stays byte-for-byte in ~/files, the shadow stays the pointer, and the extract
+  NEVER masquerades as source truth (frontmatter: type extract|transcript, derived_from, source_sha256,
+  tool). Tiered per media type, each tier an auto-detected OPTIONAL dep (try/except import or
+  shutil.which; deterministic degrade with a one-line install hint); .txt/.md extract with stdlib.
+  Same-bytes + same-tool re-run is an idempotent no-op; --reextract forces. `ingest --extract` chains.
+
 link  attaches an already-ingested asset to a hub note after the fact.
 list  shows the asset catalogue (optionally one hub's files).
 open  reveals a file in Finder via its shadow note.
 """
 import hashlib
+import importlib.util
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -33,6 +43,229 @@ PERSONAL = ("tax", "szja", "nav", "ado", "adó", "medical", "orvos", "contract",
 TEXT_SUFFIXES = {".md", ".txt"}
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".tiff", ".heic"}
 HUB_KIND = {"--client": "clients", "--project": "projects", "--area": "areas"}
+
+# Extraction media types (proposal Part 4.1). Detection is by extension; a URL source is video/URL.
+PDF_SUFFIXES = {".pdf"}
+AUDIO_SUFFIXES = {".mp3", ".wav", ".m4a", ".flac", ".ogg", ".oga", ".opus", ".aac", ".aiff", ".wma"}
+VIDEO_SUFFIXES = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v", ".flv"}
+EXTRACT_TEXT_SUFFIXES = {".txt", ".md", ".markdown", ".text", ".vtt", ".srt"}
+
+
+def _have_mod(name: str) -> bool:
+    """Optional dep present? importlib probe only — never imports at detection time (Part 4.1)."""
+    try:
+        return importlib.util.find_spec(name) is not None
+    except Exception:
+        return False
+
+
+def _mod_version(name: str) -> str:
+    try:
+        from importlib.metadata import version
+        return version(name)
+    except Exception:
+        return "?"
+
+
+def _extract_note_path(slug: str) -> Path:
+    return paths.WIKI / "files" / f"{slug}.extract.md"
+
+
+def _tier_text(src: Path, opts: dict):
+    def run() -> str:
+        raw = src.read_text(encoding="utf-8", errors="replace")
+        body = "\n".join(ln.rstrip() for ln in raw.splitlines()).strip()
+        return re.sub(r"\n{3,}", "\n\n", body)
+    return ("stdlib-text 1.0", "extract", run)
+
+
+def _tier_pdf(src: Path, opts: dict):
+    if _have_mod("pymupdf4llm"):
+        def run() -> str:
+            import pymupdf4llm
+            return (pymupdf4llm.to_markdown(str(src)) or "").strip()
+        return (f"pymupdf4llm {_mod_version('pymupdf4llm')}", "extract", run)
+    if opts.get("heavy") and _have_mod("docling"):
+        def run() -> str:
+            from docling.document_converter import DocumentConverter
+            return DocumentConverter().convert(str(src)).document.export_to_markdown().strip()
+        return (f"docling {_mod_version('docling')}", "extract", run)
+    return (None, "pdf", "no PDF extractor — install: pip install pymupdf4llm (or --heavy for docling)")
+
+
+def _tier_audio(src: Path, opts: dict):
+    if not shutil.which("ffmpeg"):
+        return (None, "audio", "audio extraction needs ffmpeg — install: brew install ffmpeg")
+    lang = opts.get("lang")
+    if _have_mod("parakeet_mlx"):
+        def run() -> str:
+            from parakeet_mlx import from_pretrained
+            model = from_pretrained("mlx-community/parakeet-tdt-0.6b-v2")
+            return (model.transcribe(str(src)).text or "").strip()
+        return (f"parakeet-mlx {_mod_version('parakeet-mlx')}", "transcript", run)
+    if _have_mod("mlx_whisper"):
+        def run() -> str:
+            import mlx_whisper
+            kw = {"language": lang} if lang else {}
+            return (mlx_whisper.transcribe(str(src), **kw).get("text") or "").strip()
+        return (f"mlx-whisper {_mod_version('mlx-whisper')}", "transcript", run)
+    if _have_mod("faster_whisper"):
+        def run() -> str:
+            from faster_whisper import WhisperModel
+            segs, _ = WhisperModel("base").transcribe(str(src), language=lang)
+            return "\n".join(s.text.strip() for s in segs).strip()
+        return (f"faster-whisper {_mod_version('faster-whisper')}", "transcript", run)
+    if shutil.which("whisper-cli") or shutil.which("whisper.cpp"):
+        binname = "whisper-cli" if shutil.which("whisper-cli") else "whisper.cpp"
+
+        def run() -> str:
+            out = subprocess.run([binname, "-otxt", "-f", str(src)], capture_output=True, text=True)
+            return out.stdout.strip()
+        return (f"{binname} (system)", "transcript", run)
+    return (None, "audio",
+            "no ASR backend — install: pip install parakeet-mlx (Apple Silicon) or mlx-whisper/faster-whisper")
+
+
+def _tier_image(src: Path, opts: dict):
+    if _have_mod("ocrmac"):
+        def run() -> str:
+            from ocrmac import ocrmac
+            return "\n".join(a[0] for a in ocrmac.OCR(str(src)).recognize()).strip()
+        return (f"ocrmac {_mod_version('ocrmac')}", "extract", run)
+    if shutil.which("tesseract"):
+        def run() -> str:
+            return subprocess.run(["tesseract", str(src), "stdout"],
+                                  capture_output=True, text=True).stdout.strip()
+        return ("tesseract (system)", "extract", run)
+    return (None, "image", "no OCR backend — install: pip install ocrmac (Apple Vision) or brew install tesseract")
+
+
+def _tier_video(src: Path, is_url: bool, opts: dict):
+    if shutil.which("yt-dlp"):
+        target = str(src) if is_url else str(src)
+
+        def run() -> str:
+            # captions-first: ask yt-dlp for subs/auto-subs as VTT, then flatten to plain lines. Audio
+            # download + ASR is the fallback only when no captions exist (kept out of the zero-dep path).
+            import tempfile
+            with tempfile.TemporaryDirectory() as td:
+                subprocess.run(["yt-dlp", "--skip-download", "--write-subs", "--write-auto-subs",
+                                "--sub-format", "vtt", "-o", str(Path(td) / "%(id)s.%(ext)s"), target],
+                               capture_output=True, text=True)
+                vtts = sorted(Path(td).glob("*.vtt"))
+                if vtts:
+                    return _vtt_to_text(vtts[0].read_text(encoding="utf-8", errors="replace"))
+            return ""
+        return ("yt-dlp (captions)", "transcript", run)
+    return (None, "video", "no video/URL extractor — install: pip install yt-dlp (captions-first)")
+
+
+def _vtt_to_text(vtt: str) -> str:
+    """VTT/SRT → deduped plain text (drop cue timings, WEBVTT header, and repeated rolling lines)."""
+    out: list[str] = []
+    for ln in vtt.splitlines():
+        s = ln.strip()
+        if not s or s == "WEBVTT" or "-->" in s or s.isdigit():
+            continue
+        s = re.sub(r"<[^>]+>", "", s)
+        if not out or out[-1] != s:
+            out.append(s)
+    return "\n".join(out).strip()
+
+
+def _select_tier(src: Path, is_url: bool, opts: dict):
+    """First available extraction tier for the source's media type.
+    Returns (tool_str, note_type, run_callable) when a tier is available, else (None, media, hint)."""
+    suf = src.suffix.lower()
+    if is_url or suf in VIDEO_SUFFIXES:
+        return _tier_video(src, is_url, opts)
+    if suf in PDF_SUFFIXES:
+        return _tier_pdf(src, opts)
+    if suf in AUDIO_SUFFIXES:
+        return _tier_audio(src, opts)
+    if suf in IMAGE_SUFFIXES:
+        return _tier_image(src, opts)
+    if suf in EXTRACT_TEXT_SUFFIXES:
+        return _tier_text(src, opts)
+    return (None, f"'{suf or 'n/a'}'", "unsupported media — supported: pdf, audio, image, video/url, txt/md")
+
+
+def _augment_warnings(opts: dict) -> list[str]:
+    """--diarize/--describe are explicit opt-ins that NO-OP with a clear message when deps absent."""
+    w = []
+    if opts.get("diarize") and not _have_mod("pyannote.audio"):
+        w.append("--diarize requested but pyannote.audio absent — no speaker labels "
+                 "(pip install pyannote.audio; needs a gated HF token)")
+    if opts.get("describe") and not shutil.which("ollama"):
+        w.append("--describe requested but ollama absent — no VLM scene captions (install ollama)")
+    return w
+
+
+def _write_extract(slug: str, sha: str, tool: str, ntype: str, text: str, shadow: Path) -> Path:
+    dest = _extract_note_path(slug)
+    title = paths.fm_field(shadow, "title") or slug
+    today = paths.today()
+    created = (paths.fm_field(dest, "created") if dest.exists() else "") or today
+    body = text.strip() or "_(no text extracted)_"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(
+        f"---\ntype: {ntype}\ntitle: {title} (extract)\nstatus: derived\n"
+        f"derived_from: \"[[{slug}]]\"\nsource_sha256: {sha}\ntool: {tool}\n"
+        f"created: {created}\nupdated: {today}\ntags: []\n---\n"
+        f"# {title} — {ntype}\n\n{body}\n", encoding="utf-8")
+    return dest
+
+
+def _extract_one(slug: str, opts: dict, dry: bool = False) -> dict:
+    """Extract one shadow-note's source into wiki/files/<slug>.extract.md. Pure status dict (no exit)."""
+    shadow = paths.WIKI / "files" / f"{slug}.md"
+    if not shadow.exists():
+        return {"slug": slug, "status": "no-shadow",
+                "message": f"no shadow note wiki/files/{slug}.md (see `ops files list`)"}
+    src_str = paths.fm_field(shadow, "path")
+    if not src_str:
+        return {"slug": slug, "status": "no-path", "message": "shadow note has no path:"}
+    is_url = src_str.startswith(("http://", "https://"))
+    src = Path(src_str)
+    if not is_url and not src.exists():
+        return {"slug": slug, "status": "source-missing", "message": f"source not found: {src_str}"}
+
+    tool, second, third = _select_tier(src, is_url, opts)
+    if tool is None:
+        media, hint = second, third
+        return {"slug": slug, "status": "no-extractor", "media": media, "hint": hint,
+                "message": f"no extractor for {media} — {hint}"}
+    ntype, run = second, third
+    sha = hashlib.sha256(src_str.encode()).hexdigest() if is_url else _sha256(src)
+    dest = _extract_note_path(slug)
+    rel = str(dest.relative_to(paths.OPS_HOME))
+    if dest.exists() and not opts.get("reextract") \
+            and paths.fm_field(dest, "source_sha256") == sha and paths.fm_field(dest, "tool") == tool:
+        return {"slug": slug, "status": "unchanged", "note": rel, "tool": tool, "sha256": sha}
+    if dry:
+        return {"slug": slug, "status": "would-extract", "note": rel, "tool": tool, "type": ntype}
+    warns = _augment_warnings(opts)
+    try:
+        text = run()
+    except Exception as e:  # a tier's runtime failure degrades loudly, never a traceback
+        return {"slug": slug, "status": "extract-failed", "tool": tool, "message": f"{tool} failed: {e}"}
+    _write_extract(slug, sha, tool, ntype, text, shadow)
+    paths.append_journal(f"files extract {slug} <- {tool}")
+    res = {"slug": slug, "status": "extracted", "note": rel, "tool": tool, "type": ntype,
+           "sha256": sha, "chars": len(text)}
+    if warns:
+        res["warnings"] = warns
+    return res
+
+
+def _pull_opt(argv: list[str], name: str):
+    """Remove `name <value>` from argv (mutating) and return the value, or None if absent."""
+    if name in argv:
+        i = argv.index(name)
+        val = argv[i + 1] if i + 1 < len(argv) else None
+        del argv[i:i + 2]
+        return val
+    return None
 
 
 def _is_personal(name: str) -> bool:
@@ -130,7 +363,7 @@ def _parse_route(rest):
     return paths.FILES_ROOT / "inbox", None, None, leftover
 
 
-def cmd_ingest(argv, dry=False):
+def cmd_ingest(argv, dry=False, extract=False):
     dest_dir, hub_slug, hub_note, rest = _parse_route(argv)
     if hub_slug and hub_note is None:
         output.fail(output.EXIT_UNEXPECTED,
@@ -194,17 +427,30 @@ def cmd_ingest(argv, dry=False):
         if hub_note and _link_into_hub(hub_note, note.stem, src.name):
             events.append(f"    {GREEN}linked{RESET} -> [[{hub_slug}]]"); linked += 1
 
+    extracted = 0
+    if extract and not dry:
+        for r in rows:
+            if r.get("action") == "file" and r.get("slug"):
+                er = _extract_one(r["slug"], {}, dry=False)
+                r["extract"] = er["status"]
+                if er["status"] == "extracted":
+                    extracted += 1
+                    events.append(f"    {GREEN}extracted{RESET} -> {er['note']}  {DIM}({er['tool']}){RESET}")
+                elif er["status"] == "no-extractor":
+                    events.append(f"    {DIM}extract skipped: {er['hint']}{RESET}")
+
     def render(_):
         for e in events:
             print(e)
         tail = f", {linked} linked" if hub_slug else ""
         tail += f", {deduped} de-duped" if deduped else ""
+        tail += f", {extracted} extracted" if extract else ""
         print(f"\nfiles ingest: {filed} filed{tail}, {proposed} proposed for iCloud (left in place)"
               + (" (dry run)" if dry else ""))
 
     return output.emit_rows(rows, "files", human=render,
                             header={"filed": filed, "proposed": proposed, "linked": linked,
-                                    "deduped": deduped, "dry_run": dry})
+                                    "deduped": deduped, "extracted": extracted, "dry_run": dry})
 
 
 def cmd_link(argv):
@@ -273,13 +519,51 @@ def cmd_open(argv):
     return output.emit({"slug": argv[0], "path": target}, "files", human=render)
 
 
+def cmd_extract(argv, dry=False):
+    rest = list(argv)
+    lang = _pull_opt(rest, "--lang")
+    opts = {"reextract": "--reextract" in rest, "heavy": "--heavy" in rest,
+            "diarize": "--diarize" in rest, "describe": "--describe" in rest, "lang": lang}
+    slugs = [a for a in rest if not a.startswith("-")]
+    if not slugs:
+        output.fail(output.EXIT_USAGE,
+                    "usage: ops files extract <slug> [--reextract] [--heavy] [--lang <x>] "
+                    "[--diarize] [--describe]", verb="files")
+    res = _extract_one(slugs[0], opts, dry)
+    if res["status"] in ("no-shadow", "no-path", "source-missing"):
+        output.fail(output.EXIT_NOT_FOUND, res["message"], verb="files")
+
+    def render(r):
+        s = r["status"]
+        if s == "extracted":
+            line = f"{GREEN}extracted{RESET} -> {r['note']}  {DIM}({r['tool']}, {r['chars']} chars){RESET}"
+            return line + "".join(f"\n  {YEL}note{RESET}  {w}" for w in r.get("warnings", []))
+        if s == "unchanged":
+            return (f"{DIM}unchanged{RESET} {r['note']} — same bytes + tool "
+                    f"(idempotent no-op; --reextract to force)")
+        if s == "would-extract":
+            return f"{GREEN}would extract{RESET} -> {r['note']}  {DIM}({r['tool']}){RESET}  (dry run — nothing written)"
+        if s == "no-extractor":
+            return (f"{YEL}no extractor{RESET} for {r['media']} — {r['hint']}\n"
+                    f"  {DIM}(original untouched, nothing written){RESET}")
+        if s == "extract-failed":
+            return f"{YEL}extract failed{RESET}: {r.get('message', '')}"
+        return r.get("message", s)
+
+    return output.emit(res, "files", human=render)
+
+
 def main(argv):
     _, argv = output.parse_argv(argv)
     dry = "--dry-run" in argv
     argv = [a for a in argv if a != "--dry-run"]
     action = argv[0] if argv else "ingest"
     if action == "ingest":
-        return cmd_ingest(argv[1:], dry)
+        extract = "--extract" in argv
+        rest = [a for a in argv[1:] if a != "--extract"]
+        return cmd_ingest(rest, dry, extract=extract)
+    if action == "extract":
+        return cmd_extract(argv[1:], dry)
     if action == "link":
         return cmd_link(argv[1:])
     if action == "list":
@@ -287,8 +571,9 @@ def main(argv):
     if action == "open":
         return cmd_open(argv[1:])
     output.fail(output.EXIT_USAGE,
-                "usage: ops files ingest [<path>] [--client|--project|--area <slug> | --research] | "
-                "link <file> <hub> | list [--hub <slug>] | open <slug>", verb="files")
+                "usage: ops files ingest [<path>] [--client|--project|--area <slug> | --research] "
+                "[--extract] | extract <slug> [--reextract] [--heavy] [--lang <x>] [--diarize] "
+                "[--describe] | link <file> <hub> | list [--hub <slug>] | open <slug>", verb="files")
 
 
 if __name__ == "__main__":

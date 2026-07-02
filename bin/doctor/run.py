@@ -245,7 +245,10 @@ def main(argv):
             for tg in paths.fm_list(text, "tags"):
                 if tg and not tag_re.match(tg):
                     bad_tags.append(f"{rel}: '{tg}'")
-            if any("[[" in ln for ln in paths._fm_block(text)):
+            # derived_from/source are sanctioned machine pointers (Part 4.3) — a wikilink there is by
+            # design (it wires derived->source in the graph), so it is exempt from the body-only lint.
+            if any("[[" in ln and not re.match(r"^\s*(derived_from|source):", ln)
+                   for ln in paths._fm_block(text)):
                 fm_links.append(str(rel))
         if bad_tags:
             warn(f"{len(bad_tags)} tag(s) not lowercase-hyphenated (Obsidian treats #Tag != #tag):")
@@ -259,6 +262,33 @@ def main(argv):
                 warn(f"  fm-link: {b}")
         else:
             ok("wikilinks are in note bodies only")
+
+    # 10. provenance planes (Part 4.3): the three note planes must stay well-formed — a derived note
+    # points to its source (derived_from + source_sha256/tool) and lives beside its shadow in
+    # wiki/files/; an agent concept note carries a status gate. Violations are WARN (surfaced, never
+    # a hard fail) — this is the poisoned-memory antidote made checkable.
+    files_dir = paths.OPS_HOME / "wiki" / "files"
+    if wiki.is_dir():
+        prov = []
+        for md in wiki.rglob("*.md"):
+            try:
+                fm = paths.frontmatter(md)
+            except Exception:
+                continue
+            rel = md.relative_to(paths.OPS_HOME)
+            derived = fm.get("derived_from")
+            if (fm.get("tool") or fm.get("source_sha256")) and not derived:
+                prov.append(f"{rel}: has tool:/source_sha256 but no derived_from (a derived note must point to its source)")
+            if fm.get("author") == "agent" and not fm.get("status"):
+                prov.append(f"{rel}: author: agent without a status: (agent notes need a draft gate)")
+            if derived and md.parent != files_dir:
+                prov.append(f"{rel}: derived note outside wiki/files/ (derived material lives beside its shadow)")
+        if prov:
+            warn(f"{len(prov)} provenance-plane violation(s) (Part 4.3):")
+            for p in prov[:5]:
+                warn(f"  provenance: {p}")
+        else:
+            ok("provenance planes consistent (derived/agent notes well-formed)")
 
     nfail = sum(1 for lv, _ in checks if lv == "fail")
     nwarn = sum(1 for lv, _ in checks if lv == "warn")

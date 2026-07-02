@@ -43,5 +43,23 @@ Client/project/area notes carry a **compiled-truth** top (current synthesis, rew
 over an append-only `## Timeline` (evidence trail). The top stays short and current; the timeline
 never loses history.
 
+## Provenance planes
+Every note lives in exactly one of three planes, so a machine (or the graph) can never mistake
+derived or drafted material for the user's own settled thought (`ops doctor` flags violations, and
+`ops search --author human` excludes everything but the first plane):
+
+1. **Human note** — authored by you. No `author:`, no `derived_from:`. The default plane.
+2. **Derived note** — mechanically extracted from a binary/URL (`ops files extract`). Lives beside
+   its shadow in `wiki/files/<slug>.extract.md`, `type: extract|transcript`, and carries the
+   provenance triple `derived_from: "[[<slug>]]"`, `source_sha256:`, `tool: <name> <version>`. It
+   never masquerades as source truth and never folds into the shadow note.
+3. **Agent concept note** — compiled by an agent from derived material. Carries `author: agent`,
+   `source: "[[…]]"`, and a `status:` gate (`draft` until you promote it via `ops triage`).
+
+Rules doctor enforces: a note with `tool:`/`source_sha256:` MUST have `derived_from:`; an
+`author: agent` note MUST have a `status:`; a `derived_from:` note MUST live in `wiki/files/`.
+(`derived_from`/`source` are the only frontmatter fields allowed to hold a `[[wikilink]]` — they are
+machine pointers by design.)
+
 ## Filing rules
 <!-- Append one-line learned rules here when you override a triage/ingest proposal (§10). -->

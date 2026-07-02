@@ -46,6 +46,7 @@ SUITES = [
     ("obsidian frontend zero + canvas/bases (3.1/3.2)", "run_obsidian.py"),
     ("terminal ergonomics + raycast: open/orient/search (3.3/3.4)", "run_terminal.py"),
     ("install funnel: script/get (5.4)", "run_get.py"),
+    ("tiered extraction + provenance planes (4.1/4.3)", "run_extract.py"),
     ("new: scaffold project/client (§4/§12)", "run_new.py"),
     ("repo: ~/work fleet (§4/§12)", "run_repo.py"),
     ("files: binary-assets plane (§9)", "run_files.py"),

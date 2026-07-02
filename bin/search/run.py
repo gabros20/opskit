@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""ops search "<query>" [--open] [--json] — ranked file#heading hits with an FTS5 snippet excerpt
-(§10.2 stage 1, proposal Part 3.4). `--open` jumps to the top hit via `ops open`; bare `ops search`
-in a tty with fzf opens a live-reload search session (non-tty bare search keeps the usage error)."""
+"""ops search "<query>" [--author human|agent] [--open] [--json] — ranked file#heading hits with an
+FTS5 snippet excerpt (§10.2 stage 1, proposal Part 3.4). `--author human` excludes agent + derived
+material, `--author agent` keeps only agent notes (provenance planes, Part 4.3). `--open` jumps to the
+top hit via `ops open`; bare `ops search` in a tty with fzf opens a live-reload search session."""
 import shutil
 import subprocess
 import sys
@@ -39,6 +40,14 @@ def main(argv):
     _, argv = output.parse_argv(argv)
     do_open = "--open" in argv
     argv = [a for a in argv if a != "--open"]
+    author = None
+    if "--author" in argv:
+        i = argv.index("--author")
+        author = argv[i + 1] if i + 1 < len(argv) else None
+        del argv[i:i + 2]
+        if author not in ("human", "agent"):
+            output.fail(output.EXIT_USAGE, "usage: ops search \"<query>\" --author human|agent",
+                        verb="search")
     query = " ".join(argv).strip()
 
     if not query:
@@ -46,7 +55,8 @@ def main(argv):
             return _live_session()
         output.fail(output.EXIT_USAGE, 'usage: ops search "<query>"', verb="search")
 
-    hits = search(query, log=True)  # every real search is logged to .logs/queries.jsonl (ADR-002)
+    # every real search is logged to .logs/queries.jsonl (ADR-002); --author filters the plane (4.3)
+    hits = search(query, log=True, author=author)
     snips = snippets(query, {p for p, _h, _s in hits})
     rows = [{"path": p, "heading": h, "score": round(s, 6), "snippet": snips.get(p, "")}
             for p, h, s in hits]

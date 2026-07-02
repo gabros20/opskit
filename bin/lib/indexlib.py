@@ -82,6 +82,7 @@ def connect() -> sqlite3.Connection:
         CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(path, heading, body, slug UNINDEXED);
         CREATE TABLE IF NOT EXISTS links(src TEXT, dst TEXT);
         CREATE TABLE IF NOT EXISTS embedded(path TEXT PRIMARY KEY, model TEXT);
+        CREATE TABLE IF NOT EXISTS notemeta(path TEXT PRIMARY KEY, author TEXT, derived_from TEXT);
         CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
         """
     )
@@ -119,6 +120,27 @@ def _chunks(text: str) -> list[tuple[str, str]]:
 
 def _norm_link(target: str) -> str:
     return target.split("#", 1)[0].split("|", 1)[0].strip()
+
+
+def _note_provenance(text: str) -> tuple[str, str]:
+    """(author, derived_from) from the note's frontmatter — '' when absent (proposal Part 4.3).
+    Inline + stdlib so indexlib stays dependency-free and standalone-loadable; the provenance planes
+    become filterable so `ops search --author human` can exclude agent + derived material."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return "", ""
+    author = derived = ""
+    for ln in lines[1:]:
+        if ln.strip() == "---":
+            break
+        m = re.match(r"^(author|derived_from):\s*(.+)$", ln)
+        if m:
+            val = m.group(2).strip().strip('"').strip("'")
+            if m.group(1) == "author":
+                author = val
+            else:
+                derived = val
+    return author, derived
 
 
 def _embed_text(content: str, limit: int = 2000) -> str:
@@ -187,6 +209,9 @@ def index(root: Path | str = CONTENT, verbose: bool = True, changed_only: bool =
                             (rel, head, body, slug))
             for tgt in {_norm_link(t) for t in LINK_RE.findall(content)}:
                 con.execute("INSERT INTO links(src, dst) VALUES(?,?)", (rel, tgt))
+            au, dv = _note_provenance(content)
+            con.execute("INSERT OR REPLACE INTO notemeta(path, author, derived_from) VALUES(?,?,?)",
+                        (rel, au, dv))
             con.execute("INSERT OR REPLACE INTO files(path, hash) VALUES(?,?)", (rel, h))
             changed += 1
             if changed % COMMIT_EVERY == 0:
@@ -199,6 +224,7 @@ def index(root: Path | str = CONTENT, verbose: bool = True, changed_only: bool =
             con.execute("DELETE FROM links WHERE src=?", (rel,))
             con.execute("DELETE FROM files WHERE path=?", (rel,))
             con.execute("DELETE FROM embedded WHERE path=?", (rel,))
+            con.execute("DELETE FROM notemeta WHERE path=?", (rel,))
             if vec_on:
                 vs.delete_path(rel)
     _meta_set(con, "last_index_ts", repr(started))  # build stamp for the next --changed fast path
@@ -280,9 +306,20 @@ def snippets(query: str, wanted, k: int = 40) -> dict:
     return out
 
 
-def search(query: str, k: int = 10, graph: bool = True, log: bool = False) -> list[tuple[str, str, float]]:
-    """Return [(path, heading, score)] — FTS5 keyword + one-hop wikilink-graph, fused by RRF."""
+def _authorship(con) -> dict:
+    """{path: (author, derived_from)} from notemeta (proposal Part 4.3) — the provenance planes."""
+    return {p: (a or "", d or "")
+            for p, a, d in con.execute("SELECT path, author, derived_from FROM notemeta")}
+
+
+def search(query: str, k: int = 10, graph: bool = True, log: bool = False,
+           author: str | None = None) -> list[tuple[str, str, float]]:
+    """Return [(path, heading, score)] — FTS5 keyword + one-hop wikilink-graph, fused by RRF.
+
+    `author` filters by provenance plane (Part 4.3): 'human' excludes agent-authored AND derived
+    material (any note with `derived_from`); 'agent' keeps only `author: agent` notes."""
     con = connect()
+    amap = _authorship(con) if author else {}
     try:
         rows = con.execute(
             "SELECT path, heading, bm25(chunks) AS r FROM chunks WHERE chunks MATCH ? ORDER BY r LIMIT ?",
@@ -329,6 +366,15 @@ def search(query: str, k: int = 10, graph: bool = True, log: bool = False) -> li
                         best.setdefault(path, head)
             except Exception:
                 pass  # vectors are an accelerator; never let them break keyword search
+    if author:
+        def _keep(p: str) -> bool:
+            a, d = amap.get(p, ("", ""))
+            if author == "human":
+                return a != "agent" and not d
+            if author == "agent":
+                return a == "agent"
+            return True
+        scores = {p: s for p, s in scores.items() if _keep(p)}
     pool = sorted(scores.items(), key=lambda x: -x[1])
     # --- stage 3: local cross-encoder rerank of the top candidates (precision layer) ---
     if _rerank_on() and len(pool) > 1:
