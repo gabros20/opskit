@@ -23,5 +23,6 @@ docs/DECISIONS.md
 docs/how-it-works.html
 docs/obsidian-compat.md
 docs/mobile-and-capture.md
+docs/backup-and-share.md
 .gitignore
 script

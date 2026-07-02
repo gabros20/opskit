@@ -1,0 +1,33 @@
+{
+  "verb": "share",
+  "summary": "zero-knowledge share: render+encrypt a note (or tag collection) locally, publish only ciphertext",
+  "usage": "ops share <slug> [--expires 7d] [--plain|--gist] [--dry-run|--yes] | collection <tag> | list | revoke <id> --yes | init",
+  "risk": "safe_write",
+  "args": [
+    {
+      "name": "action",
+      "required": false
+    }
+  ],
+  "reads": [
+    "wiki/",
+    ".share/"
+  ],
+  "writes": [
+    ".share/",
+    "journal/"
+  ],
+  "hints": "Share a note or `collection <tag>` as ONE self-contained HTML blob, encrypted AES-256-GCM LOCALLY; only CIPHERTEXT is published to a Cloudflare Worker+KV and the key rides the URL `#fragment` (the provider can never read it). Transmitting subactions (share/collection/revoke) self-gate --yes -> EXIT_CONFIRM(3); `list` is free. `--dry-run` renders+encrypts locally and stops. `--plain` = unguessable slug, no E2E. `--gist` = secret gist fallback. Run `ops share init` once to deploy the worker. Common mistake: expecting it to send the link — output is a DRAFT link, the human sends it.",
+  "output": {
+    "mode": "rows",
+    "fields": {
+      "id": "string",
+      "kind": "string",
+      "key": "string",
+      "state": "string",
+      "expires_ts": "int",
+      "url": "string"
+    }
+  },
+  "dry_run": true
+}

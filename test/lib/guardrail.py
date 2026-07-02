@@ -45,7 +45,7 @@ KNOWN_VERBS = {
     "help", "status", "doctor", "backup", "index", "consolidate",
     "capture", "triage", "start", "close", "week",
     "search", "wiki", "task", "new", "repo", "archive", "files", "sweep",
-    "invoice", "job", "organize",
+    "invoice", "job", "organize", "share",
 }
 
 # External commands that transmit / publish / spend outside the machine — confirm-class for

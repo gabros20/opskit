@@ -44,14 +44,27 @@
     },
     {
       "verb": "backup",
-      "summary": "verify ~/ops is committed + pushed; nag (exit 1) if at risk. Never pushes for you",
-      "usage": "ops backup",
-      "risk": "read",
-      "reads": [
-        ".git"
+      "summary": "commit/push nag (bare); restic family + git-bundle net: init|status|run|drill|bundle",
+      "usage": "ops backup [status | run [--target local|cloud] --yes | drill --yes | bundle [--dry-run] | init --yes]",
+      "risk": "safe_write",
+      "args": [
+        {
+          "name": "action",
+          "required": false
+        }
       ],
-      "writes": [],
-      "hints": "Check whether ~/ops is committed + pushed; exit 1 = at risk. Common mistake: expecting it to push \u2014 it never transmits, it only nags.",
+      "reads": [
+        ".git",
+        ".backup/",
+        "~/files",
+        "~/work"
+      ],
+      "writes": [
+        ".backup/",
+        "~/files/backups/bundles/",
+        "journal/"
+      ],
+      "hints": "Bare `ops backup` is the UNCHANGED read-only commit/push nag (exit 1 = at risk; never pushes for you). Subcommands add the restic durability floor (auto-detected; degrades with an install hint): init (human-run once, --yes, writes .backup/config.json with op:// REFERENCES + renders the launchd plist), status (snapshot age per target, exit 1 if stale >48h or unconfigured), run [--target local|cloud] (cloud is --yes ALWAYS; the scheduled cloud push runs from launchd DIRECTLY with an append-only B2 key, outside this verb), drill (--yes; restore latest snapshot to tmp and diff), bundle (git bundle --all of ~/ops + every ~/work repo into ~/files/backups/bundles/ with retention). Common mistake: expecting bare backup to run restic \u2014 it only nags; use `ops backup run`.",
       "output": {
         "mode": "scalar",
         "fields": {
@@ -63,6 +76,7 @@
           "at_risk": "bool"
         }
       },
+      "dry_run": true,
       "source": "engine"
     },
     {
@@ -623,6 +637,40 @@
           "snippet": "string"
         }
       },
+      "source": "engine"
+    },
+    {
+      "verb": "share",
+      "summary": "zero-knowledge share: render+encrypt a note (or tag collection) locally, publish only ciphertext",
+      "usage": "ops share <slug> [--expires 7d] [--plain|--gist] [--dry-run|--yes] | collection <tag> | list | revoke <id> --yes | init",
+      "risk": "safe_write",
+      "args": [
+        {
+          "name": "action",
+          "required": false
+        }
+      ],
+      "reads": [
+        "wiki/",
+        ".share/"
+      ],
+      "writes": [
+        ".share/",
+        "journal/"
+      ],
+      "hints": "Share a note or `collection <tag>` as ONE self-contained HTML blob, encrypted AES-256-GCM LOCALLY; only CIPHERTEXT is published to a Cloudflare Worker+KV and the key rides the URL `#fragment` (the provider can never read it). Transmitting subactions (share/collection/revoke) self-gate --yes -> EXIT_CONFIRM(3); `list` is free. `--dry-run` renders+encrypts locally and stops. `--plain` = unguessable slug, no E2E. `--gist` = secret gist fallback. Run `ops share init` once to deploy the worker. Common mistake: expecting it to send the link \u2014 output is a DRAFT link, the human sends it.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "id": "string",
+          "kind": "string",
+          "key": "string",
+          "state": "string",
+          "expires_ts": "int",
+          "url": "string"
+        }
+      },
+      "dry_run": true,
       "source": "engine"
     },
     {

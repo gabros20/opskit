@@ -1,13 +1,26 @@
 {
   "verb": "backup",
-  "summary": "verify ~/ops is committed + pushed; nag (exit 1) if at risk. Never pushes for you",
-  "usage": "ops backup",
-  "risk": "read",
-  "reads": [
-    ".git"
+  "summary": "commit/push nag (bare); restic family + git-bundle net: init|status|run|drill|bundle",
+  "usage": "ops backup [status | run [--target local|cloud] --yes | drill --yes | bundle [--dry-run] | init --yes]",
+  "risk": "safe_write",
+  "args": [
+    {
+      "name": "action",
+      "required": false
+    }
   ],
-  "writes": [],
-  "hints": "Check whether ~/ops is committed + pushed; exit 1 = at risk. Common mistake: expecting it to push \u2014 it never transmits, it only nags.",
+  "reads": [
+    ".git",
+    ".backup/",
+    "~/files",
+    "~/work"
+  ],
+  "writes": [
+    ".backup/",
+    "~/files/backups/bundles/",
+    "journal/"
+  ],
+  "hints": "Bare `ops backup` is the UNCHANGED read-only commit/push nag (exit 1 = at risk; never pushes for you). Subcommands add the restic durability floor (auto-detected; degrades with an install hint): init (human-run once, --yes, writes .backup/config.json with op:// REFERENCES + renders the launchd plist), status (snapshot age per target, exit 1 if stale >48h or unconfigured), run [--target local|cloud] (cloud is --yes ALWAYS; the scheduled cloud push runs from launchd DIRECTLY with an append-only B2 key, outside this verb), drill (--yes; restore latest snapshot to tmp and diff), bundle (git bundle --all of ~/ops + every ~/work repo into ~/files/backups/bundles/ with retention). Common mistake: expecting bare backup to run restic — it only nags; use `ops backup run`.",
   "output": {
     "mode": "scalar",
     "fields": {
@@ -18,5 +31,6 @@
       "unpushed": "int",
       "at_risk": "bool"
     }
-  }
+  },
+  "dry_run": true
 }

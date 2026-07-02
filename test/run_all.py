@@ -37,6 +37,7 @@ SUITES = [
     ("terminal ergonomics: completion + renderer", "run_completion.py"),
     ("note types + bookmarks (issue #1 D+F)", "run_notetypes.py"),
     ("maintenance: backup, consolidate (§14/§15)", "run_maintenance.py"),
+    ("backup family + share (5.1/5.2)", "run_backup_share.py"),
     ("setup/update flow (§2/§17)", "run_setup.py"),
     ("trust wave: exit codes + update merge + doctor (0.1/0.3/0.4)", "run_trust.py"),
     ("machine contract: --json + ops.json v2 + dry-run (1.1/1.2/0.5)", "run_json.py"),

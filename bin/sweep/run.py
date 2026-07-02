@@ -82,6 +82,13 @@ def main(argv):
                 if not dry and b.is_dir() and not any(b.iterdir()):
                     b.rmdir()
 
+    # phase 3 — share hygiene (Part 5.2): warn on expired shares + notes edited since sharing.
+    share_warnings = _share_warnings()
+    for w in share_warnings:
+        say(f"  {'expired share' if w['kind']=='expired' else 'edited since share'}: "
+            f"{w['id']} ({w['detail']})")
+        rows.append({"action": w["kind"], "name": w["id"], "detail": w["detail"]})
+
     if not dry and (promoted or trashed):
         paths.append_journal(f"swept {promoted} to _swept, {trashed} to Trash")
 
@@ -89,10 +96,44 @@ def main(argv):
         for line in events:
             print(line)
         print(f"\nsweep: {promoted} promoted to _swept, {trashed} trashed"
+              + (f", {len(share_warnings)} share warning(s)" if share_warnings else "")
               + (" (dry run)" if dry else ""))
 
     return output.emit_rows(rows, "sweep", human=render,
-                            header={"promoted": promoted, "trashed": trashed, "dry_run": dry})
+                            header={"promoted": promoted, "trashed": trashed,
+                                    "share_warnings": len(share_warnings), "dry_run": dry})
+
+
+def _share_warnings():
+    """Read ~/ops/.share/ledger.json (Part 5.2): flag active shares past their TTL, and active shares
+    whose source note was edited AFTER it was shared (the published blob is now stale)."""
+    import json
+    led_path = paths.OPS_HOME / ".share" / "ledger.json"
+    try:
+        shares = json.loads(led_path.read_text(encoding="utf-8")).get("shares", [])
+    except Exception:
+        return []
+    now = int(time.time())
+    warnings = []
+    for s in shares:
+        if s.get("revoked"):
+            continue
+        exp = s.get("expires_ts", 0)
+        if exp and exp < now:
+            warnings.append({"kind": "expired", "id": s.get("id", "?"),
+                             "detail": f"expired {int((now-exp)/DAY)}d ago"})
+            continue
+        created = s.get("created_ts", 0)
+        for rel in s.get("note_paths", []):
+            p = paths.OPS_HOME / rel
+            try:
+                if created and p.stat().st_mtime > created + 1:
+                    warnings.append({"kind": "edited", "id": s.get("id", "?"),
+                                     "detail": f"{rel} edited since shared"})
+                    break
+            except Exception:
+                continue
+    return warnings
 
 
 if __name__ == "__main__":
