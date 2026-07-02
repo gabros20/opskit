@@ -4,6 +4,7 @@
   "jobs": {
     "index":        { "command": "ops index",             "schedule": { "interval_minutes": 60 }, "risk": "read",       "writes": ["~/ops/.index"] },
     "consolidate":  { "command": "ops consolidate",        "schedule": { "daily": "02:30" },       "risk": "safe_write", "writes": ["~/ops/journal"] },
+    "organize_scan":{ "command": "ops organize scan",       "schedule": { "weekly": "Sun 03:00" },  "risk": "safe_write", "writes": ["~/ops/inbox/organize"] },
     "close_nudge":  { "command": "ops close --automated",  "schedule": { "daily": "18:30" },       "risk": "safe_write", "writes": ["~/ops/journal"] },
     "backup_check": { "command": "ops backup",             "schedule": { "weekly": "Fri 17:00" },  "risk": "read",       "writes": [] }
   }

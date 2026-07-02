@@ -222,8 +222,8 @@
     },
     {
       "verb": "files",
-      "summary": "binary assets: ingest [<path>] [--client|--project|--area <slug>|--research] [--extract] | extract <slug> | link <file> <hub> | list | open <slug>",
-      "usage": "ops files ingest [<path>] [--client|--project|--area <slug> | --research] [--extract] | extract <slug> [--reextract] [--heavy] [--lang <x>] [--diarize] [--describe] | link <file> <hub> | list [--hub <slug>] | open <slug>",
+      "summary": "binary assets: ingest [<path>] [--client|--project|--area <slug>|--research] [--extract] | extract <slug> | distill <slug> | link <file> <hub> | list | open <slug>",
+      "usage": "ops files ingest [<path>] [--client|--project|--area <slug> | --research] [--extract] | extract <slug> [--reextract] [--heavy] [--lang <x>] [--diarize] [--describe] | distill <slug> | link <file> <hub> | list [--hub <slug>] | open <slug>",
       "risk": "safe_write",
       "args": [
         {
@@ -243,7 +243,7 @@
         "wiki/ (hub links)",
         "journal/"
       ],
-      "hints": "The binary-assets plane: ingest routes a file into ~/files + writes a wiki shadow note; extract emits a SIBLING derived note wiki/files/<slug>.extract.md (type extract|transcript, derived_from/source_sha256/tool) from the source bytes via auto-detected optional deps (txt/md with stdlib). Same-bytes+same-tool re-run is a no-op; --reextract forces. Common mistake: expecting the binary in git \u2014 only the plaintext shadow + extract notes are tracked; and expecting a transcript without the tier's dep installed (it degrades with an install hint).",
+      "hints": "The binary-assets plane: ingest routes a file into ~/files + writes a wiki shadow note; extract emits a SIBLING derived note wiki/files/<slug>.extract.md (type extract|transcript, derived_from/source_sha256/tool) from the source bytes via auto-detected optional deps (txt/md with stdlib). distill compiles that extract into 1-N author:agent/status:draft concept notes in wiki/notes/ (typed JSON payload with an agent, heading-outline fallback without; promote via `ops triage drafts`). Same-bytes+same-tool re-run is a no-op; --reextract forces. Common mistake: expecting the binary in git \u2014 only the plaintext shadow + extract notes are tracked; and expecting a transcript without the tier's dep installed (it degrades with an install hint).",
       "output": {
         "mode": "rows",
         "fields": {
@@ -444,6 +444,42 @@
           "path": "string"
         }
       },
+      "source": "engine"
+    },
+    {
+      "verb": "organize",
+      "summary": "self-organization loop: scan -> review -> apply typed ops (proposal queue, never direct edits)",
+      "usage": "ops organize scan [--dry-run] | review [--accept|--reject|--defer <ids|all>] [--dry-run|--yes] | apply --yes [--safe-only] [--max-ops N] [--max-lines N]",
+      "risk": "safe_write",
+      "args": [
+        {
+          "name": "action",
+          "required": false,
+          "default": "scan"
+        }
+      ],
+      "reads": [
+        "wiki/",
+        "inbox/organize/"
+      ],
+      "writes": [
+        "inbox/organize/",
+        "wiki/ (apply only, one git commit per op)",
+        "journal/"
+      ],
+      "hints": "The self-organization loop. scan does ZERO-LLM candidate generation into a typed proposal queue inbox/organize/<date>.jsonl (CLOSED op catalog: add_link, refresh_hub, normalize_tag, fix_frontmatter, retitle, flag_duplicate, propose_merge; validated at write AND read time). A model (OPS_AGENT) only RANKS confidences; with none, heuristics. review appends accept/reject/defer status lines (audit ledger, latest wins) and shows the exact diff each op would produce. apply (needs --yes, NEVER schedulable) deterministically replays APPROVED ops only, one commit per op, with an edit budget (20 ops / 300 lines, flags may only lower it) and protected paths (conventions/index/hubs/pinned) review-only; retitle/propose_merge/deletions never auto-apply. --safe-only applies only the four additive primitives above 0.8. Common mistake: expecting apply to run a model (it never does) or to touch a protected path.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "id": "string",
+          "op": "string",
+          "target": "string",
+          "confidence": "number",
+          "rationale": "string",
+          "status": "string"
+        }
+      },
+      "dry_run": true,
       "source": "engine"
     },
     {
@@ -703,8 +739,8 @@
     },
     {
       "verb": "triage",
-      "summary": "propose filing of inbox/ items into tasks or wiki; human approves",
-      "usage": "ops triage [--dry-run|--yes]",
+      "summary": "propose filing of inbox/ items into tasks or wiki; human approves | drafts: promote agent-drafted notes",
+      "usage": "ops triage [--dry-run|--yes] | drafts [--dry-run|--yes]",
       "risk": "safe_write",
       "args": [
         {
@@ -723,7 +759,7 @@
         "journal/",
         "wiki/conventions.md"
       ],
-      "hints": "Propose filing of inbox/ items into a task or note; the human approves. --json lists proposals without filing. Common mistake: expecting it to auto-file without --yes.",
+      "hints": "Propose filing of inbox/ items into a task or note; the human approves. `ops triage drafts` pages agent-drafted notes (author:agent, status:draft) from `ops files distill` as a promotion queue: accept -> active, reject -> delete, one git commit each. --json lists proposals/drafts without acting. Common mistake: expecting it to auto-file without --yes.",
       "output": {
         "mode": "rows",
         "fields": {

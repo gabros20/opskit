@@ -20,12 +20,22 @@ extract  (proposal Part 4.1) emits a SIBLING derived note wiki/files/<slug>.extr
   shutil.which; deterministic degrade with a one-line install hint); .txt/.md extract with stdlib.
   Same-bytes + same-tool re-run is an idempotent no-op; --reextract forces. `ingest --extract` chains.
 
+distill  (proposal Part 4.2) reads a derived extract note (wiki/files/<slug>.extract.md) and produces
+  1-N interlinked concept notes in wiki/notes/ (the Iron Law shape). WITH an agent (OPS_AGENT) the
+  model returns a TYPED JSON payload [{title, summary, wikilinks[]}] — never file text; the verb
+  validates (unique slugs vs the whole vault, resolvable wikilinks — unresolvable dropped with a
+  warning) and writes deterministically via the notetype templates with provenance frontmatter
+  author: agent, source: "[[<slug>.extract]]", status: draft. WITHOUT one (OPS_AGENT=none): a
+  deterministic heading-outline fallback (split the extract by ## headings). `ops triage drafts`
+  then pages the agent-drafted notes as a promotion queue (accept -> active, reject -> delete).
+
 link  attaches an already-ingested asset to a hub note after the fact.
 list  shows the asset catalogue (optionally one hub's files).
 open  reveals a file in Finder via its shadow note.
 """
 import hashlib
 import importlib.util
+import json
 import os
 import re
 import shutil
@@ -34,7 +44,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import output, paths  # noqa: E402
+from lib import agent, notetype, output, paths  # noqa: E402
 
 YEL, GREEN, DIM, CYAN, RESET = "\033[33m", "\033[32m", "\033[2m", "\033[36m", "\033[0m"
 PERSONAL = ("tax", "szja", "nav", "ado", "adó", "medical", "orvos", "contract", "szerzod", "szerződ",
@@ -519,6 +529,153 @@ def cmd_open(argv):
     return output.emit({"slug": argv[0], "path": target}, "files", human=render)
 
 
+def _strip_frontmatter(text: str) -> str:
+    if text.startswith("---"):
+        e = text.find("\n---", 3)
+        if e != -1:
+            return text[e + 4:].strip()
+    return text.strip()
+
+
+def _parse_json_array(text: str):
+    """Extract the first JSON array from a model's reply, tolerating ``` fences and surrounding prose."""
+    t = re.sub(r"```(?:json)?", "", text or "").strip()
+    i, j = t.find("["), t.rfind("]")
+    if i == -1 or j == -1 or j < i:
+        return None
+    try:
+        data = json.loads(t[i:j + 1])
+    except Exception:
+        return None
+    return data if isinstance(data, list) else None
+
+
+def _agent_concepts(body: str):
+    """Ask the configured agent (scope=read) for a TYPED payload; None -> use the outline fallback.
+    The model NEVER writes files or returns note text — only [{title, summary, wikilinks[]}]."""
+    prompt = ("Read this extract and distill it into 1-5 concept notes. Reply with ONLY a JSON array; "
+              "each element is an object with keys \"title\" (short), \"summary\" (2-4 sentences of "
+              "plain prose), and \"wikilinks\" (array of related note titles). No text outside the "
+              "JSON.\n\n" + body[:8000])
+    data = _parse_json_array(agent.run_agent(prompt, scope="read") or "")
+    if not data:
+        return None
+    out = []
+    for it in data:
+        if isinstance(it, dict) and str(it.get("title", "")).strip():
+            out.append({"title": str(it["title"]).strip(),
+                        "summary": str(it.get("summary", "")).strip(),
+                        "wikilinks": [str(w).strip() for w in (it.get("wikilinks") or []) if str(w).strip()]})
+    return out or None
+
+
+def _outline_concepts(body: str, fallback_title: str) -> list:
+    """OPS_AGENT=none deterministic path: split the extract by `## headings` into concept notes."""
+    concepts, cur, buf = [], None, []
+    for ln in body.splitlines():
+        m = re.match(r"^#{2,6}\s+(.*)$", ln)
+        if m:
+            if cur is not None and "\n".join(buf).strip():
+                concepts.append({"title": cur, "summary": "\n".join(buf).strip(), "wikilinks": []})
+            cur, buf = m.group(1).strip(), []
+        elif cur is not None:
+            buf.append(ln)
+    if cur is not None and "\n".join(buf).strip():
+        concepts.append({"title": cur, "summary": "\n".join(buf).strip(), "wikilinks": []})
+    if not concepts and body.strip():
+        concepts.append({"title": fallback_title, "summary": body.strip(), "wikilinks": []})
+    return concepts
+
+
+def _inject_provenance(text: str, source_link: str) -> str:
+    """Splice author:/source: provenance into the note's leading frontmatter (Part 4.2/4.3)."""
+    inject = f"author: agent\nsource: \"[[{source_link}]]\"\n"
+    m = re.search(r"(?m)^status:.*\n", text)
+    if m:
+        return text[:m.end()] + inject + text[m.end():]
+    return text.replace("---\n", "---\n" + inject, 1)
+
+
+def cmd_distill(argv, dry=False):
+    rest = list(argv)
+    slugs = [a for a in rest if not a.startswith("-")]
+    if not slugs:
+        output.fail(output.EXIT_USAGE, "usage: ops files distill <slug> [--redistill]", verb="files")
+    slug = slugs[0]
+    extract = _extract_note_path(slug)
+    if not extract.exists():
+        output.fail(output.EXIT_NOT_FOUND,
+                    f"no extract note wiki/files/{slug}.extract.md — run `ops files extract {slug}` first",
+                    verb="files")
+    body = _strip_frontmatter(extract.read_text(encoding="utf-8"))
+    shadow = paths.WIKI / "files" / f"{slug}.md"
+    fallback_title = (paths.fm_field(shadow, "title") if shadow.exists() else "") or slug
+    source_link = f"{slug}.extract"
+
+    concepts = _agent_concepts(body) if agent.available() else None
+    used_agent = concepts is not None
+    if concepts is None:
+        concepts = _outline_concepts(body, fallback_title)
+    if not concepts:
+        output.fail(output.EXIT_UNEXPECTED,
+                    f"nothing to distill from {extract.relative_to(paths.OPS_HOME)} (empty extract)",
+                    verb="files")
+
+    # unique slugs vs the WHOLE vault AND within this batch (Iron Law: the verb owns placement)
+    existing = {p.stem for p in paths.WIKI.rglob("*.md")}
+    used, warnings = set(existing), []
+    for c in concepts:
+        base = paths.slugify(c["title"])
+        s, i = base, 2
+        while s in used:
+            s, i = f"{base}-{i}", i + 1
+        c["slug"] = s
+        used.add(s)
+    valid = existing | {c["slug"] for c in concepts}
+    for c in concepts:
+        keep = []
+        for w in c.get("wikilinks", []):
+            tgt = w.split("#", 1)[0].split("|", 1)[0].strip().strip("[").strip("]").strip()
+            if tgt and tgt in valid and tgt != c["slug"]:
+                keep.append(tgt)
+            elif tgt:
+                warnings.append(f"dropped unresolvable link [[{tgt}]] from {c['slug']}")
+        c["wikilinks"] = keep
+
+    dest_dir = paths.WIKI / "notes"
+    rows = [{"slug": c["slug"], "title": c["title"],
+             "note": str((dest_dir / f"{c['slug']}.md").relative_to(paths.OPS_HOME)),
+             "links": c["wikilinks"], "status": "would-write" if dry else "written"}
+            for c in concepts]
+    if not dry:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        for c in concepts:
+            md = c["summary"].strip() or "_(no summary)_"
+            if c["wikilinks"]:
+                md += "\n\n## Related\n" + "\n".join(f"- [[{w}]]" for w in c["wikilinks"])
+            text = notetype.render("note", title=c["title"], status="draft", body=md, slug=c["slug"])
+            (dest_dir / f"{c['slug']}.md").write_text(_inject_provenance(text, source_link), encoding="utf-8")
+        paths.append_journal(f"files distill {slug} -> {len(concepts)} draft note(s)"
+                             + (" (agent)" if used_agent else " (outline)"))
+
+    def render(rs):
+        head = "would distill" if dry else "distilled"
+        out = [f"{head} {slug} -> {len(rs)} concept note(s) "
+               f"{DIM}({'agent' if used_agent else 'heading-outline fallback'}){RESET}:"]
+        for r in rs:
+            link = f"  {CYAN}{len(r['links'])} link(s){RESET}" if r["links"] else ""
+            out.append(f"  {r['slug']:<30} {DIM}{r['title'][:34]:<34}{RESET}{link}")
+        for w in warnings:
+            out.append(f"  {YEL}note{RESET} {w}")
+        out.append("\n  promote drafts:  ops triage drafts   (accept -> active, reject -> delete)"
+                   + ("  (dry run — nothing written)" if dry else ""))
+        return "\n".join(out)
+
+    return output.emit_rows(rows, "files", human=render,
+                            header={"slug": slug, "agent": used_agent, "warnings": warnings,
+                                    "dry_run": dry})
+
+
 def cmd_extract(argv, dry=False):
     rest = list(argv)
     lang = _pull_opt(rest, "--lang")
@@ -564,6 +721,8 @@ def main(argv):
         return cmd_ingest(rest, dry, extract=extract)
     if action == "extract":
         return cmd_extract(argv[1:], dry)
+    if action == "distill":
+        return cmd_distill(argv[1:], dry)
     if action == "link":
         return cmd_link(argv[1:])
     if action == "list":
@@ -573,7 +732,8 @@ def main(argv):
     output.fail(output.EXIT_USAGE,
                 "usage: ops files ingest [<path>] [--client|--project|--area <slug> | --research] "
                 "[--extract] | extract <slug> [--reextract] [--heavy] [--lang <x>] [--diarize] "
-                "[--describe] | link <file> <hub> | list [--hub <slug>] | open <slug>", verb="files")
+                "[--describe] | distill <slug> | link <file> <hub> | list [--hub <slug>] | "
+                "open <slug>", verb="files")
 
 
 if __name__ == "__main__":

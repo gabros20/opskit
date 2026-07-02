@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """
-ops triage [--dry-run|--yes] — PROPOSE filing of inbox/ items into a task or a wiki note; the human
-approves (§4.1, §10). Interactive by default; --dry-run shows proposals only; --yes accepts all.
+ops triage [--dry-run|--yes] | drafts [--dry-run|--yes] — PROPOSE filing of inbox/ items into a task
+or a wiki note; the human approves (§4.1, §10). Interactive by default; --dry-run shows proposals
+only; --yes accepts all.
 
 Classification here is the deterministic pure-shell fallback (no agent required). When an agent is
 wired (OPS_AGENT), it would improve the proposal — but the system works without it.
 On an override (you pick differently than proposed), it offers to record a one-line rule in
 wiki/conventions.md ## Filing rules — the plaintext learning loop.
+
+`ops triage drafts` (proposal Part 4.2) pages the agent-drafted concept notes (`author: agent`,
+`status: draft`) that `ops files distill` produced as a PROMOTION queue: accept -> status active,
+reject -> delete, one git commit each — the human is the gate on machine-authored knowledge.
 """
 import re
 import sys
@@ -82,10 +87,64 @@ def items():
     return sorted(p for p in paths.INBOX.iterdir() if p.suffix in (".md", ".txt") and p.name != ".gitkeep")
 
 
+def _draft_notes() -> list:
+    """Agent-drafted concept notes awaiting promotion (author: agent + status: draft)."""
+    if not paths.WIKI.exists():
+        return []
+    return sorted(p for p in paths.WIKI.rglob("*.md")
+                  if paths.fm_field(p, "author") == "agent" and paths.fm_field(p, "status") == "draft")
+
+
+def _commit(rel: str, msg: str) -> None:
+    paths.git("add", "-A", "--", rel)
+    paths.git("commit", "-m", msg)
+
+
+def cmd_drafts(argv, dry, yes, js):
+    notes = _draft_notes()
+    if js:
+        rows = [{"slug": p.stem, "title": paths.fm_field(p, "title") or p.stem,
+                 "source": paths.fm_field(p, "source"),
+                 "path": str(p.relative_to(paths.OPS_HOME))} for p in notes]
+        return output.emit_rows(rows, "triage", header={"drafts": len(notes)})
+    if not notes:
+        print("no agent-drafted notes to promote (run `ops files distill <slug>` first).")
+        return 0
+    print(f"triage drafts: {len(notes)} agent-drafted note(s) awaiting promotion\n")
+    for p in notes:
+        title = paths.fm_field(p, "title") or p.stem
+        src = paths.fm_field(p, "source")
+        rel = str(p.relative_to(paths.OPS_HOME))
+        print(f"• {p.stem}: \"{title}\"" + (f"  from {src}" if src else ""))
+        if dry:
+            continue
+        choice = "a" if yes else (input("    [a]ccept -> active / [r]eject -> delete / [s]kip ? ")
+                                  .strip().lower() or "a")
+        if choice in ("r", "reject"):
+            p.unlink()
+            _commit(rel, f"organize: reject agent draft {p.stem}")
+            paths.append_journal(f"triage drafts: rejected {p.stem} (deleted)")
+            print("    rejected (deleted)")
+        elif choice in ("s", "skip"):
+            print("    skipped")
+        else:
+            text = p.read_text(encoding="utf-8")
+            p.write_text(re.sub(r"(?m)^status:\s*draft\s*$", "status: active", text, count=1),
+                         encoding="utf-8")
+            _commit(rel, f"organize: promote agent draft {p.stem} -> active")
+            paths.append_journal(f"triage drafts: promoted {p.stem} -> active")
+            print("    promoted -> active")
+    if dry:
+        print("\n(dry run — nothing changed)")
+    return 0
+
+
 def main(argv):
     js, argv = output.parse_argv(argv)
     dry = "--dry-run" in argv
     yes = "--yes" in argv or "-y" in argv
+    if argv and argv[0] == "drafts":
+        return cmd_drafts(argv[1:], dry, yes, js)
     its = items()
 
     if js:  # machine mode: emit proposals as rows, file nothing (agent files via task/wiki)

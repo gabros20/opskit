@@ -290,6 +290,26 @@ def main(argv):
         else:
             ok("provenance planes consistent (derived/agent notes well-formed)")
 
+    # 11. jobs registry (Part 4.4): only read/safe_write verbs may be scheduled — a confirm/deny-class
+    # verb in the registry is a data-loss/transmit risk (e.g. `ops organize apply` must NEVER be
+    # scheduled; the weekly `ops organize scan` is safe_write and fine). WARN-only.
+    reg = paths.OPS_HOME / "jobs" / "registry.json"
+    if reg.exists():
+        try:
+            jobs = json.loads(reg.read_text(encoding="utf-8")).get("jobs", {})
+        except Exception:
+            jobs = {}
+        offenders = []
+        for name, job in jobs.items():
+            toks = str(job.get("command", "")).split()
+            verb = toks[1] if len(toks) > 1 and toks[0] == "ops" else None
+            vr = guardrail.risk_of(verb) if verb else None
+            if job.get("risk") not in ("read", "safe_write") or vr in ("confirm", "deny"):
+                offenders.append(f"{name} ({job.get('command')})")
+        (warn if offenders else ok)(
+            f"{len(offenders)} confirm/deny-class job(s) scheduled (must never be): {offenders}" if offenders
+            else "jobs registry schedules only read/safe_write verbs")
+
     nfail = sum(1 for lv, _ in checks if lv == "fail")
     nwarn = sum(1 for lv, _ in checks if lv == "warn")
     rows = [{"level": lv, "message": m} for lv, m in checks]
