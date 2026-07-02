@@ -1,16 +1,16 @@
 # Personal Operating System (`~/ops`)
 
-**A local-first, agent-agnostic system for your knowledge, tasks, and work.**
+**A local-first, agent-agnostic platform for your knowledge, tasks, and work.**
 Plaintext is the truth, git is the spine, and one `ops <verb>` command drives everything — by hand in
-a terminal, on a schedule, or through any AI agent. No server, no cloud, no lock-in. Your notes are
-Markdown files in your own git repo; you can read them, grep them, and walk away from this tool at any
-time with nothing stranded.
+a terminal, on a schedule, through Obsidian or Raycast, or through any AI agent. No server, no cloud,
+no lock-in. Your notes are Markdown files in your own git repo; you can read them, grep them, and walk
+away from this tool at any time with nothing stranded.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · 21 verbs · 24 test suites · CI · macOS / Linux · Python 3 + git
+[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · 27 verbs · 36 test suites · CI · macOS / Linux · Python 3 + git · zero required deps
 
 > 🖱️ **Want the 2-minute tour first?** Open **[`docs/how-it-works.html`](docs/how-it-works.html)** —
 > a single self-contained interactive walkthrough (no install, just open it in a browser). Click
-> through the four roots, the 21 verbs, the guardrail, and a **Flows** tab with six animated `ops`
+> through the four roots, the verbs, the guardrail, and a **Flows** tab with animated `ops`
 > flowcharts you can step through.
 
 ---
@@ -19,25 +19,29 @@ time with nothing stranded.
 
 A "personal operating system" is the small set of habits and folders you use to run your life and
 work — capturing thoughts, turning them into tasks, keeping durable notes, managing projects, and not
-losing anything. This makes that explicit and durable:
+losing anything. This makes that explicit, durable, and **drivable by machines**:
 
-- **Everything is a Markdown file** in `~/ops`, version-controlled with git. Indexes and embeddings
-  are disposable caches rebuilt from the text — never the source of truth.
-- **One command surface.** You never poke at files by hand. `ops <verb>` is the single door; each of
-  the 21 verbs knows *where* things go and *how* to keep them safe.
-- **Agent-agnostic.** A model (Claude, Codex, Grok, a local agent…) decides *what* to do; the system
-  guarantees *where* and *how*. Any agent operates it through the same verbs and the same guardrail
-  you do — so you can automate as much or as little as you like without giving up safety.
+- **Everything is a Markdown file** in `~/ops`, version-controlled with git. Indexes, embeddings, and
+  every derived artifact are disposable caches rebuilt from the text — never the source of truth.
+- **One command surface.** You never poke at files by hand. `ops <verb>` is the single door; each verb
+  knows *where* things go and *how* to keep them safe. A guardrail classifies every invocation before
+  it runs — the same wall whether it's you, a cron job, or an agent at the keyboard.
+- **One machine contract.** Every verb speaks `--json` (one frozen, versioned envelope) and a fixed
+  exit-code protocol; the generated [`ops.json`](ops.json) describes the whole surface — capabilities,
+  per-verb schemas, usage hints. An agent doesn't read the manual and hope; it does a handshake.
+- **Extensible without forking.** Your own verbs live in `plugins/` (never overwritten by updates),
+  import a frozen SDK, and inherit the guardrail. Third-party packs install with an explicit trust
+  ceiling — a plugin's self-declared permissions never take effect until *you* trust it.
 
 ### A minute in the life
 
 ```sh
-ops start                              # morning: open the journal, carry forward open tasks
+ops orient                             # where was I? journal tail, tasks, inbox, health — one call
 ops capture "RRF beats naive hybrid"   # a thought → inbox/ (zero decisions)
 ops triage                             # it proposes: file as a wiki note? a task? — you approve
 ops task add "Fix the Acme webhook"    # → tasks/active/
-ops search "ranking fusion"            # find anything, ranked
-ops task done T-20260629-01            # folder = status
+ops search "ranking fusion"            # ranked hits with snippets; add --json for machines
+ops open rrf                           # one resolver: task id → note slug → file asset → search
 ops close                              # evening: summarize the day, flag loose ends
 ```
 
@@ -49,9 +53,9 @@ ops close                              # evening: summarize the day, flag loose 
 
 | Root | Holds | In git? |
 |---|---|---|
-| `~/ops` | **this repo** — knowledge (wiki), tasks, journal, the verbs | ✅ your own repo |
+| `~/ops` | **this repo** — knowledge (wiki), tasks, journal, the verbs, your plugins | ✅ your own repo |
 | `~/work` | code — every project is its *own* git repo (`products/ labs/ tools/ clients/`) | each project separately |
-| `~/files` | binary assets — client docs, PDFs, datasets | ❌ (Time Machine / restic) |
+| `~/files` | binary assets — client docs, PDFs, datasets | ❌ (restic — see [durability](#durability--backup-and-share)) |
 | `~/dotfiles` | machine config — installs tools, puts `ops` on PATH | ✅ separately |
 
 The siblings sit *next to* `~/ops`, never inside it. That keeps the knowledge repo small, plaintext,
@@ -103,16 +107,25 @@ sh get.sh --demo        # prints the vault path and the one directory to delete
 
 Now `ops` works from anywhere. Pull engine improvements later without touching your notes:
 ```sh
-./script/update    # checks out ONLY engine files (bin/, skills/, docs…) from upstream; your content is never touched
+./script/update    # 3-way merge of ONLY the engine files — your content AND your local engine fixes survive
 ```
+
+> [!NOTE]
+> `script/update` does a per-file **3-way merge** keyed on the last-synced upstream commit
+> (`.ops-engine-ref`): unmodified engine files fast-forward, locally patched ones merge, conflicts are
+> surfaced with markers — an update never silently discards a fix you made.
 
 **Requirements:** macOS or Linux, `git`, Python 3.10+. Everything below is optional and
 auto-detected — nothing is required to run `ops`:
 - Semantic search (stages 2–3): [Ollama](https://ollama.com) + `pip install -r requirements.txt`.
-- Prettier note rendering: [`glow`](https://github.com/charmbracelet/glow) or `bat` (else a built-in renderer).
-- Fuzzy note-picking: [`fzf`](https://github.com/junegunn/fzf) (else `ops wiki open` with no slug just lists notes).
-- Better bookmark extraction: [`trafilatura`](https://github.com/adbar/trafilatura) (`pip install trafilatura`) turns a
-  URL into real main-content Markdown; without it `ops bookmark` uses a built-in crude strip. Stays local — no cloud reader.
+- Media extraction tiers (`ops files extract`): `pymupdf4llm` (PDF), `mlx-whisper` /
+  `faster-whisper` (audio), `ocrmac` / `tesseract` (images), `yt-dlp` (video captions) — each tier
+  degrades gracefully with a one-line install hint.
+- End-to-end-encrypted sharing: `cryptography` (else `ops share --plain` still works).
+- Off-machine backup: [`restic`](https://restic.net).
+- Terminal niceties: [`glow`](https://github.com/charmbracelet/glow) or `bat` (rendering),
+  [`fzf`](https://github.com/junegunn/fzf) (fuzzy pickers, live search sessions),
+  [`trafilatura`](https://github.com/adbar/trafilatura) (better bookmark extraction).
 
 **Platform notes.** *Homebrew:* if a tap ever ships, it is **only ever a tiny bootstrapper** that runs
 `script/get` (the chezmoi model) — never a formula that clones your notes into a brew-owned prefix, the
@@ -124,29 +137,33 @@ native PowerShell path.
 ## Using it #1 — in the terminal
 
 The daily rhythm is five verbs: **`start` → `capture`/`triage`/`task` → `close`**, with **`week`** on
-Fridays. Everything else is discoverable via `ops help`. The full surface:
+Fridays and **`orient`** whenever you (or an agent) sit down mid-stream. Everything else is
+discoverable via `ops help`. The full surface:
 
 | Group | Verbs |
 |---|---|
-| **System** | `help` · `status` · `doctor` (self-check) · `backup` (commit/push nag) · `index` · `consolidate` |
+| **System** | `help` · `status` · `orient` (one-call session bootstrap) · `doctor` (self-check) · `backup` (nag + restic family) · `index` · `consolidate` · `plugin` |
 | **Flow** | `capture` · `triage` · `start` · `close` · `week` |
-| **Knowledge** | `search` · `wiki` (open / edit / new / backlinks / stale / orphans) · `bookmark` (URL → note) |
+| **Knowledge** | `search` · `open` (one resolver for anything) · `wiki` (open / edit / new / backlinks / stale / orphans / canvas) · `bookmark` (URL → note) · `organize` (scan → review → apply) |
 | **Tasks** | `task` (list / add / show / move / done — folder = status) |
-| **Work** | `new` (scaffold project/client/**verb**) · `repo` (fleet health/clone/adopt) · `archive` · `files` (ingest/route/link binaries) · `sweep` (Desktop/Downloads decay) |
-| **Business** | `invoice` (draft only — never sends) |
+| **Work** | `new` (scaffold project/client/**verb**) · `repo` (fleet health/clone/adopt) · `archive` · `files` (ingest/extract/distill/link binaries) · `sweep` (Desktop/Downloads decay) |
+| **Business** | `invoice` (draft only — never sends) · `share` (encrypted, expiring links — never auto-sends) |
 | **Jobs** | `job` (list / run / apply — schedule the nightly verbs via launchd) |
+
+(Plus two hidden plumbing verbs: `ops mcp`, the agent transport, and `__complete`, which powers
+tab-completion.)
 
 ```sh
 ops help                       # the whole surface, rendered from each verb's manifest
-ops help triage                # usage for one verb
+ops help triage                # usage + hints for one verb
+ops orient                     # dashboard; --line gives a ≤60-char string for your shell prompt
+ops open T-20260702-01         # resolves task ids, note slugs, file assets — --edit/--reveal/--obsidian
+ops search                     # bare, in a tty with fzf: a live-reload search session with preview
 ops wiki new note "An idea"    # a structured note (frontmatter + slug, right folder)
-ops wiki open rrf              # read a note, rendered in the terminal
-ops wiki edit rrf              # open it in $EDITOR
-ops wiki backlinks rrf         # what links here
+ops wiki canvas acme           # a JSON Canvas map of the wikilink graph around a hub
 ops bookmark https://… --archive   # save a URL as a note (title fetched); snapshot to ~/files
 ops new project "Acme Webapp" --kind products   # scaffold a ~/work repo + wiki hub
-ops files ingest brief.pdf --client acme   # → ~/files/clients/acme/in/ + shadow note, linked from the hub
-ops files list                 # the asset catalogue (which hub each file belongs to)
+ops files ingest brief.pdf --client acme --extract  # file it + extract text into a derived note
 ops doctor                     # is everything healthy?
 ```
 
@@ -154,83 +171,151 @@ You never have to remember file paths or formats — the verb owns placement; yo
 
 ### You don't have to memorize the verbs
 
-Two conveniences make the terminal forgiving, both **zero-dependency** and both degrading gracefully:
-
-- **Tab-completion (zsh).** `ops <Tab>` lists every verb *with its summary*; `ops wiki <Tab>`
-  completes subcommands; `ops wiki open <Tab>` completes your **actual note slugs**; `ops task done
-  <Tab>` completes your **live task IDs**. Candidates are pulled live from your content, so they never
-  drift. `script/setup` installs it; to wire it by hand:
-  ```sh
-  mkdir -p ~/.zsh/completions && ln -sf ~/ops/script/completions/_ops ~/.zsh/completions/_ops
-  # in ~/.zshrc, before `compinit`:   fpath=(~/.zsh/completions $fpath)
-  ```
-- **Readable notes.** `ops wiki open <slug>` renders Markdown in the terminal — headings, dimmed
-  frontmatter, highlighted `[[links]]`. It auto-upgrades to [`glow`](https://github.com/charmbracelet/glow)
-  or `bat` if either is installed, and prints raw Markdown when piped (`OPS_RENDER=raw` forces it).
-- **Fuzzy-pick (optional).** Run `ops wiki open` (or `edit`) with **no slug** and, if
-  [`fzf`](https://github.com/junegunn/fzf) is installed, you get a fuzzy picker with a live rendered
-  preview — the "I don't remember the slug" escape hatch. Without `fzf` it just lists your notes.
+- **Tab-completion (zsh).** `ops <Tab>` lists every verb *with its summary*; `ops wiki open <Tab>`
+  completes your **actual note slugs**; `ops task done <Tab>` completes your **live task IDs**.
+  Installed by `script/setup`; candidates are pulled live from your content, so they never drift.
+- **Readable notes.** `ops wiki open <slug>` renders Markdown in the terminal (auto-upgrades to
+  `glow`/`bat`; raw when piped).
+- **Fuzzy everything (optional).** With `fzf` installed: `ops wiki open` with no slug is a picker
+  with live preview, `ops open` with no target is a picker over *everything*, and bare `ops search`
+  is a type-to-requery session.
+- **`--dry-run` everywhere.** Every mutating verb accepts `--dry-run` and prints what *would* happen —
+  and the guardrail treats a dry-run as a read, so even confirm-class verbs are explorable without
+  `--yes`.
 
 ---
 
 ## Using it #2 — with an AI agent
 
 This is where it gets powerful. Point any capable agent at `~/ops` and it operates the *same* system,
-behind the *same* guardrail. The mechanism is one contract, read by every agent:
+behind the *same* guardrail. Three layers make that reliable:
 
+**1. The contract (what the agent reads).**
 - **`AGENTS.md`** — the operating contract (the open standard most agents read).
 - **`skills/operate-ops/SKILL.md`** — the detailed manual the contract tells the agent to load.
 - **`CLAUDE.md`** — a one-line bridge for Claude Code (which reads `CLAUDE.md`, not `AGENTS.md`).
 
-The agent reads the contract, then drives the system through `ops <verb>` — it never hand-edits files
-or invents commands, because the contract and the guardrail forbid it. **Whatever the agent does, the
-guardrail still applies** (see below), so automating is safe by construction.
+**2. The machine contract (what the agent parses).** Every verb takes `--json` and emits one frozen
+envelope (`{"ops_json": 1, "ok": …, "data"|"error": …}`; NDJSON rows for list verbs). Exit codes are a
+protocol, not an accident: `0` ok · `2` usage · `3` needs `--yes` · `4` not found · `5` denied — and
+error messages carry the exact remediation, so a refusal teaches the caller the correct next call.
+[`ops.json`](ops.json) v2 is the complete I/O contract: every verb's args, output schema, risk class,
+source (engine or plugin), and a usage hint — plus a `capabilities` block (vectors? reranker? which
+agent?) re-detected on every regeneration. Details: [`docs/machine-contract.md`](docs/machine-contract.md).
 
-| Agent | Reads the contract as | How to point it at `~/ops` | Optional hardening |
-|---|---|---|---|
-| **Claude Code** (`claude`) | `CLAUDE.md` (bridge — already in the repo) | run `claude` from `~/ops` | `.claude/settings.json`: allow `Bash(ops:*)`, deny the rest |
-| **Codex CLI** (`codex`) | `AGENTS.md` (native) | run from `~/ops` (or `--cd ~/ops`) | `.codex/config.toml` sandbox=`workspace-write`; symlink `.codex/skills → ../skills` |
-| **Grok CLI / Grok Build** | `AGENTS.md` + `skills/` (both native) | run in `~/ops` | works out of the box — picks up `AGENTS.md`, skills, hooks |
-| **Hermes** (Nous Research) | `AGENTS.md` (native) | set the gateway cwd to `~/ops`; add `~/ops/skills` as an external skill dir | config lives in `~/dotfiles` |
-| **OpenClaw / nanoClaw** | `AGENTS.md` (native, workspace) | set the agent workspace to `~/ops` | tighten `exec-approvals` to allow only the `ops` binary |
-
-**The universal rule:** any agent that can read a file and run a shell command can drive `~/ops` —
-start it in the directory, and it reads `AGENTS.md` → loads `operate-ops` → runs `ops` verbs. Most
-agents read `AGENTS.md` natively; only Claude needs the bridge (already shipped). For coding agents,
-`ops` verbs can also call an agent *headlessly* as a scoped executor (e.g. `claude -p` with
-`--allowedTools`) — the system stays in charge of *where/how*, the model supplies judgment.
-
-> `ops doctor` checks the wiring: that `CLAUDE.md` bridges `AGENTS.md`, the skill exists, and any
-> adapter symlinks/configs resolve. A broken adapter is how an agent silently starts improvising — so
-> it's a first-class health check.
-
-**MCP transport (`ops mcp`).** For hosts that speak [MCP](https://modelcontextprotocol.io), `ops mcp`
-is a **stateless stdio server** — the host spawns it per session, it dies with it (no daemon, no HTTP,
-no resident state). Its tool list is generated from `ops.json`, so *every* verb (and every installed
-plugin) shows up automatically with schemas and hints; each tool call shells out to `ops <verb> --json`,
+**3. The transport (how a host connects).** For hosts that speak [MCP](https://modelcontextprotocol.io),
+`ops mcp` is a **stateless stdio server** — spawned per session, dies with it (no daemon, no HTTP, no
+resident state). Its tool list is *generated from ops.json*, so every verb and every installed plugin
+shows up automatically with schemas and hints; each tool call shells back through `ops <verb> --json`,
 so the guardrail and `.logs/` stay the single enforcement path. A confirm-class call without `--yes`
-comes back as a structured "needs `--yes`" result with the exact re-run — the server never auto-confirms.
-Wire it up once:
+returns a structured "needs `--yes`" result — the server never auto-confirms.
 ```sh
 ops mcp --setup    # prints:  claude mcp add ops -- /abs/path/to/ops mcp
 ```
+
+| Agent | Reads the contract as | How to point it at `~/ops` |
+|---|---|---|
+| **Claude Code** (`claude`) | `CLAUDE.md` bridge, or `ops mcp` | run `claude` from `~/ops`, or `claude mcp add ops -- ~/ops/ops mcp` |
+| **Codex CLI** (`codex`) | `AGENTS.md` (native) | run from `~/ops` (or `--cd ~/ops`) |
+| **Grok CLI / Grok Build** | `AGENTS.md` + `skills/` (native) | run in `~/ops` |
+| **Any MCP host** | tool list from `ops.json` | register `ops mcp` as a stdio server |
+| **Anything else** | `AGENTS.md` | if it can read a file and run a shell command, it can drive `ops` |
+
+> `ops doctor` checks the wiring: that `CLAUDE.md` bridges `AGENTS.md`, the skill exists, and adapter
+> symlinks/configs resolve. A broken adapter is how an agent silently starts improvising — so it's a
+> first-class health check.
+
+---
+
+## Extending it — plugins, not forks
+
+Your own verbs never touch `bin/` (the engine owns it; updates would overwrite you). Instead:
+
+```sh
+ops new verb standup                  # scaffolds plugins/local/standup/ — run.py + cmd.json
+ops plugin add you/ops-pomodoro --yes # install a pack from a repo (or a local path)
+ops plugin list                       # what's installed, pinned to which commit, trusted or not
+ops plugin trust ops-pomodoro --yes   # lift the trust ceiling to the pack's declared risks
+```
+
+- **Same shape, same rules.** A plugin verb is exactly an engine verb (`run.py` + `cmd.json`) resolved
+  from `plugins/` — it appears in `ops help`, `ops.json`, tab-completion, and MCP automatically, and
+  the guardrail gates it identically. Engine names are reserved; a plugin can never shadow a core verb.
+- **Trust is explicit.** A pack's self-declared risk classes **never take effect at install** — every
+  verb from an untrusted pack is capped at `confirm` until you run `ops plugin trust`. Even trusted
+  plugins keep the transmit-block and the path-wall. Updates re-pin explicitly; nothing auto-updates.
+- **A frozen SDK.** Plugins import [`bin/lib/api.py`](bin/lib/api.py) only (`OPS_API_VERSION = "1.0"`):
+  paths + journal, `classify` (the guardrail seam), note-type loaders, `run_agent`, and the `--json`
+  emitters. A contract test snapshots every signature — the API can't drift silently.
+
+How to write one: [`docs/plugins.md`](docs/plugins.md).
+
+---
+
+## Frontends — rent Obsidian, ship Raycast, polish the terminal
+
+The vault is plaintext, so the best "app" is one you already have:
+
+- **Obsidian (Frontend Zero).** `ops doctor --init` offers a one-time config pack
+  (`templates/obsidian/`) tuned for this vault: wikilinks kept native, attachments routed out of
+  `wiki/`, plus four starter **Bases** (active projects, open tasks, stale notes, recent decisions)
+  as saved queries over the same frontmatter. `ops wiki canvas <hub>` renders the wikilink graph as a
+  [JSON Canvas](https://jsoncanvas.org) file Obsidian opens natively. Obsidian **opens** notes
+  (`ops open <slug> --obsidian`); all *writes* still go through verbs. `ops index --changed` picks up
+  external edits incrementally, and the frontmatter reader tolerates Obsidian's Properties normalizer
+  without ever rewriting your files to fight it. Compatibility spec: [`docs/obsidian-compat.md`](docs/obsidian-compat.md).
+- **Raycast.** [`frontends/raycast/`](frontends/raycast/) ships five zero-build script commands —
+  quick-capture, search, task add/list, inline status. Every one shells to `ops` on your PATH: zero
+  privileged access, guardrail applies.
+- **Mobile = git, documented.** No app. Obsidian mobile or GitJournal over your private remote, an
+  iOS share-sheet Shortcut into `inbox/`, git push/pull as the only sync transport:
+  [`docs/mobile-and-capture.md`](docs/mobile-and-capture.md).
+
+---
+
+## The knowledge pipeline — artifacts in, linked knowledge out
+
+Binary artifacts (PDFs, recordings, screenshots, URLs) become searchable, linked, *honestly labeled*
+knowledge in three deterministic steps:
+
+```sh
+ops files ingest talk.pdf --research --extract   # 1. file it + extract text → a DERIVED note
+ops files distill talk                           # 2. compile concept notes (drafts) from the extract
+ops organize                                     # 3. scan the vault for links/dupes/fixes → proposals
+ops organize review                              # page through each proposed op with its exact diff
+ops organize apply --yes                         # replay ONLY what you approved — one git commit per op
+```
+
+- **Extraction is tiered and local** — PDF/audio/image/video each try the best locally available tool
+  and degrade gracefully (Apple-Silicon ASR at ~3000× realtime when available; captions before
+  transcription for video). Originals stay byte-for-byte in `~/files`.
+- **Provenance is a checked convention.** Three note planes — *human*, *derived* (`derived_from` +
+  `source_sha256` + `tool`), *agent* (`author: agent`, gated as `status: draft` until you promote it
+  in `ops triage`). `doctor` flags violations; `ops search --author human` excludes machine material.
+  An agent artifact can never quietly become "truth".
+- **Self-organization can't hallucinate an edit.** `organize scan` generates proposals with zero LLM
+  involvement (a model, if configured, only *ranks* them); the op catalog is closed (add link, refresh
+  hub, normalize tag, fix frontmatter, retitle, flag duplicate, propose merge — nothing else parses);
+  apply is deterministic replay of approved ops with an edit budget, protected paths, and one revert-
+  able git commit per op. The scan is schedulable; **apply never is**.
 
 ---
 
 ## How it stays safe
 
-Before any verb runs, a guardrail classifies it. New verbs default to the safest class; nothing leaves
-your machine without you. The same wall applies whether it's you or an agent at the keyboard.
+Before any verb runs, the guardrail classifies it. New verbs default to the safest class; nothing
+leaves your machine without you. The same wall applies whether it's you, a job, a plugin, or an agent.
 
 | Class | Meaning |
 |---|---|
 | `read` | pure read — runs freely, even unattended |
 | `safe_write` | writes inside the roots — every change is a revertible git diff |
 | `draft_only` | produces a draft (e.g. `invoice`) — a human sends; the system never transmits |
-| `confirm` | needs an explicit `--yes`; the default for new/undeclared verbs |
-| `deny` | always refused: force-push, `rm -rf`, reading secrets, writing iCloud/family paths |
+| `confirm` | needs an explicit `--yes` (exit `3` + the exact re-run when missing); the default for new/undeclared verbs — and the ceiling for untrusted plugins |
+| `deny` | always refused (exit `5`): force-push, `rm -rf`, reading secrets, writing iCloud/family paths |
 
-It's all git underneath, so even a mistaken `safe_write` is one `git revert` away.
+`--dry-run` on a mutating verb is treated as a read — preview anything, even confirm-class verbs,
+without `--yes`. And it's all git underneath, so even a mistaken `safe_write` is one `git revert` away.
 
 ---
 
@@ -239,25 +324,41 @@ It's all git underneath, so even a mistaken `safe_write` is one `git revert` awa
 All on your machine, no server. Keyword search works out of the box; the semantic stages are opt-in
 and rebuildable from your Markdown.
 
-1. **Keyword + graph** *(built in)* — SQLite FTS5 fused with the `[[wikilink]]` graph.
+1. **Keyword + graph** *(built in)* — SQLite FTS5 fused with the `[[wikilink]]` graph, with snippets
+   in the results so you (or an agent) judge relevance without opening files.
 2. **Semantic vectors** *(opt-in, `OPS_VECTORS=1`)* — local EmbeddingGemma + LanceDB; multilingual, finds by meaning.
 3. **Cross-encoder rerank** *(opt-in, `OPS_RERANK=1`)* — re-scores the top hits for precision.
 
 ```sh
 ops index                                  # build/refresh the index from your notes
-ops search "how do I stop a runaway agent" # ranked file#heading hits
+ops search "how do I stop a runaway agent" # ranked file#heading hits with snippets
+ops search "acme pricing" --author human   # exclude derived/agent material
 ```
 The index lives in `.index/` and is disposable: `rm -rf .index && ops index` rebuilds it from the text.
 
 ---
 
-## Keeping it safe & current
+## Durability — backup and share
+
+**Backup before share: `~/files` is the one root where loss is irreversible.**
 
 ```sh
-ops backup        # nags (exit 1) if ~/ops has uncommitted or unpushed work — never pushes for you
-ops job apply     # render launchd jobs: index hourly, consolidate + close nightly, backup weekly
-./script/update   # pull engine improvements from the template (your notes untouched)
+ops backup            # the read-only nag: exit 1 if ~/ops is uncommitted/unpushed — never pushes for you
+ops backup init --yes # once: local SSD + B2 restic repos, keys as op:// references, launchd plist rendered
+ops backup status     # snapshot age per target; exit 1 if stale >48h
+ops backup drill --yes# restore to tmp and diff — a backup that's never been restored is a hypothesis
+ops backup bundle     # git-bundle ~/ops + every ~/work repo into ~/files (catches remote-less repos)
 ```
+
+The scheduled cloud push runs from launchd invoking restic **directly with an append-only key** —
+outside the agent/verb surface entirely, so even a fully compromised agent can only *add* to backup
+history, never erase it.
+
+**`ops share`** publishes a single self-contained, **AES-256-GCM-encrypted** HTML rendering of a note
+(or a collection) to your own Cloudflare Worker — the key travels only in the URL fragment, so the
+server can never read your note. Expiring, revocable, ledgered in git, and confirm-gated: the verb's
+output is a link, and *you* send it. `ops publish` (a public digital garden) is deliberately a
+separate future verb. Details: [`docs/backup-and-share.md`](docs/backup-and-share.md).
 
 ---
 
@@ -265,17 +366,20 @@ ops job apply     # render launchd jobs: index hourly, consolidate + close night
 
 ```
 ops                  # the dispatcher: ops <verb>  (symlinked onto your PATH by setup)
-AGENTS.md  CLAUDE.md  # the agent contract (CLAUDE.md bridges to AGENTS.md)
-bin/                 # the verbs — lib/ (shared: paths, guardrail, render…) + one folder per verb
+ops.json             # GENERATED — the machine contract (surface + schemas + capabilities)
+AGENTS.md  CLAUDE.md # the agent contract (CLAUDE.md bridges to AGENTS.md)
+bin/                 # the ENGINE verbs — lib/ (shared + api.py SDK) + one folder per verb
+plugins/             # YOUR verbs + installed packs — never touched by updates
+frontends/raycast/   # zero-build Raycast script commands
 skills/operate-ops/  # the operating manual any agent loads
 wiki/                # KNOWLEDGE — your durable notes (see wiki/conventions.md)
 tasks/               # folder = status: inbox/ active/ waiting/ done/
-journal/  inbox/     # daily log · capture zone
-templates/           # scaffolds: project-repo/, tax-formula.md
+journal/  inbox/     # daily log · capture zone (inbox/organize/ holds proposal queues)
+templates/           # scaffolds: project-repo/, obsidian/ (config pack + Bases), tax-formula.md
 jobs/registry.json   # scheduled-job definitions (ops job apply → launchd)
-script/              # setup · update · engine.txt (framework/content boundary) · completions/ (zsh)
-docs/                # how-it-works.html · design/ (the spec) · DECISIONS.md (ADRs)
-test/                # validation harness (dev-only; dropped from a lean vault)
+script/              # get (installer) · setup · update (3-way merge) · engine.txt · completions/
+docs/                # the docs set — see docs/README.md
+test/                # 36 offline suites (dev-only; dropped from a lean vault)
 ```
 
 The other roots (`~/work`, `~/files`, `~/dotfiles`) are created next to this one at setup.
@@ -284,26 +388,25 @@ The other roots (`~/work`, `~/files`, `~/dotfiles`) are created next to this one
 
 ## Status & tests
 
-All **21 verbs of the design surface are built, guardrail-gated, and tested.** The retrieval engine,
-the enforced guardrail, the installer (`script/setup`/`update`), and the jobs scheduler all work
-end-to-end. **24 offline test suites** (run in CI) cover the verbs, the guardrail model, the agent indirection, retrieval, terminal ergonomics (completion + rendering), and the flows.
+**v4-complete.** All 27 verbs (+ the hidden MCP transport) are built, guardrail-gated, documented in
+the machine contract, and tested: **36 offline suites** run in CI, covering the guardrail model, the
+exit-code protocol, the `--json` contract (round-tripped against every verb's declared schema), the
+plugin resolver + trust ceiling, the MCP handshake, the extraction/organize pipeline, and backup/share
+— all stdlib-only, no network.
 
 ```sh
 python3 test/run_all.py                          # every offline suite (stdlib only, no network)
 python3 test/run_simulation.py --compare sonnet opus   # LLM-operator agnosticism check (needs a CLI)
 ```
 
-**Agnosticism check (§18): passed.** The 18 adversarial operator scenarios were run through two
-different operators (Claude Sonnet and Opus): **18/18 passed for both, with 0 divergences** — they
-filed the same repo to the same root, refused the same actions, and traversed the wiki the same way.
-Zero divergence means the contract (`AGENTS.md` + `operate-ops`) is unambiguous. (Cross-vendor agents
-read the *same* contract; this harness measures it via Claude tiers because it asks the operator to
-emit a JSON plan rather than act.) Everything else — seed notes, per-agent adapters (`.codex/`,
-`.claude/`), the §6 agent indirection, and CI — is in place. The system is v1-complete; flipping
-public is your call.
+**Agnosticism check: passed.** 18 adversarial operator scenarios, two different operators, 18/18 for
+both with **0 divergences** — same filing, same refusals, same traversal. Zero divergence means the
+contract (`AGENTS.md` + `operate-ops`) is unambiguous.
 
-Design: [`docs/design/PERSONAL_OS_DESIGN.md`](docs/design/PERSONAL_OS_DESIGN.md) (v3.7) ·
-decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md).
+Docs: [`docs/README.md`](docs/README.md) (the map) · architecture:
+[`docs/architecture.md`](docs/architecture.md) · design spec:
+[`docs/design/PERSONAL_OS_DESIGN.md`](docs/design/PERSONAL_OS_DESIGN.md) · decisions (ADRs):
+[`docs/DECISIONS.md`](docs/DECISIONS.md) · contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 

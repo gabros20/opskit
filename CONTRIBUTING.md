@@ -16,13 +16,15 @@ All suites must stay green. CI (`.github/workflows/ci.yml`) runs `run_all.py` on
 
 ## Add a verb — one folder
 
-A new verb costs exactly one directory. Nothing else to wire — `ops help`, the manifest, the
-guardrail, and every agent learn it from the same place.
+> [!IMPORTANT]
+> **Adding a verb for your own vault?** Don't touch `bin/` — that's the engine, and `script/update`
+> owns it. `ops new verb <name>` scaffolds into `plugins/local/<name>/` (update-safe, same shape,
+> same guardrail); see [`docs/plugins.md`](docs/plugins.md). The steps below are for contributing a
+> **core engine verb** to this template.
 
-**Fast path:** `ops new verb <name> [--risk <class>] [--summary "…"]` stamps out steps 1–2 and
-regenerates the manifest (step 4) from `templates/verb/`. It defaults the new verb to `confirm`-class
-per §5 — you lower the risk deliberately once it's implemented. Then just fill in `main()`. The manual
-steps, for reference:
+A new engine verb costs exactly one directory under `bin/`. Nothing else to wire — `ops help`, the
+manifest, the guardrail, and every agent learn it from the same place. Scaffold with
+`ops new verb <name>` and move the folder from `plugins/local/` into `bin/`, or create it by hand:
 
 1. **`bin/<verb>/run.py`** — the implementation. Import shared helpers from `lib`:
    ```python
@@ -34,8 +36,10 @@ steps, for reference:
    model judgment, if any, through `agent.run_agent(prompt, scope)` — always with a deterministic
    fallback (§6).
 2. **`bin/<verb>/cmd.json`** — the manifest sidecar. Set `verb`, `summary`, `usage`, and the **`risk`**
-   class (`read` / `safe_write` / `draft_only` / `confirm` / `deny`). New/undeclared verbs default to
-   `confirm`.
+   class (`read` / `safe_write` / `draft_only` / `confirm` / `deny`); new/undeclared verbs default to
+   `confirm`. Also declare the machine contract: an **`output`** block, a **`hints`** string, and
+   **`dry_run`** for mutating verbs — shapes in [`docs/machine-contract.md`](docs/machine-contract.md).
+   Emit through `lib.output` (`emit` / `emit_rows` / `fail`), never hand-rolled JSON.
 3. **Register the group** in `bin/lib/manifest.py` `GROUPS` (optional but tidy).
 4. **`ops help`** — regenerates `ops.json`. Confirm the verb appears.
 5. **`test/run_<verb>.py`** — cover it against a temp `OPS_HOME` (and `OPS_ROOTS_HOME` for the sibling
