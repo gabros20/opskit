@@ -1,7 +1,7 @@
 # v4 proposal — ops as a platform (machine contract → plugins → frontends → pipeline → durability)
 
-**Status: PROPOSAL — not decided.** Nothing here is an ADR yet; each part should be accepted/rejected
-into `docs/DECISIONS.md` individually.
+**Status: ACCEPTED & IMPLEMENTED (2026-07-02) — see ADR-007 in `docs/DECISIONS.md`.** Parts 0–5
+implemented on branch `v4-platform`; 5.3 (`ops publish`) and 3.5 (TUI) remain deferred as proposed.
 
 **Provenance.** Produced 2026-07-01 by a 15-agent research workflow: 10 web researchers (CLI-PKM
 landscape, Obsidian ecosystem, plugin architectures, frontends, sharing infra, backup/sync, media

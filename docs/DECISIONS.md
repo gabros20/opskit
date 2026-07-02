@@ -99,6 +99,28 @@ modern, ~2×) are drop-in alternatives. Engine per ADR-003 (local file, no serve
 real HU content + the production query log before final lock. `bge-m3` is the fallback if Hungarian
 quality disappoints (longest low-resource track record). **Status.** Default chosen; implement on go-ahead.
 
+## ADR-007 — Accept and implement the v4 platform roadmap (2026-07-02)
+**Context.** The 15-agent research synthesis produced `docs/design/proposals/2026-07-01-v4-platform-roadmap.md`
+(machine contract → plugins → frontends → pipeline → durability). The owner accepted the whole
+roadmap for implementation (5.3 `ops publish` and 3.5 TUI stay deferred, per the proposal itself).
+**Decision.** Implement Parts 0–5 as specified, on branch `v4-platform`, one revertible commit per
+package: 0.1–0.5 trust fixes (exit-code protocol 0/2/3/4/5, `script/update` 3-way merge keyed on
+`.ops-engine-ref`, doctor sync-wall/second-remote/churn checks, system-wide `--dry-run`); 1.1–1.2
+the machine contract (`--json` envelope via `bin/lib/output.py` on every verb, ops.json v2 with
+capabilities/source/hints/output blocks); 2.1–2.4 the platform (multi-root resolver `bin/` →
+`plugins/` → `$OPS_PATH`, frozen `lib/api.py` SDK v1.0, `ops plugin` with guardrail trust ceiling,
+`ops mcp` stateless stdio server re-entering the dispatcher); 3.1–3.4 surfaces (Obsidian Frontend
+Zero pack + Bases + JSON Canvas, Raycast script commands, `ops open`/`ops orient`, search snippets);
+4.1–4.4 the pipeline (`files extract` tiers, checked provenance planes, `files distill`,
+`ops organize` propose→review→apply with closed op catalog); 5.1–5.4 durability (restic backup
+family, zero-knowledge `ops share` with vendored worker, `script/get` install funnel).
+**Why.** Ten sequential implementation agents + one QA agent + operator validation: full offline
+suite green (36 sections, incl. 12 new v4 suites), all 12 anti-roadmap constraints verified with
+zero violations, no verb spelling removed (22 kept, 6 added: mcp/open/orient/organize/plugin/share),
+stdlib-only zero-install path intact, guardrail remains the single enforcement path.
+**Status.** Done on `v4-platform` (a2ac7f3…285f5e5). Known accepted wrinkle: `organize apply`
+ignores `--dry-run` and self-gates on `--yes`; `organize review` is the preview mechanism.
+
 ## ADR-006 — Scale to 100k–500k+ notes from day one, single-machine, no server (2026-06-19)
 **Context.** Owner's ambition is gbrain-scale (hundreds of thousands of notes), not a small personal
 KB. Prior ADRs sized some choices for small scale. Re-architect for volume *without* abandoning the
