@@ -14,7 +14,8 @@ architecture every future autonomous capability reuses: propose-then-approve, ne
           commit per op, a per-run edit budget (default 20 ops / 300 lines; flags may only LOWER it),
           protected paths (conventions/index/hubs/pinned) review-only regardless of confidence, and
           retitle / propose_merge / deletions NEVER auto-apply. --safe-only applies only the four
-          additive primitives above 0.8 confidence. apply is confirm-class (needs --yes) and is NEVER
+          additive primitives above 0.8 confidence. apply is confirm-class (needs --yes; --dry-run
+          previews the exact replay writing nothing, per the Part 0.5 contract) and is NEVER
           schedulable (doctor warns on any confirm/deny verb in jobs/registry.json).
 
 CLOSED op catalog (Mem0 lesson) — validated at BOTH write and read time; anything else is rejected:
@@ -459,11 +460,12 @@ def _int_flag(argv, name, default):
     return default
 
 
-def cmd_apply(argv):
+def cmd_apply(argv, dry: bool = False):
     yes = "--yes" in argv or "-y" in argv
-    if not yes:                                         # confirm-class: self-gate for direct calls too
+    if not yes and not dry:                             # confirm-class: self-gate for direct calls too
         output.fail(output.EXIT_CONFIRM,
-                    "ops organize apply is confirm-class — re-run with --yes to replay approved ops",
+                    "ops organize apply is confirm-class — re-run with --yes to replay approved ops"
+                    " (or preview with --dry-run)",
                     hint="re-run: ops organize apply --yes", verb="organize")
     safe_only = "--safe-only" in argv
     max_ops = _int_flag(argv, "--max-ops", DEFAULT_MAX_OPS)
@@ -502,28 +504,33 @@ def cmd_apply(argv):
             budget_hit = True
             note("deferred", f"edit budget reached ({applied}/{max_ops} ops, {changed_lines}/{max_lines} lines)")
             break
-        rel = path.relative_to(paths.OPS_HOME).as_posix()
-        path.write_text(new, encoding="utf-8")
-        _commit(rel, f"organize: {o['op']} {o['target']} — {o['rationale']}")
-        _append_status(qpath, oid, "applied")
+        if not dry:                                     # a true dry-run IS a read: no write/commit/ledger
+            rel = path.relative_to(paths.OPS_HOME).as_posix()
+            path.write_text(new, encoding="utf-8")
+            _commit(rel, f"organize: {o['op']} {o['target']} — {o['rationale']}")
+            _append_status(qpath, oid, "applied")
         applied += 1; changed_lines += nlines
-        note("applied", msg)
-    paths.append_journal(f"organize apply -> {applied} op(s) applied, {skipped} skipped, {rejected} rejected"
-                         + (" (budget reached)" if budget_hit else ""))
+        note("would apply" if dry else "applied", msg)
+    if not dry:
+        paths.append_journal(f"organize apply -> {applied} op(s) applied, {skipped} skipped, {rejected} rejected"
+                             + (" (budget reached)" if budget_hit else ""))
 
     def render(rs):
-        out = [f"organize apply: {GREEN}{applied} applied{RESET}, {skipped} skipped, "
-               f"{rejected} rejected  {DIM}({rel_q}){RESET}"]
+        verbed = "would apply" if dry else "applied"
+        out = [f"organize apply{' (dry run)' if dry else ''}: {GREEN}{applied} {verbed}{RESET}, "
+               f"{skipped} skipped, {rejected} rejected  {DIM}({rel_q}){RESET}"]
         for r in rs:
-            c = {"applied": GREEN, "rejected": RED, "deferred": YEL}.get(r["result"], DIM)
-            out.append(f"  {c}{r['result']:<9}{RESET} {r['op']:<15} {r['target']:<24} {DIM}{r['detail'][:44]}{RESET}")
+            c = {"applied": GREEN, "would apply": GREEN, "rejected": RED, "deferred": YEL}.get(r["result"], DIM)
+            out.append(f"  {c}{r['result']:<11}{RESET} {r['op']:<15} {r['target']:<24} {DIM}{r['detail'][:44]}{RESET}")
         if budget_hit:
             out.append(f"  {YEL}stopped at the edit budget — re-run to continue{RESET}")
+        if dry:
+            out.append(f"  {DIM}(dry run — nothing written; apply for real: ops organize apply --yes){RESET}")
         return "\n".join(out)
 
     return output.emit_rows(results, "organize", human=render,
                             header={"queue": rel_q, "applied": applied, "skipped": skipped,
-                                    "rejected": rejected, "budget_hit": budget_hit})
+                                    "rejected": rejected, "budget_hit": budget_hit, "dry_run": dry})
 
 
 def main(argv):
@@ -538,10 +545,10 @@ def main(argv):
     if action == "review":
         return cmd_review(rest, dry, yes, js)
     if action == "apply":
-        return cmd_apply(rest)
+        return cmd_apply(rest, dry)
     output.fail(output.EXIT_USAGE,
                 "usage: ops organize scan [--dry-run] | review [--accept|--reject|--defer <ids|all>] "
-                "[--dry-run|--yes] | apply --yes [--safe-only] [--max-ops N] [--max-lines N]",
+                "[--dry-run|--yes] | apply [--yes|--dry-run] [--safe-only] [--max-ops N] [--max-lines N]",
                 verb="organize")
 
 

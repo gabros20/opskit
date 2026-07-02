@@ -233,6 +233,24 @@ def test_organize() -> None:
         r = run("organize", ops, "apply")
         check("apply without --yes is confirm (exit 3)", r.returncode == 3, r.stdout + r.stderr)
 
+        # --- apply --dry-run is a true read: previews the replay, writes nothing (Part 0.5) ---
+        before_dry = len(git(ops, "log", "--oneline").stdout.splitlines())
+        alpha_before = (ops / "wiki" / "notes" / "alpha.md").read_text()
+        r = run("organize", ops, "apply", "--dry-run", "--json")
+        rows = [json.loads(l) for l in r.stdout.splitlines() if l.strip()]
+        check("apply --dry-run runs without --yes (exit 0)", r.returncode == 0, r.stdout + r.stderr)
+        check("apply --dry-run header flags dry_run and counts the approved op",
+              rows and rows[0].get("dry_run") is True and rows[0].get("applied") == 1, rows[:1])
+        check("apply --dry-run reports would-apply, not applied",
+              any(x.get("result") == "would apply" for x in rows[1:])
+              and not any(x.get("result") == "applied" for x in rows[1:]), rows[1:])
+        check("apply --dry-run makes no commit",
+              len(git(ops, "log", "--oneline").stdout.splitlines()) == before_dry)
+        check("apply --dry-run leaves the target untouched",
+              (ops / "wiki" / "notes" / "alpha.md").read_text() == alpha_before)
+        _, status_dry, _ = _read_queue(qpath)
+        check("apply --dry-run appends nothing to the ledger", status_dry[tag_id] == "approved", status_dry)
+
         # --- apply replays only the approved op, one commit ---
         before = len(git(ops, "log", "--oneline").stdout.splitlines())
         r = run("organize", ops, "apply", "--yes")

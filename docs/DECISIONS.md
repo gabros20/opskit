@@ -118,8 +118,9 @@ family, zero-knowledge `ops share` with vendored worker, `script/get` install fu
 suite green (36 sections, incl. 12 new v4 suites), all 12 anti-roadmap constraints verified with
 zero violations, no verb spelling removed (22 kept, 6 added: mcp/open/orient/organize/plugin/share),
 stdlib-only zero-install path intact, guardrail remains the single enforcement path.
-**Status.** Done on `v4-platform` (a2ac7f3…285f5e5). Known accepted wrinkle: `organize apply`
-ignores `--dry-run` and self-gates on `--yes`; `organize review` is the preview mechanism.
+**Status.** Done on `v4-platform` (a2ac7f3…285f5e5). QA's one wrinkle (`organize apply` ignored
+`--dry-run`) was fixed post-QA: `apply --dry-run` now previews the exact replay — budget and
+protected-path accounting included — writing no files, commits, ledger lines, or journal entries.
 
 ## ADR-006 — Scale to 100k–500k+ notes from day one, single-machine, no server (2026-06-19)
 **Context.** Owner's ambition is gbrain-scale (hundreds of thousands of notes), not a small personal
