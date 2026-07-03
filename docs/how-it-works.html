@@ -145,6 +145,62 @@
   .fclegend span{display:inline-flex; align-items:center; gap:6px}
   .fckey{width:16px; height:11px; border-radius:3px; border:1.5px solid var(--line); display:inline-block}
 
+  /* in-practice live demo (pr-*) */
+  .pr-modes{display:flex; gap:8px; margin-bottom:12px}
+  .pr-modetab{font-size:14px; padding:9px 15px}
+  .pr-chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px}
+  .pr-chip{font-size:12px; padding:5px 10px}
+  .pr-stage{display:grid; grid-template-columns:1fr 1.22fr; gap:14px; align-items:stretch; min-height:400px}
+  @media(max-width:760px){.pr-stage{grid-template-columns:1fr; min-height:0}
+    .pr-term{order:0} .pr-vault{order:1}}
+  .pr-vault{display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--line);
+    border-radius:12px; overflow:hidden}
+  .pr-vhead{display:flex; align-items:center; justify-content:space-between; padding:9px 12px;
+    border-bottom:1px solid var(--line); font-size:12.5px}
+  .pr-commit{font-size:11px; font-weight:700; color:#4F8A6B; opacity:0}
+  .pr-commit.pr-flash{animation:pr-commit 1s ease}
+  @keyframes pr-commit{0%{opacity:0;transform:translateY(-2px)}22%{opacity:1;transform:none}70%{opacity:1}100%{opacity:0}}
+  .pr-tree{padding:8px 4px; font-family:"SF Mono",SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.5}
+  .pr-row{position:relative; padding:2px 8px; border-radius:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .pr-row.pr-folder{color:var(--muted)}
+  .pr-row.pr-file{color:var(--ink)}
+  .pr-row.pr-add{animation:pr-rowin .35s ease, pr-rowbg 1.6s ease}
+  @keyframes pr-rowin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes pr-rowbg{0%{background:var(--accent-soft)}100%{background:transparent}}
+  .pr-row.pr-out{animation:pr-rowout .35s ease forwards}
+  @keyframes pr-rowout{to{opacity:0;transform:translateX(-6px);max-height:0;padding-top:0;padding-bottom:0}}
+  .pr-plus{position:absolute; right:8px; top:2px; color:#4F8A6B; font-weight:700; animation:pr-plusfade 1.6s ease forwards}
+  @keyframes pr-plusfade{0%{opacity:1}68%{opacity:1}100%{opacity:0}}
+  .pr-touch{display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--draft);
+    margin-left:7px; vertical-align:middle; animation:pr-pulse 1.2s ease}
+  @keyframes pr-pulse{0%,100%{opacity:.15}50%{opacity:1}}
+  .pr-row.pr-hit{background:var(--accent-soft); box-shadow:inset 2px 0 0 var(--accent)}
+  .pr-preview{margin-top:auto; border-top:1px solid var(--line); background:var(--card)}
+  .pr-pv-tab{font-size:11.5px; color:var(--accent-d); padding:7px 12px 5px; border-bottom:1px solid var(--line);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .pr-pv-body{padding:8px 12px 12px; font-family:"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:12px; line-height:1.5; max-height:152px; overflow:hidden; position:relative}
+  .pr-pv-line{white-space:pre-wrap; word-break:break-word}
+  .pr-pv-fm{color:var(--muted)}
+  .pr-pv-body-line{color:var(--ink)}
+  .pr-mark{background:var(--accent-soft); color:var(--accent-d); border-radius:3px; padding:0 2px}
+  .pr-pv-fade{position:absolute; left:0; right:0; bottom:0; height:22px; background:linear-gradient(transparent,var(--card))}
+  .pr-term{display:flex; flex-direction:column; background:#262420; border:1px solid #3A362E; border-radius:12px; overflow:hidden}
+  .pr-termbar{position:relative; height:30px; display:flex; align-items:center; gap:7px; padding:0 12px; border-bottom:1px solid #3A362E}
+  .pr-dot{width:11px; height:11px; border-radius:50%; opacity:.85}
+  .pr-termtitle{position:absolute; left:0; right:0; text-align:center; color:#8D8776; font-size:12px; pointer-events:none}
+  .pr-termbody{flex:1; padding:14px; font-family:"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:12.5px; line-height:1.55; max-height:340px; overflow-y:auto; color:#B9B2A0}
+  .pr-tline{white-space:pre-wrap; word-break:break-word; padding-left:1.4em; text-indent:-1.4em}
+  .pr-c-prompt{color:#E28A68} .pr-c-cmd{color:#F0EEE6} .pr-c-out{color:#B9B2A0} .pr-c-path{color:#8FBF9F}
+  .pr-c-warn{color:#D9A854} .pr-c-dim{color:#7A745F} .pr-c-say{color:#E8E3D6} .pr-c-user{color:#E28A68}
+  .pr-c-acc{color:var(--accent)} .pr-c-hl{color:#E28A68}
+  .pr-think{color:#7A745F; font-style:italic}
+  .pr-cursor{color:#F0EEE6; animation:pr-blink 1s steps(1) infinite}
+  @keyframes pr-blink{0%,50%{opacity:1}50.01%,100%{opacity:0}}
+  .pr-controls{display:flex; gap:10px; align-items:center; margin-top:16px; flex-wrap:wrap}
+  .pr-cap{min-height:20px; font-size:13px}
+
   /* footer nav */
   .footnav{position:fixed; bottom:0; left:0; right:0; background:rgba(250,249,245,.9); backdrop-filter:blur(8px);
     border-top:1px solid var(--line); padding:11px 20px}
@@ -244,6 +300,50 @@
         <span><i class="fckey" style="background:var(--surface)"></i> verb / process</span>
         <span><i class="fckey" style="background:#fff;transform:rotate(45deg);width:11px"></i> decision</span>
         <span><i class="fckey" style="background:#F3EFE3"></i> store</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3c IN PRACTICE -->
+  <section class="chapter" data-title="In practice">
+    <h2>Watch it work</h2>
+    <p class="lead">The same five moments, two ways to drive them — you at the keyboard, or an AI agent operating the system for you. The vault on the left reacts to every command on the right.</p>
+    <div class="card">
+      <div class="pr-modes" id="prModes">
+        <div class="flowtab pr-modetab active" data-mode="human">⌨️ You type</div>
+        <div class="flowtab pr-modetab" data-mode="agent">🤖 An agent drives</div>
+      </div>
+      <div class="pr-chips" id="prChips">
+        <div class="flowtab pr-chip active" data-i="0">1 · Capture a thought</div>
+        <div class="flowtab pr-chip" data-i="1">2 · Add a task</div>
+        <div class="flowtab pr-chip" data-i="2">3 · Save a bookmark</div>
+        <div class="flowtab pr-chip" data-i="3">4 · Find it again</div>
+        <div class="flowtab pr-chip" data-i="4">5 · The guardrail</div>
+      </div>
+      <div class="pr-stage" id="prStage">
+        <div class="pr-vault" id="prVault">
+          <div class="pr-vhead"><span class="mono">~/ops</span><span class="pr-commit" id="prCommit">✓ commit</span></div>
+          <div class="pr-tree" id="prTree"></div>
+          <div class="pr-preview" id="prPreview">
+            <div class="pr-pv-tab mono" id="prPvTab">no file open</div>
+            <div class="pr-pv-body" id="prPvBody"></div>
+          </div>
+        </div>
+        <div class="pr-term" id="prTerm">
+          <div class="pr-termbar">
+            <span class="pr-dot" style="background:#FF5F57"></span>
+            <span class="pr-dot" style="background:#FEBC2E"></span>
+            <span class="pr-dot" style="background:#28C840"></span>
+            <span class="pr-termtitle" id="prTermTitle">tamas — ~/ops</span>
+          </div>
+          <div class="pr-termbody" id="prTermBody"></div>
+        </div>
+      </div>
+      <div class="pr-controls">
+        <button class="btn" id="prPlay">▶ Play</button>
+        <button class="btn ghost" id="prReplay">↻ Replay</button>
+        <button class="btn ghost" id="prAll">▶▶ Play all</button>
+        <span class="stepcount pr-cap" id="prCap" style="text-align:left"></span>
       </div>
     </div>
   </section>
@@ -476,6 +576,232 @@ function initFlows(){const tabs=document.getElementById('flowtabs');
   document.getElementById('fcPlay').onclick=fcPlay;document.getElementById('fcReset').onclick=fcReset;
   document.getElementById('fcBack').onclick=fcBack;document.getElementById('fcFwd').onclick=fcFwd;fcSelect(0);}
 
+// ---- in-practice live demo ----
+const prRM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const PR_TREE=[
+ {path:'root',label:'~/ops',depth:0,type:'folder'},
+ {path:'inbox',label:'inbox/',depth:1,type:'folder'},
+ {path:'inbox/old-idea.md',label:'old-idea.md',depth:2,type:'file'},
+ {path:'journal',label:'journal/2026/07/',depth:1,type:'folder'},
+ {path:'journal/2026/07/2026-07-03.md',label:'2026-07-03.md',depth:2,type:'file'},
+ {path:'tasks/active',label:'tasks/active/',depth:1,type:'folder'},
+ {path:'wiki',label:'wiki/',depth:1,type:'folder'},
+ {path:'wiki/bookmarks',label:'bookmarks/',depth:2,type:'folder'},
+ {path:'wiki/notes',label:'notes/',depth:2,type:'folder'},
+ {path:'wiki/notes/vector-search-notes.md',label:'vector-search-notes.md',depth:3,type:'file'}
+];
+const PV_CAP={name:'inbox/cap-20260703-091203-114.md',lines:[
+ ['---','fm'],['type: capture','fm'],['created: 2026-07-03','fm'],['source: capture','fm'],['---','fm'],
+ ['call accountant re Q2 VAT deadline','body']]};
+const PV_TASK={name:'tasks/active/T-20260703-01.md',lines:[
+ ['---','fm'],['type: task','fm'],['id: T-20260703-01','fm'],['status: active','fm'],['created: 2026-07-03','fm'],['---','fm'],
+ ['# Ship the v4 release notes','body'],['## Intent','body'],['## Plan','body'],['## Outcome','body'],['## Log','body']]};
+const PV_BM={name:'wiki/bookmarks/embeddings-what-they-are.md',lines:[
+ ['---','fm'],['type: bookmark','fm'],['title: Embeddings: What they are…','fm'],
+ ['url: https://simonwillison.net/…','fm'],['tags: [ai]','fm'],['---','fm'],
+ ['# Embeddings: What they are and why they matter','body']]};
+const PV_VEC={name:'wiki/notes/vector-search-notes.md',hl:['vector','search'],lines:[
+ ['---','fm'],['type: note','fm'],['tags: [ai, search]','fm'],['---','fm'],
+ ['# Vector search notes','body'],
+ ['EmbeddingGemma and LanceDB give local vector','body'],
+ ['search over the wiki. Rerank with a cross-encoder','body'],
+ ['for hard, paraphrased queries.','body']]};
+const PV_OLD={name:'wiki/notes/old-idea.md',lines:[
+ ['---','fm'],['type: note','fm'],['---','fm'],
+ ['# Old idea','body'],['Revisit the local-first sync approach.','body']]};
+const TOUCH={op:'touch',path:'journal/2026/07/2026-07-03.md'};
+const HIT4={op:'hit',paths:['wiki/notes/vector-search-notes.md','wiki/bookmarks/embeddings-what-they-are.md'],preview:PV_VEC};
+const FX1=[{op:'add',path:'inbox/cap-20260703-091203-114.md',label:'cap-20260703-091203-114.md',depth:2,after:'inbox/old-idea.md',preview:PV_CAP}];
+const FX2=[{op:'add',path:'tasks/active/T-20260703-01.md',label:'T-20260703-01.md',depth:2,after:'tasks/active',preview:PV_TASK}];
+const FX3=[{op:'add',path:'wiki/bookmarks/embeddings-what-they-are.md',label:'embeddings-what-they-are.md',depth:3,after:'wiki/bookmarks',preview:PV_BM}];
+const FX5=[{op:'move',from:'inbox/old-idea.md',to:'wiki/notes/old-idea.md',label:'old-idea.md',depth:3,after:'wiki/notes/vector-search-notes.md',preview:PV_OLD}];
+const SCN=[
+ {fx:FX1,
+  human:[
+   {t:'cap',s:'Zero decisions — the verb stamps it, files it, journals it.'},
+   {t:'cmd',s:'ops capture "call accountant re Q2 VAT deadline"'},
+   {t:'out',lines:[[['captured -> ','out'],['inbox/cap-20260703-091203-114.md','path'],['  (triage it with `ops triage`)','dim']]]},
+   {t:'fs',m:FX1[0]},{t:'fs',m:TOUCH},
+   {t:'cap',s:'The journal logged it automatically.'}],
+  agent:[
+   {t:'cap',s:'Zero decisions — the verb stamps it, files it, journals it.'},
+   {t:'user',s:'capture this: call accountant re Q2 VAT deadline'},
+   {t:'think',s:"A loose thought, not yet actionable — that's a capture, not a task."},
+   {t:'tool',s:'ops capture --json "call accountant re Q2 VAT deadline"',out:[['{"ops_json": 1, "ok": true, "verb": "capture", "data": {"path": "inbox/cap-20260703-091203-114.md", …}}','dim']]},
+   {t:'fs',m:FX1[0]},{t:'fs',m:TOUCH},
+   {t:'say',s:"Captured. It'll surface at your next triage — nothing for you to file."},
+   {t:'cap',s:'The journal logged it automatically.'}]},
+ {fx:FX2,
+  human:[
+   {t:'cap',s:'Folder = status. Done later means the file moves to done/ — no database.'},
+   {t:'cmd',s:'ops task add "Ship the v4 release notes"'},
+   {t:'out',lines:[[['added T-20260703-01 -> ','out'],['tasks/active/T-20260703-01.md','path']]]},
+   {t:'fs',m:FX2[0]},{t:'fs',m:TOUCH}],
+  agent:[
+   {t:'cap',s:'Folder = status. Done later means the file moves to done/ — no database.'},
+   {t:'user',s:'remind me to ship the v4 release notes'},
+   {t:'think',s:'Actionable with an outcome — a task, not a capture.'},
+   {t:'tool',s:'ops task add --json "Ship the v4 release notes"',out:[['{"ops_json": 1, "ok": true, "verb": "task", …"id": "T-20260703-01"…}','dim']]},
+   {t:'fs',m:FX2[0]},{t:'fs',m:TOUCH},
+   {t:'say',s:'Tracked as T-20260703-01 in tasks/active/ — folder = status, so `ops task done` just moves the file.'}]},
+ {fx:FX3,
+  human:[
+   {t:'cap',s:'A URL became a titled, tagged, searchable note — one command.'},
+   {t:'cmd',s:'ops bookmark https://simonwillison.net/2023/Oct/23/embeddings/'},
+   {t:'out',lines:[[['saved -> ','path'],['wiki/bookmarks/embeddings-what-they-are.md','path'],['  (simonwillison.net)','dim']]]},
+   {t:'fs',m:FX3[0]},{t:'fs',m:TOUCH}],
+  agent:[
+   {t:'cap',s:'A URL became a titled, tagged, searchable note — one command.'},
+   {t:'user',s:'save this for the ai pile: https://simonwillison.net/2023/Oct/23/embeddings/'},
+   {t:'tool',s:'ops bookmark --json https://simonwillison.net/2023/Oct/23/embeddings/',out:[['{"ops_json": 1, "ok": true, "verb": "bookmark", …"title": "Embeddings: What they are and why they matter"…}','dim']]},
+   {t:'fs',m:FX3[0]},{t:'fs',m:TOUCH},
+   {t:'say',s:'Saved as "Embeddings: What they are and why they matter" — titled from the page, linked into the wiki graph.'}]},
+ {fx:[],
+  human:[
+   {t:'cap',s:'Keyword + graph is built in; vectors and rerank are opt-in stages — all local.'},
+   {t:'cmd',s:'ops search "vector search"'},
+   {t:'out',lines:[
+     [['0.0164  ','dim'],['notes/vector-search-notes.md#Vector search notes','path']],
+     [['        EmbeddingGemma and LanceDB give local ','out'],['vector','hl'],[' ','out'],['search','hl'],[' over the wiki. Rerank with…','out']],
+     [['0.0121  ','dim'],['bookmarks/embeddings-what-they-are.md#Embeddings','path']],
+     [['        …what they are and why they matter for local ','out'],['vector','hl'],[' ','out'],['search','hl'],[' and retrieval…','out']]]},
+   {t:'fs',m:HIT4}],
+  agent:[
+   {t:'cap',s:'Keyword + graph is built in; vectors and rerank are opt-in stages — all local.'},
+   {t:'user',s:'what do we have on vector search?'},
+   {t:'tool',s:'ops search --json "vector search"',out:[
+     ['{"ops_json": 1, "ok": true, "verb": "search", "count": 2}','dim'],
+     ['{"path": "notes/vector-search-notes.md", "score": 0.0164, …}','dim']]},
+   {t:'fs',m:HIT4},
+   {t:'say',s:'Two notes: your own vector-search-notes (EmbeddingGemma + LanceDB, rerank for hard queries) and the Simon Willison embeddings bookmark you saved. Both in wiki/ — want them opened?'}]},
+ {fx:FX5,
+  human:[
+   {t:'cap',s:'confirm-class verbs refuse first — the error teaches the exact re-run.'},
+   {t:'cmd',s:'ops organize apply'},
+   {t:'out',lines:[[['ops organize apply is confirm-class — re-run with --yes to replay approved ops (or preview with --dry-run) (re-run: ops organize apply --yes)','warn']]]},
+   {t:'cmd',s:'ops organize apply --yes'},
+   {t:'out',lines:[
+     [['applied  ','path'],['move: inbox/old-idea.md -> wiki/notes/old-idea.md','out']],
+     [['1 op applied · 1 commit — revert any op with git','dim']]]},
+   {t:'fs',m:FX5[0]},{t:'fs',m:TOUCH}],
+  agent:[
+   {t:'cap',s:'Same wall, same door: the agent hits exit 3 and must bring the question to you.'},
+   {t:'user',s:'clean up the vault'},
+   {t:'tool',s:'ops organize apply --json',out:[['exit 3 · confirm-class — re-run with --yes','warn']]},
+   {t:'think',s:'The guardrail stopped me — this needs your consent, not mine.'},
+   {t:'say',s:'1 approved cleanup op is queued: move inbox/old-idea.md → wiki/notes/. Apply it? (yes / no)'},
+   {t:'user',s:'yes'},
+   {t:'tool',s:'ops organize apply --yes --json',out:[['{"ops_json": 1, "ok": true, "verb": "organize", "data": {"applied": 1}…}','dim']]},
+   {t:'fs',m:FX5[0]},{t:'fs',m:TOUCH},
+   {t:'say',s:'Done — one op, one git commit. Revertible like everything else.'}]}
+];
+
+let prIdx=0, prMode='human', prGen=0, prTimers=[];
+function prTermBodyEl(){return document.getElementById('prTermBody');}
+function prScroll(){const b=prTermBodyEl();b.scrollTop=b.scrollHeight;}
+function prSleep(ms){return new Promise(res=>{const id=setTimeout(res,ms);prTimers.push(id);});}
+function prCancel(){prGen++;prTimers.forEach(clearTimeout);prTimers=[];}
+function prNormLine(line){return (typeof line[0]==='string')?[line]:line;}
+function prAppendSegs(el,line){prNormLine(line).forEach(seg=>{const s=document.createElement('span');s.className='pr-c-'+seg[1];s.textContent=seg[0];el.appendChild(s);});}
+function prEsc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function prHighlight(text,words){return prEsc(text).replace(new RegExp('('+words.join('|')+')','gi'),'<span class="pr-mark">$1</span>');}
+
+function prMakeRow(path,label,depth,type){const d=document.createElement('div');
+  d.className='pr-row '+(type==='folder'?'pr-folder':'pr-file');
+  d.setAttribute('data-path',path);d.style.paddingLeft=(8+depth*15)+'px';d.textContent=label;return d;}
+function prBuildTree(){const t=document.getElementById('prTree');t.innerHTML='';
+  PR_TREE.forEach(n=>t.appendChild(prMakeRow(n.path,n.label,n.depth,n.type)));}
+function prStructAdd(m,anim){const row=prMakeRow(m.path,m.label,m.depth,'file');
+  const after=document.querySelector('#prTree [data-path="'+m.after+'"]');
+  if(after)after.parentNode.insertBefore(row,after.nextSibling);else document.getElementById('prTree').appendChild(row);
+  if(anim){row.classList.add('pr-add');const plus=document.createElement('span');plus.className='pr-plus';plus.textContent='+';row.appendChild(plus);
+    setTimeout(()=>{row.classList.remove('pr-add');plus.remove();},1600);}
+  return row;}
+async function prStructMove(m,anim,g){const src=document.querySelector('#prTree [data-path="'+m.from+'"]');
+  if(src){if(anim){src.classList.add('pr-out');await prSleep(360);}src.remove();}
+  if(g!==prGen)return;prStructAdd({path:m.to,label:m.label,depth:m.depth,after:m.after},anim);}
+function prTouch(m){const row=document.querySelector('#prTree [data-path="'+m.path+'"]');if(!row)return;
+  const dot=document.createElement('span');dot.className='pr-touch';row.appendChild(dot);setTimeout(()=>dot.remove(),1300);}
+function prHit(m){m.paths.forEach(p=>{const row=document.querySelector('#prTree [data-path="'+p+'"]');if(row)row.classList.add('pr-hit');});}
+function prCommitFlash(){const c=document.getElementById('prCommit');c.classList.remove('pr-flash');void c.offsetWidth;c.classList.add('pr-flash');}
+async function prRenderPreview(pv,g){const tab=document.getElementById('prPvTab'),body=document.getElementById('prPvBody');
+  tab.textContent=pv.name;body.innerHTML='';
+  for(let i=0;i<pv.lines.length;i++){if(g!==prGen)return;const txt=pv.lines[i][0],kind=pv.lines[i][1];
+    const d=document.createElement('div');d.className='pr-pv-line '+(kind==='fm'?'pr-pv-fm':'pr-pv-body-line');
+    if(pv.hl&&kind==='body')d.innerHTML=prHighlight(txt,pv.hl);else d.textContent=txt;
+    body.appendChild(d);if(!prRM)await prSleep(70);}
+  const fade=document.createElement('div');fade.className='pr-pv-fade';body.appendChild(fade);}
+
+async function prTypeIn(prefix,cls,s,g,base){const line=document.createElement('div');line.className='pr-tline';
+  const p=document.createElement('span');p.className=cls;p.textContent=prefix;line.appendChild(p);
+  const t=document.createElement('span');t.className=cls;line.appendChild(t);
+  prTermBodyEl().appendChild(line);prScroll();
+  if(prRM){t.textContent=s;prScroll();return;}
+  const cur=document.createElement('span');cur.className='pr-cursor';cur.textContent='▍';line.appendChild(cur);
+  for(let i=0;i<s.length;i++){if(g!==prGen)return;t.textContent+=s[i];prScroll();await prSleep(base+Math.random()*15);if(g!==prGen)return;}
+  await prSleep(230);cur.remove();}
+async function prOut(lines,g){for(let i=0;i<lines.length;i++){if(g!==prGen)return;
+  const d=document.createElement('div');d.className='pr-tline';prAppendSegs(d,lines[i]);prTermBodyEl().appendChild(d);prScroll();
+  if(!prRM)await prSleep(110);}}
+async function prThink(s,g){const d=document.createElement('div');d.className='pr-tline pr-think';d.textContent='✱ '+s;
+  prTermBodyEl().appendChild(d);prScroll();if(!prRM)await prSleep(650);}
+async function prTool(step,g){const head=document.createElement('div');head.className='pr-tline';
+  const a=document.createElement('span');a.className='pr-c-acc';a.textContent='⏺ ';head.appendChild(a);
+  const c=document.createElement('span');c.className='pr-c-cmd';c.textContent=step.s;head.appendChild(c);
+  prTermBodyEl().appendChild(head);prScroll();if(!prRM)await prSleep(200);
+  const outs=step.out||[];for(let i=0;i<outs.length;i++){if(g!==prGen)return;
+    const d=document.createElement('div');d.className='pr-tline';
+    const pf=document.createElement('span');pf.className='pr-c-dim';pf.textContent='  ⎿ ';d.appendChild(pf);
+    prAppendSegs(d,outs[i]);prTermBodyEl().appendChild(d);prScroll();if(!prRM)await prSleep(140);}}
+async function prSay(s,g){const d=document.createElement('div');d.className='pr-tline';
+  const p=document.createElement('span');p.className='pr-c-say';p.textContent='✻ ';d.appendChild(p);
+  const t=document.createElement('span');t.className='pr-c-say';t.textContent=s;d.appendChild(t);
+  prTermBodyEl().appendChild(d);prScroll();if(!prRM)await prSleep(120);}
+function prSetCap(s){document.getElementById('prCap').textContent=s;}
+async function prFsPlay(m,g){
+  if(m.op==='add'){prStructAdd(m,!prRM);prCommitFlash();await prRenderPreview(m.preview,g);}
+  else if(m.op==='move'){await prStructMove(m,!prRM,g);prCommitFlash();if(m.preview)await prRenderPreview(m.preview,g);}
+  else if(m.op==='touch'){prTouch(m);}
+  else if(m.op==='hit'){prHit(m);if(m.preview)await prRenderPreview(m.preview,g);}}
+
+async function prRun(steps,g){for(let i=0;i<steps.length;i++){if(g!==prGen)return;const st=steps[i];
+  if(st.t==='cmd')await prTypeIn('❯ ','pr-c-cmd',st.s,g,30);
+  else if(st.t==='user')await prTypeIn('› ','pr-c-user',st.s,g,28);
+  else if(st.t==='out')await prOut(st.lines,g);
+  else if(st.t==='think')await prThink(st.s,g);
+  else if(st.t==='tool')await prTool(st,g);
+  else if(st.t==='say')await prSay(st.s,g);
+  else if(st.t==='fs')await prFsPlay(st.m,g);
+  else if(st.t==='cap')prSetCap(st.s);
+  else if(st.t==='pause'){if(!prRM)await prSleep(st.ms);}
+  if(!prRM&&g===prGen)await prSleep(120);}}
+
+function prUpdateChips(){document.querySelectorAll('#prChips .pr-chip').forEach(c=>c.classList.toggle('active',+c.getAttribute('data-i')===prIdx));}
+function prUpdateModes(){document.querySelectorAll('#prModes .pr-modetab').forEach(t=>t.classList.toggle('active',t.getAttribute('data-mode')===prMode));}
+function prSetRunning(b){['prPlay','prReplay','prAll'].forEach(id=>document.getElementById(id).disabled=b);}
+function prReset(idx){prBuildTree();
+  for(let i=0;i<idx;i++)SCN[i].fx.forEach(m=>{
+    if(m.op==='add')prStructAdd(m,false);
+    else if(m.op==='move'){const src=document.querySelector('#prTree [data-path="'+m.from+'"]');if(src)src.remove();
+      prStructAdd({path:m.to,label:m.label,depth:m.depth,after:m.after},false);}});
+  prTermBodyEl().innerHTML='';
+  document.getElementById('prTermTitle').textContent=prMode==='human'?'tamas — ~/ops':'claude — ~/ops';
+  document.getElementById('prPvTab').textContent='no file open';document.getElementById('prPvBody').innerHTML='';prSetCap('');}
+async function prPlay(){prCancel();const g=prGen;prReset(prIdx);prSetRunning(true);
+  await prRun(SCN[prIdx][prMode],g);if(g===prGen)prSetRunning(false);}
+async function prPlayAll(){prCancel();const g=prGen;prSetRunning(true);
+  for(let i=0;i<SCN.length;i++){if(g!==prGen)return;prIdx=i;prUpdateChips();prReset(i);
+    await prRun(SCN[i][prMode],g);if(g!==prGen)return;await prSleep(prRM?300:1200);}
+  if(g===prGen)prSetRunning(false);}
+function prSetMode(mode){if(mode===prMode)return;prMode=mode;prUpdateModes();prCancel();prSetRunning(false);prReset(prIdx);}
+function initDemo(){prMode='human';prIdx=0;prBuildTree();
+  document.querySelectorAll('#prChips .pr-chip').forEach(c=>c.onclick=()=>{prIdx=+c.getAttribute('data-i');prUpdateChips();prPlay();});
+  document.querySelectorAll('#prModes .pr-modetab').forEach(t=>t.onclick=()=>prSetMode(t.getAttribute('data-mode')));
+  document.getElementById('prPlay').onclick=()=>prPlay();
+  document.getElementById('prReplay').onclick=()=>prPlay();
+  document.getElementById('prAll').onclick=()=>prPlayAll();
+  prReset(0);}
+
 let cur=0, sections, total;
 const pills=document.getElementById('pills');
 
@@ -517,6 +843,7 @@ function build(){
     el.innerHTML=`<div class="num">${i+1}</div><div><h4>${st.h}<span class="opt">${st.opt}</span></h4><p>${st.p}</p></div>`;s.appendChild(el);});
   // flowcharts
   initFlows();
+  initDemo();
 
   // chapters + pills
   sections=[...document.querySelectorAll('.chapter')];total=sections.length;
