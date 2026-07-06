@@ -27,3 +27,25 @@ fastembed>=0.4         # ONNX runtime, no torch; auto-picks jina-reranker-v2-bas
 # Bookmark extraction (ops bookmark) — optional local upgrade. Without it, `ops bookmark` still
 # works (built-in crude strip); with it you get real main-content article → Markdown, all local:
 trafilatura>=2.0       # best-in-class local extractor (drops nav/ads, native MD). Auto-detected.
+#
+# Image reading (ops files extract on images; see docs/design/proposals/2026-07-06-image-reading.md)
+# — three layers, each an auto-detected optional dep, deterministic fallback throughout:
+# Layer 1 (metadata: format/dimensions/EXIF). Without it, extraction falls back to stdlib basics
+# (format + dimensions only, no EXIF) — it never crashes:
+Pillow>=10.0
+# Layer 2 (OCR) and Layer 3 (VLM describe) on Apple Silicon run via mlx-vlm (GLM-OCR/DeepSeek-OCR,
+# Qwen3-VL, moondream). Not available on Intel — the same runtime split as the audio tier's
+# parakeet-mlx (Apple-Silicon-only) vs mlx-whisper/faster-whisper (portable):
+mlx-vlm>=0.1 ; platform_system == "Darwin" and platform_machine == "arm64"
+#
+# NOTE: the model weights themselves are NOT pip packages. On Intel (or any host without mlx-vlm),
+# Layer 2/3 run the SAME models through a running Ollama instead:
+#   ollama pull qwen3-vl:4b       # Layer 3 primary (OPS_VLM)
+#   ollama pull moondream         # Layer 3 fallback (OPS_VLM_FALLBACK)
+#   ollama pull glm-ocr           # Layer 2 primary (OPS_OCR) — GGUF, pulled not pip-installed
+#   ollama pull deepseek-ocr      # Layer 2 alternative (OPS_OCR=deepseek-ocr)
+# If neither mlx-vlm nor Ollama is available, Layer 2 degrades to the deterministic OCR fallbacks
+# below (no model download, matches the existing `ops files extract` image tier):
+#   ocrmac      — Apple Vision framework, Apple Silicon or Intel, install via: pip install ocrmac
+#   tesseract   — system binary, any platform, install via: brew install tesseract
+# Layer 3 (--describe) has no non-model fallback; with neither mlx-vlm nor Ollama, it is skipped.

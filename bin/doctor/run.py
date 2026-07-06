@@ -97,6 +97,32 @@ def main(argv):
             else:
                 warn(f"optional: {mod} not installed ({why} disabled)")
 
+    # image reading (docs/design/proposals/2026-07-06-image-reading.md): Layer 1 metadata (Pillow),
+    # Layer 2/3 OCR+VLM runtimes (mlx-vlm on Apple Silicon, Ollama anywhere), deterministic OCR
+    # fallbacks (ocrmac, tesseract). Every probe here is soft — the whole feature degrades gracefully.
+    for mod, why in (("PIL", "image metadata (Pillow)"), ("mlx_vlm", "Apple-Silicon OCR/VLM runtime"),
+                      ("ocrmac", "Apple Vision OCR fallback")):
+        try:
+            __import__(mod); ok(f"optional: {mod} present ({why})")
+        except Exception:
+            warn(f"optional: {mod} not installed ({why} disabled)")
+    (ok if shutil.which("ollama") else warn)(
+        "optional: ollama present (OCR/VLM runtime)" if shutil.which("ollama")
+        else "optional: ollama not on PATH (OCR/VLM runtime disabled)")
+    (ok if shutil.which("tesseract") else warn)(
+        "optional: tesseract present (OCR fallback)" if shutil.which("tesseract")
+        else "optional: tesseract not on PATH (OCR fallback disabled)")
+    vlm_requested = os.environ.get("OPS_VLM", "").strip().lower()
+    if vlm_requested and vlm_requested != "none":
+        try:
+            __import__("mlx_vlm"); has_mlx_vlm = True
+        except Exception:
+            has_mlx_vlm = False
+        if not has_mlx_vlm and not shutil.which("ollama"):
+            warn(f"OPS_VLM={os.environ['OPS_VLM']} but neither mlx-vlm nor ollama is available — "
+                 "`ops files extract --describe` will skip Layer 3 entirely. Fix: install mlx-vlm "
+                 "(Apple Silicon) or run ollama (any host); or unset OPS_VLM.")
+
     # 2. folders
     for d in REQUIRED_DIRS:
         p = paths.OPS_HOME / d

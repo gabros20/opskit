@@ -6,6 +6,22 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
 
 ## [Unreleased]
 
+### Added
+- **Cross-architecture image reading proposal**
+  ([#1](https://github.com/gabros20/personal-operating-system/issues/1),
+  [`docs/design/proposals/2026-07-06-image-reading.md`](docs/design/proposals/2026-07-06-image-reading.md)).
+  Design for three escalating layers on top of `ops files extract`'s image tier — Layer 1 metadata
+  (format/dimensions/EXIF via Pillow, GPS dropped for privacy), Layer 2 OCR (GLM-OCR/DeepSeek-OCR via
+  `mlx-vlm` on Apple Silicon or Ollama on Intel/any, falling back to `ocrmac`/`tesseract`), and Layer 3
+  VLM understanding (Qwen3-VL 4B → moondream → skip, `--describe`) — with on-demand model load/unload
+  (`keep_alive:0`, no daemon), sequential-run peak-memory discipline, and a `OPS_IMAGE_FAKE` test seam.
+  New env knobs: `OPS_OCR`, `OPS_VLM`, `OPS_VLM_FALLBACK`, `OPS_MLX`, `OPS_VLM_KEEP_ALIVE`,
+  `OPS_IMAGE_FAKE`. `requirements.txt` documents the optional deps (`Pillow`, `mlx-vlm` on Apple
+  Silicon) and that model weights are pulled via `ollama pull`, not pip. `ops doctor` gained soft probes
+  for `PIL`/`mlx_vlm`/`ollama`/`ocrmac`/`tesseract` and a pointed warning when `OPS_VLM` is set but
+  neither runtime is available. Proposed, not yet implemented — the runtime (`bin/lib/imagelib.py`) and
+  `_tier_image` cascade land separately.
+
 ### Fixed
 - **`ops index` crashed with `OPS_VECTORS=1` when `lancedb` was missing**
   ([#3](https://github.com/gabros20/personal-operating-system/issues/3)). The vector-plane probe

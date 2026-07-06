@@ -53,6 +53,7 @@ SUITES = [
     ("repo: ~/work fleet (§4/§12)", "run_repo.py"),
     ("files: binary-assets plane (§9)", "run_files.py"),
     ("archive + invoice (§4)", "run_archive_invoice.py"),
+    ("image-reading backend (imagelib)", "run_image_backend.py"),
 ]
 
 
