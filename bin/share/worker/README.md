@@ -7,11 +7,20 @@ never sees the key — the key travels in the URL `#fragment` and is decrypted i
 
 ## API
 
-| Method | Path    | Headers                | Body | Returns |
-|--------|---------|------------------------|------|---------|
-| `PUT`  | `/`     | `X-Expire-Seconds`     | blob | `{ id, admin_token }` |
-| `GET`  | `/<id>` | —                      | —    | the stored blob |
-| `DELETE` | `/<id>` | `X-Admin-Token`      | —    | `204` (admin only) |
+| Method | Path         | Headers            | Body | Returns |
+|--------|--------------|--------------------|------|---------|
+| `PUT`  | `/`          | `X-Expire-Seconds` | blob | `{ id, admin_token }` |
+| `GET`  | `/<id>`      | `Accept: text/html` (browser) | — | the **viewer** page (decrypts client-side) |
+| `GET`  | `/<id>?raw=1` | —                 | —    | the raw stored blob (what the viewer fetches) |
+| `GET`  | `/<id>`      | any other `Accept` (curl) | — | the raw stored blob |
+| `DELETE` | `/<id>`    | `X-Admin-Token`    | —    | `204` (admin only) |
+
+**The viewer.** A browser opening `/<id>#<key>` gets a small self-contained page that fetches the
+raw ciphertext (`?raw=1`) and decrypts it in-page with Web Crypto using the key from the URL
+`#fragment` — byte-compatible with `bin/lib/sharelib.py` (`nonce[12] ‖ ct ‖ tag[16]`, base64url).
+The decrypted note renders inside a **scriptless sandboxed iframe** (it can never read the key), and
+the `#fragment` is stripped from the address bar after load. `--plain` shares (no `#fragment`) render
+their HTML directly. Without the viewer the browser would just download opaque ciphertext.
 
 Expiry is native KV `expirationTtl` (1:1 from `--expires`, so there is no cleanup code). Revoke is a
 `DELETE` with the `admin_token` returned at publish time and recorded in `.share/ledger.json`.
@@ -35,3 +44,8 @@ Free tier: 100k requests/day, 1k KV writes/day — a collection coalesces into O
   human sends the resulting link.
 - The worker is vendored inside the engine boundary (`bin/share/worker/`) so fixes distribute via
   `script/update`.
+- Cloudflare bot-management **403s the default `Python-urllib/x.y` User-Agent** (a `PUT` that works
+  from `curl` fails from stdlib `urllib` for this reason alone). `ops share` sends
+  `User-Agent: ops-share/1.0` so the edge lets it through; keep that header if you customize the
+  client. When forwarding a link (e.g. over Telegram), send it **whole** — the `#…` tail is the
+  decryption key, and a truncated link cannot be opened.

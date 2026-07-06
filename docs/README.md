@@ -13,6 +13,7 @@ Start with the project [README](../README.md) (what this is + install). Docs her
 | [`mobile-and-capture.md`](mobile-and-capture.md) | capture from phone/share-sheet; read the vault on mobile (git is the only sync) | How-to |
 | [`obsidian-compat.md`](obsidian-compat.md) | the normative definition of "Obsidian-compatible" (what ops emits vs tolerates) | Reference |
 | [`DECISIONS.md`](DECISIONS.md) | the ADR log — every load-bearing decision, with the why | Explanation (record) |
+| [`../CHANGELOG.md`](../CHANGELOG.md) | what changed and when (newest first) | Reference (record) |
 | [`design/PERSONAL_OS_DESIGN.md`](design/PERSONAL_OS_DESIGN.md) | the full v3 design spec (deep background; ADRs supersede where they conflict) | Explanation |
 | [`design/proposals/`](design/proposals/) | accepted/active proposals — the v4 platform roadmap lives here | Explanation |
 

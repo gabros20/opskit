@@ -1,0 +1,41 @@
+# Changelog
+
+Notable changes to the ops platform, newest first. Format follows
+[Keep a Changelog](https://keepachangelog.com). The *why* behind load-bearing decisions lives in the
+ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what changed*.
+
+## [Unreleased]
+
+### Fixed
+- **`ops share` end-to-end ([#2](https://github.com/gabros20/personal-operating-system/issues/2)).**
+  Dogfooding the share surface on live Cloudflare Workers surfaced three defects, all fixed:
+  - **Publish 403.** Stdlib `urllib`'s default `Python-urllib/x.y` User-Agent is blocked by
+    Cloudflare bot-management (a `PUT` that works from `curl` failed from the client). The client now
+    sends `User-Agent: ops-share/1.0` on every `PUT`/`DELETE` (`bin/share/run.py`).
+  - **Encrypted link downloaded ciphertext instead of rendering.** The worker always returned
+    `application/octet-stream`, and no in-browser viewer existed. The worker now serves a
+    self-contained **decrypt viewer** on browser navigation (`Accept: text/html`): it fetches the raw
+    blob (`?raw=1`) and decrypts in-page with Web Crypto using the key from the URL `#fragment`,
+    then renders into a **scriptless sandboxed iframe** (the note can never read the key) and strips
+    the `#fragment` from the address bar (`bin/share/worker/worker.js`). `--plain` shares render
+    directly; `curl`/programmatic GETs still receive the raw blob.
+  - **Silent failure on truncated links.** A forwarded link that lost its `#…` tail now shows a clear
+    "this encrypted link is missing its key" message in the viewer, and `ops share` reminds you to
+    send the full link (the `#…` is the decryption key).
+
+### Added
+- Committed known-answer crypto fixture (`test/fixtures/share_kat.json`) plus a **Node Web Crypto
+  cross-check** in the share suite that pins byte-compatibility between `sharelib.py`'s AES-256-GCM
+  output (`nonce ‖ ct ‖ tag`, base64url) and the browser viewer. Runs in CI — it needs only `node`,
+  not the optional `cryptography` package.
+- A real-transport **User-Agent assertion** in the share suite (a one-shot local HTTP server captures
+  the actual `PUT` and checks the header), so the 403 fix can't silently regress.
+
+### Changed
+- `bin/share/worker/README.md`: documented the viewer, the `?raw=1` route, the content-negotiated
+  `GET`, and the Cloudflare User-Agent gotcha.
+
+---
+
+History before this changelog is in `git log` and the ADR record ([`docs/DECISIONS.md`](docs/DECISIONS.md),
+ADR-001 … ADR-007, which covers the v4 platform).

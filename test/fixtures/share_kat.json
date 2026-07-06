@@ -1,0 +1,6 @@
+{
+  "text": "the quick brown fox <secret> & a snowman ☃ — жаба",
+  "blob": "o59UXN-pjKDIyoaMxAYevUy8CSA18l8qZ6yxM7j0sPzwy9k6K-e4CHKXy3I77Jq3Mzq5feU_lMwwDBhRtIQC5mH2EckCAzWhB2JEsCYbSUHaq-XucA",
+  "key": "2S40YSaAEkvip8qiOFIw9MjP1FdLGnEAEZd4nCi9jmg",
+  "_note": "Known-answer test for ops share E2E. blob=b64url(nonce[12]||ct||tag[16]), key=b64url(32), from bin/lib/sharelib.py encrypt(). The worker VIEWER (Web Crypto) and Python sharelib.decrypt() must both recover text. Regenerate only if the wire format changes."
+}

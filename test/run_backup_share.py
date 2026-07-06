@@ -53,6 +53,33 @@ def run(verb, *args, home, roots=None, extra_env=None):
 def main() -> int:
     sl = _load_sharelib()
 
+    # ---------- E2E known-answer: the viewer's Web Crypto decrypts sharelib's ciphertext (issue #2 part 2) ----------
+    # A frozen (text, blob, key) triple produced by sharelib.encrypt(). The worker VIEWER decrypts in
+    # the browser with Web Crypto; Node's identical Web Crypto here pins byte-compatibility of the
+    # nonce||ct||tag / b64url wire format. Runs in CI (only needs `node`) even without `cryptography`.
+    import shutil as _sh
+    kat = json.loads((REPO / "test" / "fixtures" / "share_kat.json").read_text(encoding="utf-8"))
+    if sl.have_crypto():
+        check("KAT: python sharelib.decrypt round-trips the fixture",
+              sl.decrypt(kat["blob"], kat["key"]).decode("utf-8") == kat["text"])
+    if _sh.which("node"):
+        js = (
+            'function d(s){s=s.replace(/-/g,"+").replace(/_/g,"/");s+="=".repeat((4-s.length%4)%4);'
+            'return new Uint8Array(Buffer.from(s,"base64"));}'
+            '(async()=>{const r=d(process.argv[2]),n=r.slice(0,12),c=r.slice(12);'
+            'const k=await crypto.subtle.importKey("raw",d(process.argv[3]),{name:"AES-GCM"},false,["decrypt"]);'
+            'const p=await crypto.subtle.decrypt({name:"AES-GCM",iv:n,tagLength:128},k,c);'
+            'process.stdout.write(new TextDecoder().decode(p));})()'
+            '.catch(e=>{process.stderr.write(String(e));process.exit(1);});')
+        with tempfile.NamedTemporaryFile("w", suffix=".mjs", delete=False) as f:
+            f.write(js); mjs = f.name
+        p = subprocess.run(["node", mjs, kat["blob"], kat["key"]], capture_output=True, text=True)
+        os.unlink(mjs)
+        check("KAT: Web Crypto (Node) decrypts sharelib ciphertext to the same plaintext",
+              p.stdout == kat["text"], p.stdout + p.stderr)
+    else:
+        check("KAT: node absent — Web Crypto cross-check skipped (informational)", True)
+
     # ---------- sharelib: encrypt/decrypt round-trip + expiry + HTML rendering ----------
     if sl.have_crypto():
         pt = b"the quick brown fox <secret>"
@@ -165,6 +192,33 @@ def main() -> int:
         cenv = json.loads(r.stdout.splitlines()[0]) if r.stdout.strip() else {}
         check("collection selects both tagged notes",
               set(cenv.get("data", {}).get("notes", [])) == {"alpha", "beta"}, r.stdout)
+
+        # ---------- transport: a REAL publish carries a named User-Agent (issue #2 part 1) ----------
+        # Cloudflare bot-management 403s the default `Python-urllib/x.y` UA. Point the client at a
+        # one-shot local server (no OPS_SHARE_FAKE) and assert the PUT's UA. --plain keeps it
+        # stdlib-only. This exercises the real _publish() path, header included.
+        import http.server, threading
+        cap = {}
+
+        class _H(http.server.BaseHTTPRequestHandler):
+            def do_PUT(self):
+                cap["ua"] = self.headers.get("User-Agent")
+                self.rfile.read(int(self.headers.get("Content-Length", "0") or "0"))
+                self.send_response(200); self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(b'{"id":"testid","admin_token":"tok"}')
+
+            def log_message(self, *a):  # keep the suite output clean
+                pass
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), _H)
+        th = threading.Thread(target=srv.handle_request, daemon=True); th.start()
+        (h / ".share").mkdir(exist_ok=True)
+        (h / ".share" / "config.json").write_text(
+            json.dumps({"endpoint": f"http://127.0.0.1:{srv.server_address[1]}"}))
+        run("share", "alpha", "--yes", "--plain", "--json", home=h)  # real transport, no FAKE
+        th.join(timeout=5); srv.server_close()
+        check("real publish sends a named User-Agent (Cloudflare 403 fix)",
+              cap.get("ua") == "ops-share/1.0", str(cap))
 
         # ---------- sweep share hygiene: expired + edited-since warnings ----------
         import time as _t

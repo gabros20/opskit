@@ -25,6 +25,10 @@ from lib import output, paths, sharelib  # noqa: E402
 
 GREEN, YEL, DIM, RESET = "\033[32m", "\033[33m", "\033[2m", "\033[0m"
 
+# Cloudflare bot-management 403s the default `Python-urllib/x.y` User-Agent (a PUT that succeeds
+# from curl fails from urllib for this reason alone). A named UA passes the edge.
+UA = "ops-share/1.0"
+
 SHARE_DIR = paths.OPS_HOME / ".share"
 CONFIG = SHARE_DIR / "config.json"
 LEDGER = SHARE_DIR / "ledger.json"
@@ -94,7 +98,7 @@ def _publish(endpoint: str, body: bytes, ttl: int) -> dict:
         return {"id": h, "admin_token": "fake-" + h}
     req = urllib.request.Request(endpoint.rstrip("/") + "/", data=body, method="PUT",
                                  headers={"Content-Type": "application/octet-stream",
-                                          "X-Expire-Seconds": str(ttl)})
+                                          "X-Expire-Seconds": str(ttl), "User-Agent": UA})
     with urllib.request.urlopen(req, timeout=30) as r:  # pragma: no cover - never run in tests
         return json.loads(r.read().decode("utf-8"))
 
@@ -103,7 +107,7 @@ def _revoke_remote(endpoint: str, sid: str, token: str) -> None:
     if _fake():
         return
     req = urllib.request.Request(f"{endpoint.rstrip('/')}/{sid}", method="DELETE",
-                                 headers={"X-Admin-Token": token})
+                                 headers={"X-Admin-Token": token, "User-Agent": UA})
     with urllib.request.urlopen(req, timeout=30):  # pragma: no cover - never run in tests
         pass
 
@@ -242,8 +246,11 @@ def cmd_share(argv):
 
     data = {"id": sid, "url": url, "kind": kind, "key": key, "expires_ts": entry["expires_ts"],
             "encrypted": not plain}
+    keynote = "" if plain else (
+        f"\n  {YEL}send the FULL link — the #… after the id is the decryption key; "
+        f"a truncated link cannot be opened{RESET}")
     return output.emit(data, "share", human=lambda _:
-                       f"{GREEN}shared{RESET} {kind} {key}\n  {url}\n"
+                       f"{GREEN}shared{RESET} {kind} {key}\n  {url}{keynote}\n"
                        f"  {DIM}revoke: ops share revoke {sid} --yes{RESET}")
 
 

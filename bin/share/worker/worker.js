@@ -6,10 +6,47 @@
 //
 // Routes:
 //   PUT  /            body = blob, header X-Expire-Seconds = TTL -> { id, admin_token }
-//   GET  /<id>        -> the blob (or the viewer HTML if Accept: text/html)
+//   GET  /<id>        browser (Accept: text/html) -> the viewer page; else -> the raw blob
+//   GET  /<id>?raw=1  -> the raw blob (what the viewer fetches, then decrypts client-side)
 //   DELETE /<id>      header X-Admin-Token -> 204 (admin only)
 
 const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+// Self-contained decrypt viewer (no deps, no external refs). Served for browser navigations; it
+// fetches the raw blob (?raw=1), decrypts with the AES key from the URL #fragment via Web Crypto —
+// byte-compatible with bin/lib/sharelib.py encrypt(): blob = b64url(nonce[12] || ct || tag[16]),
+// key = b64url(32). The decrypted note renders inside a scriptless sandboxed iframe, so it can never
+// read the key, and the #fragment is stripped from the address bar after load.
+const VIEWER = `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>ops share</title>
+<style>html,body{margin:0;height:100%}#f{border:0;width:100%;height:100vh;display:none}
+#m{font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#444;
+max-width:34rem;margin:14vh auto;padding:0 1.4rem;text-align:center}
+#m b{color:#111}#m code{background:#f4f4f4;padding:.1em .3em;border-radius:3px}</style></head>
+<body><div id="m">Decrypting…</div><iframe id="f" sandbox referrerpolicy="no-referrer"></iframe>
+<script>
+function b64uDec(s){s=s.replace(/-/g,"+").replace(/_/g,"/");s+="=".repeat((4-s.length%4)%4);
+var bin=atob(s),out=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out;}
+async function decrypt(b64,keyB64){var raw=b64uDec(b64),nonce=raw.slice(0,12),data=raw.slice(12);
+var key=await crypto.subtle.importKey("raw",b64uDec(keyB64),{name:"AES-GCM"},false,["decrypt"]);
+var pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:nonce,tagLength:128},key,data);
+return new TextDecoder().decode(pt);}
+function msg(h){document.getElementById("m").innerHTML=h;}
+function show(html){var f=document.getElementById("f");f.srcdoc=html;
+document.getElementById("m").style.display="none";f.style.display="block";}
+(async function(){try{
+var key=location.hash.slice(1);
+var res=await fetch(location.pathname+"?raw=1",{headers:{Accept:"application/octet-stream"}});
+if(res.status===404)return msg("<b>This share has expired or was revoked.</b>");
+if(!res.ok)return msg("<b>Could not load this share.</b><br>HTTP "+res.status+".");
+var text=await res.text();var html;
+if(key){html=await decrypt(text,key);}
+else if(text.indexOf("<")>=0){html=text;}
+else return msg("<b>This encrypted link is missing its key.</b><br>The <code>#…</code> part after the id was probably dropped when the link was forwarded — ask the sender for the full link.");
+history.replaceState(null,"",location.pathname);
+show(html);
+}catch(e){msg("<b>Could not decrypt this share.</b><br>The key in the link may be wrong or truncated.");}})();
+</script></body></html>`;
 
 function randId(n = 10) {
   const buf = new Uint8Array(n);
@@ -42,6 +79,15 @@ export default {
     }
 
     if (request.method === "GET" && id !== "") {
+      const raw = url.searchParams.has("raw");
+      const wantsHtml = (request.headers.get("Accept") || "").includes("text/html");
+      // Browser navigation → the static viewer (no KV read; it surfaces 404/expiry via its own
+      // ?raw=1 fetch). Everything else (the viewer's fetch, curl, programmatic) → the raw blob.
+      if (wantsHtml && !raw) {
+        return new Response(VIEWER, {
+          headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+        });
+      }
       const blob = await env.OPS_SHARE.get("blob:" + id, "arrayBuffer");
       if (!blob) return json({ error: "not found" }, 404);
       return new Response(blob, {
