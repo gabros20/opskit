@@ -104,9 +104,17 @@ def main() -> int:
         (h / "wiki" / "notes" / "beta.md").write_text(
             "---\ntype: note\ntitle: Beta\ntags: [pub]\n---\n# Beta\nhi\n")
 
+        # `cryptography` is an optional dep and CI runs this suite stdlib-only, so drive the share
+        # CLI in --plain mode when crypto is absent. Plain exercises the identical render / ledger /
+        # list / revoke / collection bookkeeping; only the E2E #key URL fragment (asserted
+        # separately below) needs the AES layer. On a machine with `cryptography`, PM is empty and
+        # the full E2E path runs exactly as before.
+        HAVE_CRYPTO = sl.have_crypto()
+        PM = [] if HAVE_CRYPTO else ["--plain"]
+
         # dry-run writes the HTML blob and never publishes
         outp = Path(td) / "alpha.html"
-        r = run("share", "alpha", "--dry-run", "--out", str(outp), home=h)
+        r = run("share", "alpha", "--dry-run", "--out", str(outp), *PM, home=h)
         check("share dry-run exits 0", r.returncode == 0, r.stdout + r.stderr)
         check("share dry-run wrote HTML, no ledger",
               outp.exists() and not (h / ".share" / "ledger.json").exists())
@@ -115,21 +123,25 @@ def main() -> int:
               "beta" in blob and "ghost" in blob and 'href="#note-' not in blob, blob[:200])
 
         # confirm-gate: no --yes → EXIT_CONFIRM(3)
-        r = run("share", "alpha", home=h)
+        r = run("share", "alpha", *PM, home=h)
         check("share without --yes → exit 3 (needs-yes)", r.returncode == 3, r.stdout + r.stderr)
 
         # not-found slug
-        r = run("share", "nonesuch", "--dry-run", home=h)
+        r = run("share", "nonesuch", "--dry-run", *PM, home=h)
         check("share unknown slug → exit 4", r.returncode == 4, r.stdout + r.stderr)
 
         # full flow with fake transport: ledger + frontmatter + list + revoke
         fenv = {"OPS_SHARE_FAKE": "1"}
-        r = run("share", "alpha", "--expires", "1d", "--yes", "--json", home=h, extra_env=fenv)
+        r = run("share", "alpha", "--expires", "1d", "--yes", "--json", *PM, home=h, extra_env=fenv)
         check("share --yes (fake) exits 0", r.returncode == 0, r.stdout + r.stderr)
         env = json.loads(r.stdout.splitlines()[0]) if r.stdout.strip() else {}
         sid = env.get("data", {}).get("id", "")
-        check("share returns an id + url with #key fragment",
-              bool(sid) and "#" in env.get("data", {}).get("url", ""), r.stdout)
+        url = env.get("data", {}).get("url", "")
+        check("share returns an id", bool(sid), r.stdout)
+        if HAVE_CRYPTO:
+            check("E2E share url carries the #key fragment", "#" in url, r.stdout)
+        else:
+            check("plain share url has no #key fragment", bool(url) and "#" not in url, r.stdout)
         led = json.loads((h / ".share" / "ledger.json").read_text())
         check("ledger records the share", any(s["id"] == sid for s in led["shares"]))
         check("frontmatter stamped with share:", "share:" in (h / "wiki" / "notes" / "alpha.md").read_text())
@@ -149,7 +161,7 @@ def main() -> int:
 
         # collection by tag renders both notes
         r = run("share", "collection", "pub", "--dry-run", "--out", str(Path(td) / "coll.html"),
-                "--json", home=h)
+                "--json", *PM, home=h)
         cenv = json.loads(r.stdout.splitlines()[0]) if r.stdout.strip() else {}
         check("collection selects both tagged notes",
               set(cenv.get("data", {}).get("notes", [])) == {"alpha", "beta"}, r.stdout)
