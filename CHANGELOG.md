@@ -21,6 +21,11 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
     isn't importable, both say exactly how to fix it (install `requirements.txt` into *the `python3`
     that runs `ops`*, verify with `python3 -c 'import lancedb'`), and `requirements.txt` documents
     that `ops` dispatches via bare `python3` — optional deps must live on that interpreter's PATH.
+  - **Platform-aware `lancedb` pin.** The old `lancedb>=0.33` was uninstallable on macOS-Intel
+    (x86_64), where upstream ships no wheels past 0.25.x — so `pip install -r requirements.txt`
+    failed outright on Intel Macs. Replaced with mutually-exclusive PEP 508 markers: Intel Macs pin
+    `>=0.25,<0.26`, everything else (Apple Silicon / Linux / Windows) `>=0.33`. The engine's vector
+    code works on both.
 
 ### Changed
 - **`ops share` end-to-end ([#2](https://github.com/gabros20/personal-operating-system/issues/2)).**

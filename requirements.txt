@@ -9,8 +9,13 @@
 # `ops doctor` (it prints "optional: lancedb present"). With OPS_VECTORS=1 but lancedb missing, `ops
 # index` warns and falls back to keyword-only — it never crashes; it just won't build vectors.
 #
-# Stage-2 vectors (OPS_VECTORS=1) — the scale-grade semantic layer (ADR-006) — needs:
-lancedb>=0.33          # embedded, file-based ANN vector store (no server). pip install lancedb
+# Stage-2 vectors (OPS_VECTORS=1) — the scale-grade semantic layer (ADR-006) — needs lancedb
+# (embedded, file-based ANN vector store; no server). LanceDB stopped publishing macOS-Intel
+# (x86_64) wheels after 0.25.x, so Intel Macs cap there while Apple Silicon / Linux / Windows take a
+# modern release. These two markers are mutually exclusive, so `pip install -r` resolves cleanly on
+# every host — the engine's vectorstore code works on both 0.25.x and 0.33.x.
+lancedb>=0.25,<0.26 ; platform_system == "Darwin" and platform_machine == "x86_64"
+lancedb>=0.33 ; platform_system != "Darwin" or platform_machine != "x86_64"
 #
 # Stage-3 rerank (OPS_RERANK=1) — local cross-encoder precision layer (ADR-006):
 fastembed>=0.4         # ONNX runtime, no torch; auto-picks jina-reranker-v2-base-multilingual
