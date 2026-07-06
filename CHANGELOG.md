@@ -19,8 +19,10 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
   `OPS_IMAGE_FAKE`. `requirements.txt` documents the optional deps (`Pillow`, `mlx-vlm` on Apple
   Silicon) and that model weights are pulled via `ollama pull`, not pip. `ops doctor` gained soft probes
   for `PIL`/`mlx_vlm`/`ollama`/`ocrmac`/`tesseract` and a pointed warning when `OPS_VLM` is set but
-  neither runtime is available. Proposed, not yet implemented — the runtime (`bin/lib/imagelib.py`) and
-  `_tier_image` cascade land separately.
+  neither runtime is available. **Implemented** (commits `a298c47`/`15cc5cc`, CI-green): the runtime
+  (`bin/lib/imagelib.py`), the lazy `_tier_image` OCR cascade, image metadata on ingest, and the
+  `--describe` VLM wiring all ship, exercised offline via the `OPS_IMAGE_FAKE` seam; the live model
+  backends are `# pragma: no cover` pending on-host validation.
 
 ### Fixed
 - **`ops index` crashed with `OPS_VECTORS=1` when `lancedb` was missing**

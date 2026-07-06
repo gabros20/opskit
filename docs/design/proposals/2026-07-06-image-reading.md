@@ -1,6 +1,10 @@
 # Cross-architecture image reading — metadata, OCR, and VLM understanding
 
-**Status: PROPOSED (2026-07-06).** High-level design, not yet accepted.
+**Status: ACCEPTED — implemented 2026-07-06** (`bin/lib/imagelib.py` + the `ops files` wiring;
+commits `a298c47`/`15cc5cc`, CI-green). The metadata, OCR/VLM dispatch, fallback cascade, `ops doctor`
+probes, and env knobs below all ship on `main`, exercised offline through the `OPS_IMAGE_FAKE` test
+seam. The real model backends (mlx-vlm / Ollama with the models pulled) are written but
+`# pragma: no cover` — live validation on each host is the one remaining step.
 Closes the image-understanding half of
 [issue #1](https://github.com/gabros20/personal-operating-system/issues/1) ("how does artefacts like
 images... get stored and associated with a note?"). The storage/association half — ingest, the shadow
