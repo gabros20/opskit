@@ -119,8 +119,12 @@ Now `ops` works from anywhere. Pull engine improvements later without touching y
 auto-detected — nothing is required to run `ops`:
 - Semantic search (stages 2–3): [Ollama](https://ollama.com) + `pip install -r requirements.txt`.
 - Media extraction tiers (`ops files extract`): `pymupdf4llm` (PDF), `mlx-whisper` /
-  `faster-whisper` (audio), `ocrmac` / `tesseract` (images), `yt-dlp` (video captions) — each tier
-  degrades gracefully with a one-line install hint.
+  `faster-whisper` (audio), `yt-dlp` (video captions) — each tier degrades gracefully with a
+  one-line install hint.
+- Image reading (`ops files extract` on images, `--describe` for a VLM caption): quality OCR via
+  GLM-OCR/DeepSeek-OCR and VLM description via Qwen3-VL/moondream, both through `mlx-vlm` on Apple
+  Silicon or Ollama on any host, falling back to `ocrmac` / `tesseract` with neither installed. See
+  [`docs/image-reading.md`](docs/image-reading.md) for per-host setup.
 - End-to-end-encrypted sharing: `cryptography` (else `ops share --plain` still works).
 - Off-machine backup: [`restic`](https://restic.net).
 - Terminal niceties: [`glow`](https://github.com/charmbracelet/glow) or `bat` (rendering),

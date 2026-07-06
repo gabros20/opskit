@@ -114,6 +114,9 @@ Discover the live, authoritative set with `ops help`; this is the working summar
 - Tasks:             `ops task list|add "<title>"|show <id>|move <id> <status>|done <id>`
 - Knowledge:         `ops wiki open <slug>|new <type> <name>|backlinks <slug>|stale|orphans`
 - Filing:            `ops triage` (text → tasks/wiki) · `ops files ingest` (binaries → ~/files + shadow note)
+  - `ops files extract <img> [--describe]` OCRs an image (+ optional VLM description) — needs models
+    installed/pulled, see [`docs/image-reading.md`](../../docs/image-reading.md); degrades to
+    deterministic OCR (`ocrmac`/`tesseract`) without them, never crashes.
 - Work scaffolding:  `ops new project|client "<name>"` (asks/uses the routing tree above)
 - Repo lifecycle:    `ops repo health|clone <p>|clone --all` · `ops archive <project>` (dead repo → bundle)
 - Business:          `ops invoice <client>` (DRAFT only; reads tax-formula.md; never sends)
