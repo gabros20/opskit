@@ -90,9 +90,10 @@ def main(argv):
             # import, `ops index` will silently fall back to keyword-only. That mismatch is a
             # misconfiguration worth calling out loudly, with the exact remedy.
             if mod == "lancedb" and vectors_requested:
-                warn("OPS_VECTORS=1 but lancedb is NOT importable by this python3 — "
-                     "`ops index` falls back to keyword-only. Fix: pip install -r requirements.txt "
-                     "into this interpreter (python3 -c 'import lancedb'), or unset OPS_VECTORS.")
+                warn("OPS_VECTORS=1 but lancedb is NOT importable by this python3 (`which python3`) — "
+                     "`ops index` falls back to keyword-only. Fix: install requirements.txt into THIS "
+                     "interpreter and put $OPS_HOME/.venv/bin first on PATH (in an agent terminal, in "
+                     "its shell init) — see docs/agent-terminal-search.md; or unset OPS_VECTORS.")
             else:
                 warn(f"optional: {mod} not installed ({why} disabled)")
 

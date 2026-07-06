@@ -81,6 +81,10 @@ hubs, not a pile of files. Rules of traversal:
 - **Search first; never trawl.** To find anything, run `ops search "<query>"` → it
   returns ranked `file#heading` hits. Open the file and read the relevant heading. Do not
   `cat` your way through folders; the index exists precisely so you don't.
+  - *Driving ops from an agent terminal (Hermes, dispatch, cron)?* Keyword search always works,
+    but **semantic** search (`OPS_VECTORS=1`) needs the agent's shell to use the same `python3`
+    (venv + PATH) as your interactive shell — a common silent gap. If `ops doctor` says lancedb is
+    missing though you installed it, see [`docs/agent-terminal-search.md`](../../docs/agent-terminal-search.md).
 - **Read frontmatter before body.** `type`, `status`, `related`, and (for projects)
   `repo:`/`remote:` tell you what a note is and where it connects before you read a word
   of prose.

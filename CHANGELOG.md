@@ -67,6 +67,15 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
   User-Agent gotcha in `bin/share/worker/README.md`.
 
 ### Added
+- **`docs/agent-terminal-search.md`** — how to get semantic search (`OPS_VECTORS`/`OPS_RERANK`)
+  working when an **agent terminal** (Hermes, a dispatched session, cron) drives `ops` rather than
+  your interactive shell ([#4](https://github.com/gabros20/personal-operating-system/issues/4)). The
+  engine runs whichever `python3` is first on `PATH`, and agent terminals often don't source
+  `~/.zshrc`, so they silently run a different interpreter without the venv's optional deps. The doc
+  covers the venv, PATH order, and the agent-shell-init requirement (with Hermes `shell_init_files`
+  as a dated worked example, including the silent YAML-scalar-vs-list pitfall). Linked from the docs
+  index and the `operate-ops` skill; `ops doctor`'s vector-misconfig warning now names
+  `which python3` and points at the doc.
 - Committed known-answer crypto fixture (`test/fixtures/share_kat.json`) plus a **Node Web Crypto
   cross-check** in the share suite that pins byte-compatibility between `sharelib.py`'s AES-256-GCM
   output (`nonce ‖ ct ‖ tag`, base64url) and the browser viewer. Runs in CI — it needs only `node`,
