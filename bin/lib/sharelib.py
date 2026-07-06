@@ -29,11 +29,38 @@ _BOLD = re.compile(r"\*\*([^*]+)\*\*")
 _ICODE = re.compile(r"`([^`]+)`")
 _MDLINK = re.compile(r"(?<!\!)\[([^\]]+)\]\(([^)]+)\)")
 
+# Self-contained reading stylesheet (Flexoki palette, kepano-minimal). Pure CSS — no JS, no external
+# refs (the note renders inside a scriptless sandboxed iframe, and the bundle must stay portable).
+# Light/dark auto via prefers-color-scheme; code blocks scroll instead of blowing out the layout.
 _CSS = (
-    "body{max-width:44rem;margin:2rem auto;padding:0 1rem;"
-    "font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a1a}"
-    "h1,h2,h3{line-height:1.25}code{background:#f4f4f4;padding:.1em .3em;border-radius:3px}"
-    "img{max-width:100%}a{color:#b5651d}hr{border:none;border-top:1px solid #ddd;margin:2rem 0}"
+    ":root{color-scheme:light dark;"
+    "--bg:#FFFCF0;--tx:#100F0F;--tx2:#6F6E69;--line:#DAD8CE;--code:#F2F0E5;--accent:#24837B;--sel:#DAD8CE}"
+    "@media (prefers-color-scheme:dark){:root{"
+    "--bg:#100F0F;--tx:#CECDC3;--tx2:#878580;--line:#282726;--code:#1C1B1A;--accent:#3AA99F;--sel:#282726}}"
+    "*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}"
+    "body{margin:0 auto;max-width:44rem;"
+    "padding:3.5rem max(1.25rem,env(safe-area-inset-right)) 6rem max(1.25rem,env(safe-area-inset-left));"
+    "background:var(--bg);color:var(--tx);overflow-wrap:break-word;-webkit-font-smoothing:antialiased;"
+    "font:1.0625rem/1.7 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}"
+    "::selection{background:var(--sel)}"
+    "h1,h2,h3,h4,h5,h6{line-height:1.25;font-weight:650;letter-spacing:-.01em;margin:2.4rem 0 .8rem}"
+    "h1{font-size:1.9rem;font-weight:700;margin-top:0}h2{font-size:1.4rem}h3{font-size:1.17rem}"
+    "h4,h5,h6{font-size:1.02rem}"
+    "p{margin:0 0 1.05rem}strong{font-weight:650}em{font-style:italic}"
+    "a{color:var(--tx);text-decoration:underline;text-underline-offset:2px;"
+    "text-decoration-color:var(--line);text-decoration-thickness:1px}"
+    "a:hover{color:var(--accent);text-decoration-color:var(--accent)}"
+    "ul,ol{margin:0 0 1.05rem;padding-left:1.5rem}li{margin:.3rem 0}li::marker{color:var(--tx2)}"
+    "blockquote{margin:1.5rem 0;padding:.15rem 0 .15rem 1rem;border-left:3px solid var(--line);color:var(--tx2)}"
+    "blockquote p{margin:.45rem 0}"
+    "hr{border:0;border-top:1px solid var(--line);margin:2.8rem 0}"
+    "img{max-width:100%;height:auto;display:block;margin:1.6rem 0;border-radius:8px}"
+    "code{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;"
+    "font-size:.88em;background:var(--code);padding:.15em .38em;border-radius:5px}"
+    "pre{margin:1.5rem 0;padding:1rem 1.1rem;background:var(--code);border:1px solid var(--line);"
+    "border-radius:10px;overflow-x:auto;-webkit-overflow-scrolling:touch}"
+    "pre code{background:none;padding:0;border-radius:0;font-size:.86rem;line-height:1.55;"
+    "display:block;white-space:pre}"
     ".ops-note{margin-bottom:2rem}"
 )
 
@@ -117,32 +144,87 @@ def render_note_html(md: str, resolvable: set[str], image_resolver=None) -> str:
     a data: URI (or None to drop the image — over the size cap or outside the files root)."""
     out, lines = [], _strip_frontmatter(md).splitlines()
     in_code = False
+    list_type = None  # 'ul' | 'ol' | None — the currently open list
+    in_quote = False
+
+    def close_list():
+        nonlocal list_type
+        if list_type:
+            out.append(f"</{list_type}>")
+            list_type = None
+
+    def close_quote():
+        nonlocal in_quote
+        if in_quote:
+            out.append("</blockquote>")
+            in_quote = False
+
+    def inl(s):
+        return _md_inline(html.escape(s), resolvable)
+
     for raw in lines:
         if raw.strip().startswith("```"):
-            out.append("</pre>" if in_code else "<pre>")
+            close_list(); close_quote()
+            out.append("</code></pre>" if in_code else "<pre><code>")
             in_code = not in_code
             continue
         if in_code:
             out.append(html.escape(raw))
             continue
-        # images first (before escaping) so we can inline data URIs
-        img = _IMG.match(raw.strip())
+
+        stripped = raw.strip()
+        if stripped == "":
+            close_list(); close_quote()
+            out.append("")
+            continue
+
+        # images (whole-line) first — before escaping — so data URIs inline
+        img = _IMG.match(stripped)
         if img:
+            close_list(); close_quote()
             alt, path = img.group(1), img.group(2).strip()
             uri = image_resolver(path) if image_resolver else None
-            if uri:
-                out.append(f'<img alt="{html.escape(alt)}" src="{uri}">')
-            else:
-                out.append(f"<p><em>{html.escape(alt or path)}</em></p>")
+            out.append(f'<img alt="{html.escape(alt)}" src="{uri}">' if uri
+                       else f"<p><em>{html.escape(alt or path)}</em></p>")
             continue
+
         hm = re.match(r"^(#{1,6})\s+(.*)$", raw)
         if hm:
+            close_list(); close_quote()
             lvl = len(hm.group(1))
-            out.append(f"<h{lvl}>{_md_inline(html.escape(hm.group(2)), resolvable)}</h{lvl}>")
-        elif raw.strip() == "":
-            out.append("")
-        else:
-            out.append(f"<p>{_md_inline(html.escape(raw), resolvable)}</p>")
+            out.append(f"<h{lvl}>{inl(hm.group(2))}</h{lvl}>")
+            continue
+
+        um = re.match(r"^\s*[-*+]\s+(.*)$", raw)
+        if um:
+            close_quote()
+            if list_type != "ul":
+                close_list(); out.append("<ul>"); list_type = "ul"
+            out.append(f"<li>{inl(um.group(1))}</li>")
+            continue
+
+        om = re.match(r"^\s*\d+[.)]\s+(.*)$", raw)
+        if om:
+            close_quote()
+            if list_type != "ol":
+                close_list(); out.append("<ol>"); list_type = "ol"
+            out.append(f"<li>{inl(om.group(1))}</li>")
+            continue
+
+        qm = re.match(r"^\s*>\s?(.*)$", raw)
+        if qm:
+            close_list()
+            if not in_quote:
+                out.append("<blockquote>"); in_quote = True
+            out.append(f"<p>{inl(qm.group(1))}</p>")
+            continue
+
+        close_list(); close_quote()
+        out.append(f"<p>{inl(raw)}</p>")
+
+    close_list(); close_quote()
+    if in_code:  # defensive: unterminated fence
+        out.append("</code></pre>")
     return "\n".join(out)
 
 

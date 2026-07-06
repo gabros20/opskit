@@ -23,6 +23,18 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
     "this encrypted link is missing its key" message in the viewer, and `ops share` reminds you to
     send the full link (the `#…` is the decryption key).
 
+### Changed
+- **Shared-note reading experience redesigned** (`bin/lib/sharelib.py`). The recipient view was
+  cramped and, worse, wide code lines blew out the page width — breaking the whole mobile layout so
+  body text scrolled off-screen. The new self-contained stylesheet is a Flexoki-palette,
+  kepano-minimal reading layout: system type scale, generous spacing, safe-area padding, automatic
+  light/dark via `prefers-color-scheme` (pure CSS — the note renders in a scriptless sandboxed
+  iframe), and **code blocks that scroll horizontally inside a bordered panel** instead of forcing
+  the page wide. The Markdown renderer now also emits real **lists** (`-`/`*`/`+`, `1.`) and
+  **blockquotes** (`>`) rather than dumping them as literal-prefixed paragraphs.
+- Documented the viewer, the `?raw=1` route, the content-negotiated `GET`, and the Cloudflare
+  User-Agent gotcha in `bin/share/worker/README.md`.
+
 ### Added
 - Committed known-answer crypto fixture (`test/fixtures/share_kat.json`) plus a **Node Web Crypto
   cross-check** in the share suite that pins byte-compatibility between `sharelib.py`'s AES-256-GCM
@@ -30,10 +42,6 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
   not the optional `cryptography` package.
 - A real-transport **User-Agent assertion** in the share suite (a one-shot local HTTP server captures
   the actual `PUT` and checks the header), so the 403 fix can't silently regress.
-
-### Changed
-- `bin/share/worker/README.md`: documented the viewer, the `?raw=1` route, the content-negotiated
-  `GET`, and the Cloudflare User-Agent gotcha.
 
 ---
 
