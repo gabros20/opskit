@@ -7,6 +7,22 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
 ## [Unreleased]
 
 ### Fixed
+- **`ops index` crashed with `OPS_VECTORS=1` when `lancedb` was missing**
+  ([#3](https://github.com/gabros20/personal-operating-system/issues/3)). The vector-plane probe
+  (`indexlib._vec_modules`) only checked that `vectorstore` imports — but `vectorstore` imports
+  `lancedb` lazily, so the probe passed and indexing then died in pass 2 with `ModuleNotFoundError`
+  instead of falling back to keyword-only. Now:
+  - `vectorstore.available()` deep-probes the actual `lancedb` import, and `_vec_modules()` gates on
+    it, so the existing keyword-only fallback actually fires.
+  - Pass 2 (embedding) is wrapped so any mid-run vector failure (embedder unreachable, disk, a
+    connect that fails after the probe) still leaves a complete keyword/graph index — `ops index`
+    never loses the durable pass-1 work.
+  - The fallback message and `ops doctor` are now **actionable**: when `OPS_VECTORS=1` but `lancedb`
+    isn't importable, both say exactly how to fix it (install `requirements.txt` into *the `python3`
+    that runs `ops`*, verify with `python3 -c 'import lancedb'`), and `requirements.txt` documents
+    that `ops` dispatches via bare `python3` — optional deps must live on that interpreter's PATH.
+
+### Changed
 - **`ops share` end-to-end ([#2](https://github.com/gabros20/personal-operating-system/issues/2)).**
   Dogfooding the share surface on live Cloudflare Workers surfaced three defects, all fixed:
   - **Publish 403.** Stdlib `urllib`'s default `Python-urllib/x.y` User-Agent is blocked by

@@ -81,11 +81,20 @@ def main(argv):
     # 1. tools
     for t in ("git", "python3", "sqlite3"):
         (ok if shutil.which(t) else (warn if t == "sqlite3" else fail))(f"tool: {t} {'present' if shutil.which(t) else 'MISSING'}")
+    vectors_requested = os.environ.get("OPS_VECTORS", "").lower() in ("1", "true", "yes", "on")
     for mod, why in (("lancedb", "stage-2 vectors"), ("fastembed", "stage-3 rerank")):
         try:
             __import__(mod); ok(f"optional: {mod} present ({why})")
         except Exception:
-            warn(f"optional: {mod} not installed ({why} disabled)")
+            # A missing optional dep is normally fine — but if OPS_VECTORS=1 and lancedb can't
+            # import, `ops index` will silently fall back to keyword-only. That mismatch is a
+            # misconfiguration worth calling out loudly, with the exact remedy.
+            if mod == "lancedb" and vectors_requested:
+                warn("OPS_VECTORS=1 but lancedb is NOT importable by this python3 — "
+                     "`ops index` falls back to keyword-only. Fix: pip install -r requirements.txt "
+                     "into this interpreter (python3 -c 'import lancedb'), or unset OPS_VECTORS.")
+            else:
+                warn(f"optional: {mod} not installed ({why} disabled)")
 
     # 2. folders
     for d in REQUIRED_DIRS:

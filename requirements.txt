@@ -3,6 +3,12 @@
 # Stage-1 search (ops index/search, keyword + wikilink graph) needs NOTHING beyond Python 3.9+
 # stdlib (sqlite3 with FTS5). The deterministic test suites are stdlib-only too.
 #
+# WHICH interpreter: `ops` dispatches via BARE `python3` on your PATH (see the `ops` script). These
+# packages must be importable by THAT interpreter — not some other venv. If you use a venv, put its
+# bin first on PATH (e.g. `export PATH="$OPS_HOME/.venv/bin:$PATH"`), install there, and confirm with
+# `ops doctor` (it prints "optional: lancedb present"). With OPS_VECTORS=1 but lancedb missing, `ops
+# index` warns and falls back to keyword-only — it never crashes; it just won't build vectors.
+#
 # Stage-2 vectors (OPS_VECTORS=1) — the scale-grade semantic layer (ADR-006) — needs:
 lancedb>=0.33          # embedded, file-based ANN vector store (no server). pip install lancedb
 #

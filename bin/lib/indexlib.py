@@ -42,10 +42,15 @@ def _vectors_on() -> bool:
 
 
 def _vec_modules():
-    """Lazily load the (optional) vector plane; returns (None, None) if unavailable."""
+    """Lazily load the (optional) vector plane; returns (None, None) if unavailable.
+    `import vectorstore` succeeds even without lancedb (it imports lancedb lazily), so we must
+    deep-probe with vectorstore.available() — otherwise index() thinks vectors are on and crashes in
+    pass 2 at the first connect()."""
     try:
         import embed
         import vectorstore
+        if not vectorstore.available():
+            return None, None
         return embed, vectorstore
     except Exception:
         return None, None
@@ -173,8 +178,10 @@ def index(root: Path | str = CONTENT, verbose: bool = True, changed_only: bool =
     vec_on = _vectors_on()
     emb, vs = _vec_modules() if vec_on else (None, None)
     if vec_on and not (emb and vs):
-        print("OPS_VECTORS set but vector plane unavailable (need lancedb + a reachable embedder); "
-              "indexing keyword-only.")
+        print("OPS_VECTORS=1 but lancedb isn't importable by the python3 that runs ops — "
+              "indexing keyword-only (stage 1).\n"
+              "  Enable vectors: pip install -r requirements.txt into THAT interpreter "
+              "(verify: python3 -c 'import lancedb'), then re-run `ops index`. See requirements.txt.")
         vec_on = False
     model = emb.model_name() if vec_on else None
     BATCH = int(os.environ.get("OPS_EMBED_BATCH", "32"))
@@ -231,23 +238,31 @@ def index(root: Path | str = CONTENT, verbose: bool = True, changed_only: bool =
     con.commit()
 
     # --- pass 2: embed the worklist in batches (one Ollama call per batch; durable per batch) ---
+    # The keyword/graph index (pass 1) is already committed and durable. The vector plane is an
+    # optional accelerator, so a mid-run failure here (embedder/Ollama unreachable, lancedb import
+    # that probes but fails on connect, disk) must NOT lose that work — warn and finish keyword-only.
     embedded = 0
     if vec_on and worklist:
-        vs.delete_paths([rel for rel, _ in worklist])  # clear any partial/old vectors (idempotent resume)
-        dim = emb.dim()
-        for i in range(0, len(worklist), BATCH):
-            batch = worklist[i:i + BATCH]
-            vecs = emb.embed_docs([t for _, t in batch])
-            recs = [{"id": rel, "path": rel, "heading": "(note)", "vector": vec}
-                    for (rel, _), vec in zip(batch, vecs)]
-            vs.add_batch(recs, dim)
-            con.executemany("INSERT OR REPLACE INTO embedded(path, model) VALUES(?,?)",
-                            [(rel, model) for rel, _ in batch])
-            con.commit()  # durable: a crash after this batch resumes from here, not from zero
-            embedded += len(batch)
-            if verbose and (embedded % (BATCH * 5) == 0 or embedded == len(worklist)):
-                print(f"  embedded {embedded}/{len(worklist)} notes")
-        vs.maybe_build_ann()
+        try:
+            vs.delete_paths([rel for rel, _ in worklist])  # clear partial/old vectors (idempotent resume)
+            dim = emb.dim()
+            for i in range(0, len(worklist), BATCH):
+                batch = worklist[i:i + BATCH]
+                vecs = emb.embed_docs([t for _, t in batch])
+                recs = [{"id": rel, "path": rel, "heading": "(note)", "vector": vec}
+                        for (rel, _), vec in zip(batch, vecs)]
+                vs.add_batch(recs, dim)
+                con.executemany("INSERT OR REPLACE INTO embedded(path, model) VALUES(?,?)",
+                                [(rel, model) for rel, _ in batch])
+                con.commit()  # durable: a crash after this batch resumes from here, not from zero
+                embedded += len(batch)
+                if verbose and (embedded % (BATCH * 5) == 0 or embedded == len(worklist)):
+                    print(f"  embedded {embedded}/{len(worklist)} notes")
+            vs.maybe_build_ann()
+        except Exception as e:
+            print(f"vector pass failed ({type(e).__name__}: {e}) — keyword/graph index is complete; "
+                  "vectors skipped. Check the embedder (Ollama) and lancedb, then re-run `ops index`.")
+            vec_on = False  # keep the summary honest: don't claim vectors were written
 
     n = con.execute("SELECT COUNT(*) FROM files").fetchone()[0]
     con.close()

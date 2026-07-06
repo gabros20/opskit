@@ -21,6 +21,17 @@ def _lancedb():
     return lancedb
 
 
+def available() -> bool:
+    """True iff the LanceDB backend can actually be imported — a real probe, not a lazy one.
+    `import vectorstore` always succeeds (lancedb is imported lazily in _lancedb), so callers that
+    need to know whether the vector plane will WORK must ask this, not just import the module."""
+    try:
+        _lancedb()
+        return True
+    except Exception:
+        return False
+
+
 def connect():
     LANCE_DIR.parent.mkdir(parents=True, exist_ok=True)
     return _lancedb().connect(str(LANCE_DIR))
