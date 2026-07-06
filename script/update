@@ -31,7 +31,21 @@ git -C "$ROOT" fetch -q "$REMOTE"
 # tree), staged, with conflict markers surfaced. First run (no ref) falls back + warns loudly.
 UPSTREAM_SHA="$(git -C "$ROOT" rev-parse "$REMOTE/$BRANCH")"
 REFFILE="$ROOT/.ops-engine-ref"
-REF=""; [ -f "$REFFILE" ] && REF="$(tr -d '[:space:]' < "$REFFILE")"
+REF=""
+if [ -f "$REFFILE" ]; then
+  REF="$(tr -d '[:space:]' < "$REFFILE")"
+  # The ref MUST be exactly one 40-hex commit SHA. A corrupted ref (e.g. two SHAs concatenated by an
+  # interrupted/duplicated write) makes `git rev-parse "$REF:path"` fail, so every engine file then
+  # 3-way-merges against an EMPTY base → spurious conflict markers everywhere. Reject a malformed or
+  # unknown ref loudly and fall back to the no-ref path (fast checkout) — never merge against garbage.
+  if ! printf '%s' "$REF" | grep -qiE '^[0-9a-f]{40}$'; then
+    printf '\033[33mwarning: .ops-engine-ref is not a single 40-char SHA (%d chars) — ignoring it; treating as a first sync (it is rewritten cleanly below).\033[0m\n' "${#REF}" >&2
+    REF=""
+  elif ! git -C "$ROOT" rev-parse --verify --quiet "${REF}^{commit}" >/dev/null 2>&1; then
+    printf '\033[33mwarning: .ops-engine-ref %s is not a fetched commit — treating as a first sync; run `git fetch %s` for a real 3-way merge.\033[0m\n' "${REF:0:8}" "$REMOTE" >&2
+    REF=""
+  fi
+fi
 CONFLICTS=()
 
 g() { git -C "$ROOT" "$@"; }
@@ -68,7 +82,10 @@ else
       [ -n "$f" ] || continue
       theirs_hash="$(g rev-parse "$REMOTE/$BRANCH:$f" 2>/dev/null)" || continue
       if [ ! -e "$ROOT/$f" ]; then fast_path "$f"; continue; fi          # absent locally → take upstream
-      ours_hash="$(g hash-object "$ROOT/$f")"
+      ours_hash="$(g hash-object "$ROOT/$f" 2>/dev/null || true)"
+      # A working-tree path git can't hash (e.g. `.codex/skills`, a tracked symlink to a directory)
+      # must NOT abort the whole update under `set -e` — take upstream's version and move on.
+      [ -n "$ours_hash" ] || { fast_path "$f"; continue; }
       [ "$ours_hash" = "$theirs_hash" ] && continue                       # already identical → skip
       ref_hash="$(g rev-parse "$REF:$f" 2>/dev/null || true)"
       if [ -n "$ref_hash" ] && [ "$ours_hash" = "$ref_hash" ]; then
@@ -80,7 +97,7 @@ else
   done < "$ROOT/script/engine.txt"
 fi
 
-echo "$UPSTREAM_SHA" > "$REFFILE"; g add -- .ops-engine-ref   # advance + stage the sync ref
+printf '%s\n' "$UPSTREAM_SHA" > "$REFFILE"; g add -- .ops-engine-ref   # single clean write: one SHA + newline, never appended
 
 "$ROOT/ops" help >/dev/null 2>&1 || true   # regenerate ops.json from any new cmd.json
 echo

@@ -3,6 +3,8 @@
 and PATH redirected into a temp dir (OPS_ROOTS_HOME / OPS_BIN_DIR) so real ~/ is never touched."""
 from __future__ import annotations
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -69,6 +71,36 @@ def main() -> int:
         content = {"wiki", "tasks", "journal", "inbox", "test", "ref", "jobs"}
         check("engine manifest lists only framework paths",
               "bin" in paths and "skills" in paths and not (content & set(paths)), str(paths))
+
+        # --- issue #5: script/update must survive a corrupted/invalid .ops-engine-ref (never merge
+        # against garbage) AND not abort on unhashable engine paths (the .codex/skills symlink). Each
+        # case gets a FRESH clone (one update per vault = real usage; a reused vault would inherit the
+        # prior run's staged state). `origin` = the local template clone, a reachable remote for the
+        # real merge path. We copy the working-tree script so the test validates the CURRENT script.
+        cur = git(vault, "rev-parse", "HEAD").stdout.strip()
+        prev = git(vault, "rev-parse", "HEAD~1").stdout.strip()
+        older = git(vault, "rev-parse", "HEAD~3").stdout.strip()
+
+        def _update_case(ref_text, i):
+            v = tmp / f"refcase{i}"
+            subprocess.run(["git", "clone", "-q", str(REPO), str(v)], capture_output=True, text=True)
+            shutil.copy(REPO / "script" / "update", v / "script" / "update")
+            (v / ".ops-engine-ref").write_text(ref_text)
+            r = subprocess.run([str(v / "script" / "update"), "--remote", "origin", "--branch", "main"],
+                               capture_output=True, text=True, env={**env, "OPS_HOME": str(v)})
+            return r, (v / ".ops-engine-ref").read_text().strip()
+
+        u, ref_after = _update_case(cur + prev, 1)  # two SHAs concatenated (the reported corruption)
+        check("corrupted double-SHA ref → warns, no spurious conflicts, exit 0",
+              u.returncode == 0 and "not a single 40-char SHA" in u.stderr and "CONFLICT" not in u.stdout,
+              u.stdout + u.stderr)
+        check("corrupted ref rewritten to a single 40-hex SHA", bool(re.fullmatch(r"[0-9a-f]{40}", ref_after)))
+        u2, _ = _update_case("f" * 40, 2)  # valid format but not a fetched commit
+        check("unfetched ref → warns 'not a fetched commit', exit 0",
+              u2.returncode == 0 and "not a fetched commit" in u2.stderr, u2.stdout + u2.stderr)
+        u3, _ = _update_case(older, 3)  # valid older base → exercises the REAL 3-way merge (.codex/skills symlink)
+        check("valid older ref → real 3-way merge, no fatal/abort (.codex/skills symlink)",
+              u3.returncode == 0 and "fatal" not in (u3.stdout + u3.stderr), u3.stdout + u3.stderr)
 
     print(f"{BOLD}Setup/update flow (script/setup, script/update) — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
