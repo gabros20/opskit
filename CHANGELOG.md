@@ -32,6 +32,10 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
   iframe), and **code blocks that scroll horizontally inside a bordered panel** instead of forcing
   the page wide. The Markdown renderer now also emits real **lists** (`-`/`*`/`+`, `1.`) and
   **blockquotes** (`>`) rather than dumping them as literal-prefixed paragraphs.
+- The viewer no longer strips the `#key` fragment from the URL after decrypting. Doing so left the
+  in-app browser (e.g. Telegram) on a keyless URL, so "Open in Safari" / reload / copy-link failed
+  with "missing key". The key now stays in the fragment (the zero-knowledge model — fragments are
+  never sent to the server), keeping the link reloadable and portable across browsers.
 - **Mobile-browser hardening** for the share pages (`bin/share/worker/worker.js` viewer +
   `sharelib.py` bundle): `viewport-fit=cover`, per-scheme `theme-color`, `color-scheme`, and the
   iOS 26 "Liquid Glass" edge-strip + matching-background pattern so the iPhone status/URL bar blends

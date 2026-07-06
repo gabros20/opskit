@@ -58,7 +58,9 @@ var text=await res.text();var html;
 if(key){html=await decrypt(text,key);}
 else if(text.indexOf("<")>=0){html=text;}
 else return msg("<b>This encrypted link is missing its key.</b><br>The <code>#…</code> part after the id was probably dropped when the link was forwarded — ask the sender for the full link.");
-history.replaceState(null,"",location.pathname);
+// Keep the #key in the URL: it is the zero-knowledge model (fragments are never sent to the
+// server) and the link must stay reloadable, copyable, and openable in another browser
+// (e.g. Telegram in-app -> "Open in Safari"). Stripping it here broke exactly that.
 show(html);
 }catch(e){msg("<b>Could not decrypt this share.</b><br>The key in the link may be wrong or truncated.");}})();
 </script></body></html>`;
