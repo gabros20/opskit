@@ -169,6 +169,36 @@ def read_text(path, opts: dict | None = None) -> tuple[str, str]:
     return "", "none"
 
 
+def ocr_backend_label(opts: dict | None = None) -> str | None:
+    """The label read_text() WOULD select, decided by the same probes/env — no model run. Lets a
+    dry-run / unchanged-file preview show its OCR tier without eagerly paying for the OCR itself
+    (mirrors bin/files/run.py's cheap-label / lazy-run() split for the other extraction tiers)."""
+    opts = opts or {}
+    if _fake():
+        return "fake"
+    mode = (os.environ.get("OPS_OCR", "auto") or "auto").strip().lower()
+    if mode == "none":
+        return None
+    if mode == "glm-ocr":
+        return "mlx-vlm:glm-ocr" if _has_mlx() else None
+    if mode == "deepseek-ocr":
+        return "ollama:deepseek-ocr" if _has_ollama() else None
+    if mode == "apple":
+        return "ocrmac" if _has_ocrmac() else None
+    if mode == "tesseract":
+        return "tesseract" if _has_tesseract() else None
+    # auto
+    if _has_mlx():
+        return "mlx-vlm:glm-ocr"
+    if _has_ollama():
+        return "ollama:deepseek-ocr"
+    if _has_ocrmac():
+        return "ocrmac"
+    if _has_tesseract():
+        return "tesseract"
+    return None
+
+
 # --------------------------------------------------------------------------- VLM dispatch (caption + description)
 
 def _run_mlx_vlm(path: Path, model: str) -> tuple[str, str]:  # pragma: no cover - real model call, never in tests

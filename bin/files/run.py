@@ -44,7 +44,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import agent, notetype, output, paths  # noqa: E402
+from lib import agent, imagelib, notetype, output, paths  # noqa: E402
 
 YEL, GREEN, DIM, CYAN, RESET = "\033[33m", "\033[32m", "\033[2m", "\033[36m", "\033[0m"
 PERSONAL = ("tax", "szja", "nav", "ado", "adó", "medical", "orvos", "contract", "szerzod", "szerződ",
@@ -137,17 +137,13 @@ def _tier_audio(src: Path, opts: dict):
 
 
 def _tier_image(src: Path, opts: dict):
-    if _have_mod("ocrmac"):
-        def run() -> str:
-            from ocrmac import ocrmac
-            return "\n".join(a[0] for a in ocrmac.OCR(str(src)).recognize()).strip()
-        return (f"ocrmac {_mod_version('ocrmac')}", "extract", run)
-    if shutil.which("tesseract"):
-        def run() -> str:
-            return subprocess.run(["tesseract", str(src), "stdout"],
-                                  capture_output=True, text=True).stdout.strip()
-        return ("tesseract (system)", "extract", run)
-    return (None, "image", "no OCR backend — install: pip install ocrmac (Apple Vision) or brew install tesseract")
+    # imagelib owns the full OCR cascade (mlx-vlm/GLM-OCR/DeepSeek-OCR -> ollama -> ocrmac -> tesseract).
+    # ocr_backend_label() is a cheap probe (no model run) matching _tier_pdf/_tier_audio's contract:
+    # the label is known upfront, the actual OCR is deferred to run() — dry-run/unchanged stay free.
+    label = imagelib.ocr_backend_label(opts)
+    if not label:
+        return (None, "image", "no OCR backend — install: pip install ocrmac (Apple Vision) or brew install tesseract")
+    return (label, "extract", lambda: imagelib.read_text(src, opts)[0])
 
 
 def _tier_video(src: Path, is_url: bool, opts: dict):
@@ -201,26 +197,35 @@ def _select_tier(src: Path, is_url: bool, opts: dict):
 
 
 def _augment_warnings(opts: dict) -> list[str]:
-    """--diarize/--describe are explicit opt-ins that NO-OP with a clear message when deps absent."""
+    """--diarize/--describe are explicit opt-ins that NO-OP with a clear message when deps absent.
+    --describe on an IMAGE is handled in _extract_one (real imagelib.describe() cascade); this covers
+    only the non-image case, where no VLM applies but the flag was still passed."""
     w = []
     if opts.get("diarize") and not _have_mod("pyannote.audio"):
         w.append("--diarize requested but pyannote.audio absent — no speaker labels "
                  "(pip install pyannote.audio; needs a gated HF token)")
-    if opts.get("describe") and not shutil.which("ollama"):
+    if opts.get("describe") and not opts.get("_is_image") and not shutil.which("ollama"):
         w.append("--describe requested but ollama absent — no VLM scene captions (install ollama)")
     return w
 
 
-def _write_extract(slug: str, sha: str, tool: str, ntype: str, text: str, shadow: Path) -> Path:
+def _write_extract(slug: str, sha: str, tool: str, ntype: str, text: str, shadow: Path,
+                   vlm: tuple[str, str, str] | None = None) -> Path:
     dest = _extract_note_path(slug)
     title = paths.fm_field(shadow, "title") or slug
     today = paths.today()
     created = (paths.fm_field(dest, "created") if dest.exists() else "") or today
     body = text.strip() or "_(no text extracted)_"
+    vlm_fm = ""
+    if vlm:
+        cap, desc, vbackend = vlm
+        vlm_fm = f"vlm_caption: {cap}\nvlm_backend: {vbackend}\n"
+        if desc.strip():
+            body += f"\n\n## Description\n\n{desc.strip()}\n"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(
         f"---\ntype: {ntype}\ntitle: {title} (extract)\nstatus: derived\n"
-        f"derived_from: \"[[{slug}]]\"\nsource_sha256: {sha}\ntool: {tool}\n"
+        f"derived_from: \"[[{slug}]]\"\nsource_sha256: {sha}\ntool: {tool}\n{vlm_fm}"
         f"created: {created}\nupdated: {today}\ntags: []\n---\n"
         f"# {title} — {ntype}\n\n{body}\n", encoding="utf-8")
     return dest
@@ -240,6 +245,7 @@ def _extract_one(slug: str, opts: dict, dry: bool = False) -> dict:
     if not is_url and not src.exists():
         return {"slug": slug, "status": "source-missing", "message": f"source not found: {src_str}"}
 
+    is_image = not is_url and src.suffix.lower() in IMAGE_SUFFIXES
     tool, second, third = _select_tier(src, is_url, opts)
     if tool is None:
         media, hint = second, third
@@ -254,12 +260,20 @@ def _extract_one(slug: str, opts: dict, dry: bool = False) -> dict:
         return {"slug": slug, "status": "unchanged", "note": rel, "tool": tool, "sha256": sha}
     if dry:
         return {"slug": slug, "status": "would-extract", "note": rel, "tool": tool, "type": ntype}
-    warns = _augment_warnings(opts)
+    warns = _augment_warnings({**opts, "_is_image": is_image})
     try:
         text = run()
     except Exception as e:  # a tier's runtime failure degrades loudly, never a traceback
         return {"slug": slug, "status": "extract-failed", "tool": tool, "message": f"{tool} failed: {e}"}
-    _write_extract(slug, sha, tool, ntype, text, shadow)
+    vlm = None
+    if opts.get("describe") and is_image:
+        cap, desc, vbackend = imagelib.describe(src, opts)
+        if vbackend == "none":
+            warns.append("--describe requested but no VLM backend available — "
+                         "no scene captions (install ollama or mlx-vlm)")
+        else:
+            vlm = (cap, desc, vbackend)
+    _write_extract(slug, sha, tool, ntype, text, shadow, vlm=vlm)
     paths.append_journal(f"files extract {slug} <- {tool}")
     res = {"slug": slug, "status": "extracted", "note": rel, "tool": tool, "type": ntype,
            "sha256": sha, "chars": len(text)}
@@ -344,7 +358,14 @@ def _shadow(dest: Path, title: str, sha: str, hub_slug: str | None) -> Path:
     asset = (f"![{title}]({dest})\n" if is_image
              else f"Shadow note for a binary in `~/files` (not stored in git). File: `{dest}`.\n")
     kind_fm = "kind: image\n" if is_image else ""
-    f.write_text(f"---\ntype: file\n{kind_fm}title: {title}\nstatus: active\nsource: ingest\n"
+    meta_fm = ""
+    if is_image:
+        meta = imagelib.image_metadata(dest)
+        # only keys imagelib actually returns land in frontmatter (width/height/taken/camera need
+        # Pillow; format+bytes are stdlib-only and always present) — never fabricate a missing field.
+        meta_fm = "".join(f"{k}: {meta[k]}\n" for k in ("format", "bytes", "width", "height", "taken", "camera")
+                          if k in meta)
+    f.write_text(f"---\ntype: file\n{kind_fm}{meta_fm}title: {title}\nstatus: active\nsource: ingest\n"
                  f"ingested: {paths.today()}\npath: {dest}\nsha256: {sha}\n{hub_fm}tags: []\n---\n# {title}\n\n"
                  f"{asset}{hub_body}", encoding="utf-8")
     return f

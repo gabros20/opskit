@@ -128,6 +128,63 @@ def main() -> int:
             os.environ.pop("OPS_OCR", None)
             il._has_mlx, il._has_ollama, il._run_mlx_ocr, il._run_ollama_ocr = orig
 
+        # ---------- ocr_backend_label: probe-only prediction of read_text's pick, NO model run ----------
+        orig = (il._has_mlx, il._has_ollama, il._has_ocrmac, il._has_tesseract,
+                il._run_mlx_ocr, il._run_ollama_ocr, il._run_ocrmac, il._run_tesseract)
+        try:
+            # all runners raise — a passing label prediction with no exception proves zero model calls
+            il._run_mlx_ocr = _boom
+            il._run_ollama_ocr = _boom
+            il._run_ocrmac = _boom
+            il._run_tesseract = _boom
+
+            il._has_mlx = lambda: False
+            il._has_ollama = lambda: False
+            il._has_ocrmac = lambda: False
+            il._has_tesseract = lambda: False
+            check("ocr_backend_label auto: all unavailable → None", il.ocr_backend_label() is None)
+
+            il._has_ocrmac = lambda: True
+            check("ocr_backend_label auto: only ocrmac → 'ocrmac'", il.ocr_backend_label() == "ocrmac")
+
+            il._has_mlx = lambda: True
+            check("ocr_backend_label auto: mlx available → 'mlx-vlm:glm-ocr' (matches read_text's pick)",
+                  il.ocr_backend_label() == "mlx-vlm:glm-ocr")
+
+            # explicit backend: label only when its probe passes, else None (no chaining)
+            il._has_mlx, il._has_ollama = (lambda: False), (lambda: True)
+            os.environ["OPS_OCR"] = "glm-ocr"
+            check("ocr_backend_label explicit unavailable → None",
+                  il.ocr_backend_label() is None)
+            os.environ["OPS_OCR"] = "deepseek-ocr"
+            check("ocr_backend_label explicit available → matching label",
+                  il.ocr_backend_label() == "ollama:deepseek-ocr")
+
+            # OPS_OCR=none → None, regardless of probes
+            os.environ["OPS_OCR"] = "none"
+            check("ocr_backend_label OPS_OCR=none → None", il.ocr_backend_label() is None)
+            os.environ.pop("OPS_OCR", None)
+
+            # fake seam
+            os.environ["OPS_IMAGE_FAKE"] = "1"
+            check("ocr_backend_label fake seam → 'fake'", il.ocr_backend_label() == "fake")
+            os.environ.pop("OPS_IMAGE_FAKE", None)
+
+            # cross-check against read_text's actual pick under the same (mocked) probes, with the
+            # mlx runner given a canned no-op result so read_text can be called safely
+            il._has_mlx = lambda: True
+            il._has_ollama = lambda: False
+            il._has_ocrmac = lambda: False
+            il._has_tesseract = lambda: False
+            il._run_mlx_ocr = lambda p, model: "irrelevant"
+            _, actual = il.read_text(png)
+            check("ocr_backend_label matches read_text's actual selection",
+                  il.ocr_backend_label() == actual, f"predicted={il.ocr_backend_label()!r} actual={actual!r}")
+        finally:
+            os.environ.pop("OPS_OCR", None); os.environ.pop("OPS_IMAGE_FAKE", None)
+            (il._has_mlx, il._has_ollama, il._has_ocrmac, il._has_tesseract,
+             il._run_mlx_ocr, il._run_ollama_ocr, il._run_ocrmac, il._run_tesseract) = orig
+
         # ---------- VLM dispatch: primary unavailable (fails), fallback available → uses fallback ----------
         orig = (il._has_mlx, il._has_ollama, il._run_mlx_vlm, il._run_ollama_vlm)
         try:

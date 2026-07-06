@@ -54,6 +54,7 @@ SUITES = [
     ("files: binary-assets plane (§9)", "run_files.py"),
     ("archive + invoice (§4)", "run_archive_invoice.py"),
     ("image-reading backend (imagelib)", "run_image_backend.py"),
+    ("files: imagelib wiring (metadata + OCR + describe)", "run_files_image.py"),
 ]
 
 
