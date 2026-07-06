@@ -17,13 +17,28 @@ const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 // byte-compatible with bin/lib/sharelib.py encrypt(): blob = b64url(nonce[12] || ct || tag[16]),
 // key = b64url(32). The decrypted note renders inside a scriptless sandboxed iframe, so it can never
 // read the key, and the #fragment is stripped from the address bar after load.
-const VIEWER = `<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>ops share</title>
-<style>html,body{margin:0;height:100%}#f{border:0;width:100%;height:100vh;display:none}
-#m{font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#444;
-max-width:34rem;margin:14vh auto;padding:0 1.4rem;text-align:center}
-#m b{color:#111}#m code{background:#f4f4f4;padding:.1em .3em;border-radius:3px}</style></head>
-<body><div id="m">Decrypting…</div><iframe id="f" sandbox referrerpolicy="no-referrer"></iframe>
+const VIEWER = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#FFFCF0">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#100F0F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>ops share</title>
+<style>:root{color-scheme:light dark;--bg:#FFFCF0;--mut:#6F6E69;--st:#100F0F;--cd:#F2F0E5}
+@media (prefers-color-scheme:dark){:root{--bg:#100F0F;--mut:#878580;--st:#CECDC3;--cd:#1C1B1A}}
+html,body{margin:0;height:100%;background:var(--bg)}
+/* iOS 26 "Liquid Glass" ignores theme-color and samples fixed edge elements (must be 100%
+   wide, >=6px tall). These inert 12px strips + the matching bg feed that sampler so the URL
+   bar/status bar blend with the page. */
+.cs{position:fixed;left:0;right:0;height:12px;background:var(--bg);pointer-events:none;z-index:0}
+#f{position:fixed;inset:0;width:100%;height:100%;border:0;display:none;background:var(--bg);z-index:1}
+#m{position:relative;z-index:2;font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+color:var(--mut);max-width:34rem;margin:0 auto;padding:16vh 1.4rem;text-align:center}
+#m b{color:var(--st)}#m code{background:var(--cd);padding:.1em .35em;border-radius:5px}</style></head>
+<body><div class="cs" style="top:0" aria-hidden="true"></div>
+<div class="cs" style="bottom:0" aria-hidden="true"></div>
+<div id="m">Decrypting…</div><iframe id="f" sandbox referrerpolicy="no-referrer"></iframe>
 <script>
 function b64uDec(s){s=s.replace(/-/g,"+").replace(/_/g,"/");s+="=".repeat((4-s.length%4)%4);
 var bin=atob(s),out=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out;}

@@ -39,7 +39,8 @@ _CSS = (
     "--bg:#100F0F;--tx:#CECDC3;--tx2:#878580;--line:#282726;--code:#1C1B1A;--accent:#3AA99F;--sel:#282726}}"
     "*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}"
     "body{margin:0 auto;max-width:44rem;"
-    "padding:3.5rem max(1.25rem,env(safe-area-inset-right)) 6rem max(1.25rem,env(safe-area-inset-left));"
+    "padding:calc(3.5rem + env(safe-area-inset-top)) max(1.25rem,env(safe-area-inset-right)) "
+    "calc(6rem + env(safe-area-inset-bottom)) max(1.25rem,env(safe-area-inset-left));"
     "background:var(--bg);color:var(--tx);overflow-wrap:break-word;-webkit-font-smoothing:antialiased;"
     "font:1.0625rem/1.7 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}"
     "::selection{background:var(--sel)}"
@@ -235,7 +236,10 @@ def render_bundle(notes: list[dict], image_resolver=None) -> str:
     title = notes[0]["title"] if len(notes) == 1 else f"{len(notes)} notes"
     parts = [
         "<!doctype html>", '<html lang="en"><head><meta charset="utf-8">',
-        '<meta name="viewport" content="width=device-width,initial-scale=1">',
+        '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">',
+        '<meta name="color-scheme" content="light dark">',
+        '<meta name="theme-color" media="(prefers-color-scheme:light)" content="#FFFCF0">',
+        '<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#100F0F">',
         f"<title>{html.escape(title)}</title><style>{_CSS}</style></head><body>",
     ]
     for i, n in enumerate(notes):

@@ -32,6 +32,12 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
   iframe), and **code blocks that scroll horizontally inside a bordered panel** instead of forcing
   the page wide. The Markdown renderer now also emits real **lists** (`-`/`*`/`+`, `1.`) and
   **blockquotes** (`>`) rather than dumping them as literal-prefixed paragraphs.
+- **Mobile-browser hardening** for the share pages (`bin/share/worker/worker.js` viewer +
+  `sharelib.py` bundle): `viewport-fit=cover`, per-scheme `theme-color`, `color-scheme`, and the
+  iOS 26 "Liquid Glass" edge-strip + matching-background pattern so the iPhone status/URL bar blends
+  with the note instead of showing a white/dark band; the viewer's iframe is pinned to the visual
+  viewport (`position:fixed; inset:0`) to avoid the `100vh` address-bar jump; and note padding now
+  respects `env(safe-area-inset-*)` so text clears the notch/home indicator.
 - Documented the viewer, the `?raw=1` route, the content-negotiated `GET`, and the Cloudflare
   User-Agent gotcha in `bin/share/worker/README.md`.
 
