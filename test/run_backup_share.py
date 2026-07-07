@@ -121,6 +121,22 @@ def main() -> int:
     dropped = sl.render_note_html("![pic](big.png)\n", set(), image_resolver=lambda p: None)
     check("render: over-cap image dropped to alt text", "data:image" not in dropped and "pic" in dropped)
 
+    tbl_md = (
+        "| Role | Model |\n"
+        "|------|-------|\n"
+        "| **Default** | `gemma4:e4b` |\n"
+        "| HU override | OpenEuroLLM |\n"
+    )
+    tbl_html = sl.render_note_html(tbl_md, set())
+    check("render: GFM table → <table>", "<table>" in tbl_html and "<thead>" in tbl_html and "<tbody>" in tbl_html)
+    check("render: table cells not raw pipe paragraphs",
+          "<p>| Role |" not in tbl_html and "gemma4:e4b" in tbl_html)
+    check("render: table-wrap for mobile scroll", "table-wrap" in sl.render_bundle(
+        [{"slug": "t", "title": "T", "md": tbl_md}]))
+
+    pipe_only = "| not a table without separator |\n"
+    check("render: lone pipe line stays paragraph", "<table>" not in sl.render_note_html(pipe_only, set()))
+
     # ---------- share: dry-run render (offline), confirm-gate, fake-transport bookkeeping ----------
     with tempfile.TemporaryDirectory() as td:
         h = Path(td) / "ops"; roots = Path(td) / "roots"

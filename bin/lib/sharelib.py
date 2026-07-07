@@ -27,6 +27,40 @@ _LINK = re.compile(r"\[\[([^\]]+)\]\]")
 _IMG = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 _BOLD = re.compile(r"\*\*([^*]+)\*\*")
 _ICODE = re.compile(r"`([^`]+)`")
+_SEP_CELL = re.compile(r"^:?-{1,}:?$")
+
+
+def _split_table_row(line: str) -> list[str]:
+    """GFM pipe row → cell strings (outer pipes optional)."""
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|"):
+        s = s[:-1]
+    return [c.strip() for c in s.split("|")]
+
+
+def _is_table_separator(line: str) -> bool:
+    cells = _split_table_row(line)
+    return bool(cells) and all(_SEP_CELL.match(c.replace(" ", "")) for c in cells)
+
+
+def _is_table_row(line: str) -> bool:
+    if "|" not in line:
+        return False
+    return len(_split_table_row(line)) >= 2
+
+
+def _render_table(header: list[str], body: list[list[str]], inl) -> str:
+    def row(cells: list[str], tag: str) -> str:
+        return "<tr>" + "".join(f"<{tag}>{inl(c)}</{tag}>" for c in cells) + "</tr>"
+    parts = ['<div class="table-wrap"><table>']
+    parts.append("<thead>" + row(header, "th") + "</thead>")
+    if body:
+        parts.append("<tbody>" + "".join(row(r, "td") for r in body) + "</tbody>")
+    parts.append("</table></div>")
+    return "".join(parts)
+
 _MDLINK = re.compile(r"(?<!\!)\[([^\]]+)\]\(([^)]+)\)")
 
 # Self-contained reading stylesheet (Flexoki palette, kepano-minimal). Pure CSS — no JS, no external
@@ -62,6 +96,11 @@ _CSS = (
     "border-radius:10px;overflow-x:auto;-webkit-overflow-scrolling:touch}"
     "pre code{background:none;padding:0;border-radius:0;font-size:.86rem;line-height:1.55;"
     "display:block;white-space:pre}"
+    ".table-wrap{margin:1.25rem 0;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}"
+    "table{width:max-content;min-width:100%;border-collapse:collapse;font-size:.94rem;line-height:1.45}"
+    "th,td{border:1px solid var(--line);padding:.45rem .65rem;text-align:left;vertical-align:top}"
+    "th{font-weight:650;background:var(--code);white-space:nowrap}"
+    "td code{white-space:nowrap}"
     ".ops-note{margin-bottom:2rem}"
 )
 
@@ -163,20 +202,25 @@ def render_note_html(md: str, resolvable: set[str], image_resolver=None) -> str:
     def inl(s):
         return _md_inline(html.escape(s), resolvable)
 
-    for raw in lines:
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
         if raw.strip().startswith("```"):
             close_list(); close_quote()
             out.append("</code></pre>" if in_code else "<pre><code>")
             in_code = not in_code
+            i += 1
             continue
         if in_code:
             out.append(html.escape(raw))
+            i += 1
             continue
 
         stripped = raw.strip()
         if stripped == "":
             close_list(); close_quote()
             out.append("")
+            i += 1
             continue
 
         # images (whole-line) first — before escaping — so data URIs inline
@@ -187,6 +231,23 @@ def render_note_html(md: str, resolvable: set[str], image_resolver=None) -> str:
             uri = image_resolver(path) if image_resolver else None
             out.append(f'<img alt="{html.escape(alt)}" src="{uri}">' if uri
                        else f"<p><em>{html.escape(alt or path)}</em></p>")
+            i += 1
+            continue
+
+        # GFM pipe tables: header row + |---| separator + body rows
+        if (_is_table_row(stripped) and i + 1 < len(lines)
+                and _is_table_separator(lines[i + 1].strip())):
+            close_list(); close_quote()
+            header = _split_table_row(stripped)
+            i += 2
+            body: list[list[str]] = []
+            while i < len(lines):
+                row_st = lines[i].strip()
+                if row_st == "" or not _is_table_row(row_st):
+                    break
+                body.append(_split_table_row(row_st))
+                i += 1
+            out.append(_render_table(header, body, inl))
             continue
 
         hm = re.match(r"^(#{1,6})\s+(.*)$", raw)
@@ -194,6 +255,7 @@ def render_note_html(md: str, resolvable: set[str], image_resolver=None) -> str:
             close_list(); close_quote()
             lvl = len(hm.group(1))
             out.append(f"<h{lvl}>{inl(hm.group(2))}</h{lvl}>")
+            i += 1
             continue
 
         um = re.match(r"^\s*[-*+]\s+(.*)$", raw)
@@ -202,6 +264,7 @@ def render_note_html(md: str, resolvable: set[str], image_resolver=None) -> str:
             if list_type != "ul":
                 close_list(); out.append("<ul>"); list_type = "ul"
             out.append(f"<li>{inl(um.group(1))}</li>")
+            i += 1
             continue
 
         om = re.match(r"^\s*\d+[.)]\s+(.*)$", raw)
@@ -210,6 +273,7 @@ def render_note_html(md: str, resolvable: set[str], image_resolver=None) -> str:
             if list_type != "ol":
                 close_list(); out.append("<ol>"); list_type = "ol"
             out.append(f"<li>{inl(om.group(1))}</li>")
+            i += 1
             continue
 
         qm = re.match(r"^\s*>\s?(.*)$", raw)
@@ -218,10 +282,12 @@ def render_note_html(md: str, resolvable: set[str], image_resolver=None) -> str:
             if not in_quote:
                 out.append("<blockquote>"); in_quote = True
             out.append(f"<p>{inl(qm.group(1))}</p>")
+            i += 1
             continue
 
         close_list(); close_quote()
         out.append(f"<p>{inl(raw)}</p>")
+        i += 1
 
     close_list(); close_quote()
     if in_code:  # defensive: unterminated fence
