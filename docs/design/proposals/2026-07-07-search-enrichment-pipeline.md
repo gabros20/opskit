@@ -77,6 +77,37 @@ extractor loads → text → unloads (`keep_alive:0` / process exit) → the enr
 meta → unloads. Peak RAM ≈ the larger single model (~5–6 GB), never the sum — the same discipline as
 the image design. `OPS_ENRICH_KEEP_ALIVE=0` by default.
 
+### 2.1 Swappable by construction — one provider, uniform config, `ops models`
+
+Model choice must be **env config, not code** — so you can A/B any Ollama-compatible model, retrofit a
+new speech-to-text engine, or add a runtime without touching a verb. Today that's only half-true
+(OCR/VLM/embed have env knobs, but the **audio/STT tier hardcodes** `mlx-community/parakeet-tdt-0.6b-v2`
+with no override, the env names are ad-hoc, and there is no download/offload surface). This proposal
+therefore lands on a small model-layer foundation (build package **E0**):
+
+- **One provider — `bin/lib/models.py`.** Every model-backed stage (`stt`, `ocr`, `vlm`, `enrich`,
+  `embed`, `rerank`) resolves `(model, runtime, keep_alive, fallback)` from env and calls
+  `models.generate(stage, …)`. Runtimes are pluggable: `ollama` (HTTP, `keep_alive`), `mlx`
+  (mlx-vlm / mlx-whisper), `builtin` (paddle, faster-whisper, deterministic tools). `imagelib`,
+  `enrichlib`, and the audio tier become thin callers. **Adding a model = an env var; adding a runtime
+  = one provider extension; nothing else changes.**
+- **Uniform env contract.** `OPS_<STAGE>_MODEL`, `OPS_<STAGE>_MODEL_FALLBACK`, `OPS_<STAGE>_RUNTIME`
+  (else `OPS_MLX=auto` decides), and a global `OPS_MODEL_KEEP_ALIVE` (default `0`). Existing names
+  (`OPS_VLM`, `OPS_OCR`, `OPS_EMBED_MODEL`, `OPS_RERANK_MODEL`, `OPS_AGENT_MODEL`) keep working as
+  back-compat aliases. **STT joins the contract:** `OPS_STT_MODEL`/`OPS_STT_RUNTIME` retrofit the audio
+  tier, so whisper/parakeet — or a different ASR entirely — swap by setting one variable.
+- **`ops models` — the download / offload / test surface (the "script" you want, as a verb):**
+  - `ops models list` — per stage: configured model · runtime · pulled? · resident?
+  - `ops models pull [--stage <s> | --all]` — `ollama pull` the configured models (the *download*).
+  - `ops models stop [--all]` — `ollama stop` (the *offload* / wind-down); `status` → `ollama ps`.
+  - `ops models test <stage> [--model <m>] [--input <file>]` — pull if needed, run the stage on a
+    sample (or your file), print output + timing. **This is "test a new model on demand"**: A/B a
+    candidate against the current default with zero wiring, then adopt it by setting its env var.
+  A `builtin`/`OPS_MODELS_FAKE` seam keeps the offline suite green with nothing pulled.
+
+The rest of this proposal (enrich stage, schema, fallback) sits on top of this layer: the enrich model
+is just `OPS_ENRICH_MODEL` resolved through the same provider as every other stage.
+
 ## 3. Schema + index changes (so the meta is actually searched)
 
 - Add **`description`** (1–2 sentences) and **`keywords`** (5–10 topical terms) to `wiki/conventions.md`.
@@ -123,10 +154,14 @@ of generated meta beyond the note's own frontmatter (it's descriptive, revertibl
 
 | Pkg | What | New code | Depends on |
 |---|---|---|---|
+| **E0** | **`bin/lib/models.py` provider** (ollama/mlx/builtin runtimes) + uniform `OPS_<STAGE>_MODEL` env with back-compat aliases + **`ops models` verb** (list/pull/stop/status/test) + retrofit OCR/VLM/**STT**/embed to route through it | med | — |
 | E1 | `description`/`keywords` schema (`conventions.md`) + index support (embed lead + FTS) + `--reembed` | small | — |
-| E2 | `bin/lib/enrichlib.py`: the summarize+tag call (Ollama structured outputs, `keep_alive:0`) + YAKE/RAKE deterministic fallback + `OPS_ENRICH_FAKE` seam + unit tests | small–med | E1 |
+| E2 | `bin/lib/enrichlib.py`: the summarize+tag call (structured outputs via the provider) + YAKE/RAKE deterministic fallback + `OPS_ENRICH_FAKE` seam + unit tests | small–med | E0, E1 |
 | E3 | `ops enrich <slug>` verb + wire into `files extract` / `bookmark`; `ops doctor` probe for the enrich model | small | E2 |
 | E4 | *(adjacent)* URL entry for the video tier (`ingest <url>` or `bookmark --extract`) | small | — |
 
-E1–E3 are the enrichment pipeline; E4 unblocks YouTube/video transcription. Each ships behind the
-`OPS_ENRICH_FAKE` seam so the offline suite stays green without any model pulled.
+**E0 is the modularity foundation** — do it first; it makes every stage's model swappable by env and
+adds the download/offload/test surface, and can ship on its own (it's pure refactor + a new management
+verb, backward-compatible). E1–E3 are the enrichment pipeline on top; E4 unblocks YouTube/video
+transcription. Each package ships behind the `OPS_*_FAKE` seam so the offline suite stays green with
+no model pulled.

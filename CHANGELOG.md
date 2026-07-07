@@ -14,8 +14,11 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
   `OpenEuroLLM-Hungarian` as the HU-max override), feeding both keyword and semantic search. The
   `.extract.md` note is the file-based working memory between models; models load per-note and unload
   (`keep_alive:0`); a deterministic YAKE/RAKE fallback keeps search improving with no model pulled.
-  Also flags the adjacent gap that no verb currently reaches the video/URL extraction tier for a bare
-  URL. Proposed, not yet implemented.
+  Sits on a **modular model-provider layer** (`bin/lib/models.py`) with a uniform `OPS_<STAGE>_MODEL`
+  env contract and an **`ops models`** verb (list/pull/stop/status/test) so any Ollama-compatible model
+  — including a swappable **STT** engine (today hardcoded) — can be interchanged and A/B-tested on
+  demand with zero wiring. Also flags the adjacent gap that no verb currently reaches the video/URL
+  extraction tier for a bare URL. Proposed, not yet implemented.
 - **Cross-architecture image reading proposal**
   ([#1](https://github.com/gabros20/personal-operating-system/issues/1),
   [`docs/design/proposals/2026-07-06-image-reading.md`](docs/design/proposals/2026-07-06-image-reading.md)).
