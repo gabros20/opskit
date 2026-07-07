@@ -13,7 +13,9 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
   ingested source (image/voice/video/pdf/link) via a small local LLM (default `gemma4:e4b` for EN+HU;
   `OpenEuroLLM-Hungarian` as the HU-max override), feeding both keyword and semantic search. The
   `.extract.md` note is the file-based working memory between models; models load per-note and unload
-  (`keep_alive:0`); a deterministic YAKE/RAKE fallback keeps search improving with no model pulled.
+  (`keep_alive:0`); a deterministic **stdlib** keyword floor (YAKE an optional upgrade) keeps search
+  improving with no model pulled. Revised after an Opus QA pass (value-first sequencing; meta on the
+  shadow note; block-list `keywords`; determinism/idempotency + empty-extraction guards).
   Sits on a **modular model-provider layer** (`bin/lib/models.py`) with a uniform `OPS_<STAGE>_MODEL`
   env contract and an **`ops models`** verb (list/pull/stop/status/test) so any Ollama-compatible model
   — including a swappable **STT** engine (today hardcoded) — can be interchanged and A/B-tested on
