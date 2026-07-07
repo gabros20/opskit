@@ -17,6 +17,12 @@ lives in `docs/design/PERSONAL_OS_DESIGN.md` §10.1.
 Allowed `type`: `client | project | area | person | tool | note | runbook | skill | decision |
 meeting | research | prediction | bookmark`.
 
+Auto-generated meta (optional, written by `ops enrich`): `description` (single line, one-to-two
+sentences, `fm_field`-readable) and `keywords` (a **block list** — `- keyword` lines, read via
+`_fm_block`, never inline `[a, b]`; an inline flow list is exactly what `ops doctor`'s frontmatter-churn
+check flags). Frontmatter already leads every note, so both fields are keyword- and vector-searchable
+for free.
+
 The type registry is **data-driven** — the authoritative list (and each type's target folder and
 per-type body template) lives in `templates/wiki/` (`types.json` + `<type>.md`). Adding a note type is
 config, not code: add an entry to `types.json` (and optionally a `<type>.md` template), and it's

@@ -1,0 +1,29 @@
+{
+  "verb": "models",
+  "summary": "download/offload/test surface for the model layer: list|status|stop|pull|test per stage (stt, ocr, vlm, enrich, embed, rerank)",
+  "usage": "ops models list | status | stop [--all] [<model>] | pull [--stage <s>|--all] --yes | test <stage> [--model <m>] [--input <file>] --yes",
+  "risk": "safe_write",
+  "args": [
+    {
+      "name": "action",
+      "required": false
+    }
+  ],
+  "reads": [
+    "OPS_OCR / OPS_VLM / OPS_ENRICH_MODEL / OPS_EMBED_MODEL / OPS_RERANK_MODEL env",
+    "ollama (CLI, if installed)"
+  ],
+  "writes": [
+    "ollama's local model store (pull only; outside ~/ops)"
+  ],
+  "hints": "Per-stage model management, env-config-driven (proposal docs/design/proposals/2026-07-07-search-enrichment-pipeline.md §2.1). `list` shows each stage's configured model, runtime, and whether it's pulled/available — pure probes, never loads a model. `status` is `ollama ps` (resident models). `stop [--all]` unloads a resident model (`ollama stop`) — free of --yes, it just reloads on next use. `pull [--stage <s>|--all]` and `test <stage> [--model <m>] [--input <file>]` both self-gate: without --yes they refuse with EXIT_CONFIRM(3) and print the exact re-run, because both can pull gigabytes; test then runs the stage's configured (or --model override) model on a sample/--input and prints output + timing, so you can A/B a candidate before adopting it by setting its env var. stt/rerank are pip-managed runtimes, not ollama models — pull skips them with a note. Common mistake: expecting `pull`/`test` to run without --yes — they never do, by design.",
+  "output": {
+    "mode": "rows",
+    "fields": {
+      "stage": "string",
+      "model": "string",
+      "runtime": "string",
+      "available": "bool"
+    }
+  }
+}

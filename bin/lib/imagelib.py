@@ -14,11 +14,19 @@ canned output so the offline suite can exercise dispatch logic with zero models 
 from __future__ import annotations
 import base64
 import importlib.util
+import json
 import os
 import platform
 import shutil
 import subprocess
+import urllib.request
 from pathlib import Path
+
+# Ollama is talked to over its HTTP API via stdlib urllib (mirrors bin/lib/embed.py) — never `import
+# ollama` (a pip package NOT in requirements.txt; `_has_ollama()` only probes the CLI, so importing
+# the pip package here would let a host with the CLI but not the package pass the probe then
+# ImportError at runtime).
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
 try:
     from PIL import Image, ExifTags  # type: ignore
@@ -121,12 +129,20 @@ def _run_mlx_ocr(path: Path, model: str) -> str:  # pragma: no cover - real mode
     return (generate(m, processor, prompt, [str(path)], verbose=False).text or "").strip()
 
 
+def _ollama_generate(model: str, prompt: str, b64_image: str, keep_alive) -> str:  # pragma: no cover
+    """POST /api/generate with the image inlined as base64, non-streamed (one JSON object back)."""
+    payload = {"model": model, "prompt": prompt, "images": [b64_image], "keep_alive": keep_alive,
+              "stream": False}
+    req = urllib.request.Request(OLLAMA_HOST + "/api/generate", data=json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as r:
+        return (json.loads(r.read()).get("response") or "").strip()
+
+
 def _run_ollama_ocr(path: Path, model: str) -> str:  # pragma: no cover - real model call, never in tests
-    import ollama
     b64 = base64.b64encode(Path(path).read_bytes()).decode("ascii")
-    r = ollama.generate(model=model, prompt="Transcribe all text in this image, verbatim.",
-                        images=[b64], keep_alive=os.environ.get("OPS_VLM_KEEP_ALIVE", "0"))
-    return (r.get("response") or "").strip()
+    return _ollama_generate(model, "Transcribe all text in this image, verbatim.", b64,
+                            os.environ.get("OPS_VLM_KEEP_ALIVE", "0"))
 
 
 def _run_ocrmac(path: Path) -> str:  # pragma: no cover - real model call, never in tests
@@ -217,12 +233,9 @@ def _run_mlx_vlm(path: Path, model: str) -> tuple[str, str]:  # pragma: no cover
 
 
 def _run_ollama_vlm(path: Path, model: str, keep_alive: str) -> tuple[str, str]:  # pragma: no cover
-    import ollama
     b64 = base64.b64encode(Path(path).read_bytes()).decode("ascii")
-    r = ollama.generate(model=model,
-                        prompt="Caption this image in one line, then describe it in one short paragraph.",
-                        images=[b64], keep_alive=keep_alive)
-    out = (r.get("response") or "").strip()
+    out = _ollama_generate(model, "Caption this image in one line, then describe it in one short paragraph.",
+                           b64, keep_alive)
     lines = out.splitlines()
     return (lines[0].strip() if lines else ""), ("\n".join(lines[1:]).strip() if len(lines) > 1 else out)
 
