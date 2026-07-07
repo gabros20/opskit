@@ -34,6 +34,12 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
   backends are `# pragma: no cover` pending on-host validation.
 
 ### Fixed
+- **`ops share` preview: GFM pipe tables rendered as raw `|` paragraphs**
+  ([#6](https://github.com/gabros20/personal-operating-system/issues/6)). `sharelib.render_note_html`
+  now recognizes header + `|---|` separator + body rows and emits `<table>` inside a horizontally
+  scrollable `.table-wrap` (same mobile discipline as `pre` blocks). Inline markdown in cells still
+  runs through the existing inline pass.
+
 - **`ops index` crashed with `OPS_VECTORS=1` when `lancedb` was missing**
   ([#3](https://github.com/gabros20/personal-operating-system/issues/3)). The vector-plane probe
   (`indexlib._vec_modules`) only checked that `vectorstore` imports — but `vectorstore` imports
