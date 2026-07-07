@@ -40,6 +40,8 @@ guess a permanent home.
 | Durable knowledge (something learned, a decision, a how-to) | `~/ops/wiki/` (notes/ for atomic ideas; the entity hub for client/project facts) | edit the note; `ops wiki new` for a new one |
 | Multi-step work to track | `~/ops/tasks/<status>/` | `ops task add` |
 | A binary doc you RECEIVED (brief, contract draft, asset, research PDF) | `~/files/<area>/…/in/` or `research/`, + a shadow note in the wiki | `ops files ingest` |
+| An ingested PDF/audio/video/image you want to search or read as text | a sibling derived note `wiki/files/<slug>.extract.md` (markdown/transcript/OCR) | `ops files extract <slug>` |
+| A link/article/URL you want saved and searchable | `wiki/bookmarks/` (a `type: bookmark` note; readable text pulled in) | `ops bookmark <url>` |
 | A binary you PRODUCED (invoice, export, report) | the project's `~/files/.../out/`, linked from its wiki note | the producing verb writes it there |
 | A personal/legal/family doc (tax, medical, ID, signed master) | iCloud — **you do NOT file this; you PROPOSE the destination and stop** | report the suggested path |
 | **A code repo** | see the routing tree below — this is where misfiling happens | `ops new project` / by hand |
@@ -114,9 +116,25 @@ Discover the live, authoritative set with `ops help`; this is the working summar
 - Tasks:             `ops task list|add "<title>"|show <id>|move <id> <status>|done <id>`
 - Knowledge:         `ops wiki open <slug>|new <type> <name>|backlinks <slug>|stale|orphans`
 - Filing:            `ops triage` (text → tasks/wiki) · `ops files ingest` (binaries → ~/files + shadow note)
-  - `ops files extract <img> [--describe]` OCRs an image (+ optional VLM description) — needs models
-    installed/pulled, see [`docs/image-reading.md`](../../docs/image-reading.md); degrades to
-    deterministic OCR (`ocrmac`/`tesseract`) without them, never crashes.
+  - `ops files extract <slug>` turns an ingested source into a searchable derived note
+    (`wiki/files/<slug>.extract.md`) — tier auto-detected by media type: PDF → markdown
+    (pymupdf4llm, `--heavy` for docling), audio → transcript (`--lang`, `--diarize` for speaker
+    labels), video/URL → transcript via yt-dlp captions, txt/md → plain text. Each tier is an
+    optional dep that degrades to a one-line install hint instead of crashing; same-bytes+same-tool
+    re-run is a no-op, `--reextract` forces.
+    - `ops files extract <img> [--describe]` OCRs an image (+ optional VLM description) — needs models
+      installed/pulled, see [`docs/image-reading.md`](../../docs/image-reading.md); degrades to
+      deterministic OCR (`ocrmac`/`tesseract`) without them, never crashes.
+    - the video/URL tier needs a shadow note whose `path:` is already the URL — there's no
+      `ingest <url>` support yet, so a bare link/YouTube URL doesn't have a verb-based way in;
+      save it with `ops bookmark` instead (below).
+  - `ops files distill <slug>` compiles an extract note into 1-N draft concept notes in
+    `wiki/notes/` (agent-typed with an agent configured, heading-outline fallback without); promote
+    with `ops triage drafts`.
+  - `ops bookmark <url> [--archive]` saves an article/link as a searchable `type: bookmark` note
+    (readable text via trafilatura when installed, crude tag-strip fallback otherwise); `--archive`
+    also snapshots the page HTML to `~/files/bookmarks/` against link-rot. Any http(s) URL is
+    accepted as a generic link — there's no special x.com/tweet handling.
 - Work scaffolding:  `ops new project|client "<name>"` (asks/uses the routing tree above)
 - Repo lifecycle:    `ops repo health|clone <p>|clone --all` · `ops archive <project>` (dead repo → bundle)
 - Business:          `ops invoice <client>` (DRAFT only; reads tax-formula.md; never sends)
