@@ -13,6 +13,7 @@ Start with the project [README](../README.md) (what this is + install). Docs her
 | [`mobile-and-capture.md`](mobile-and-capture.md) | capture from phone/share-sheet; read the vault on mobile (git is the only sync) | How-to |
 | [`agent-terminal-search.md`](agent-terminal-search.md) | get semantic search working when an agent terminal (Hermes, dispatch, cron) drives `ops` — venv, PATH, shell init | How-to |
 | [`image-reading.md`](image-reading.md) | set up image metadata/OCR/VLM description (`ops files extract` on images) — install per host, env knobs, degradation | How-to |
+| [`search-enrichment.md`](search-enrichment.md) | set up generated `description`/`keywords` meta (`ops enrich`, auto-wired into `files extract`/`bookmark`) and the `ops models` surface — install, env knobs, degradation | How-to |
 | [`obsidian-compat.md`](obsidian-compat.md) | the normative definition of "Obsidian-compatible" (what ops emits vs tolerates) | Reference |
 | [`DECISIONS.md`](DECISIONS.md) | the ADR log — every load-bearing decision, with the why | Explanation (record) |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | what changed and when (newest first) | Reference (record) |

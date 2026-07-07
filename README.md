@@ -125,6 +125,11 @@ auto-detected — nothing is required to run `ops`:
   GLM-OCR/DeepSeek-OCR and VLM description via Qwen3-VL/moondream, both through `mlx-vlm` on Apple
   Silicon or Ollama on any host, falling back to `ocrmac` / `tesseract` with neither installed. See
   [`docs/image-reading.md`](docs/image-reading.md) for per-host setup.
+- Search enrichment (`ops enrich`, auto-wired into `files extract`/`bookmark`): generates a
+  `description` + `keywords` per source via a local Ollama model (`gemma4:e4b` default, EN+HU),
+  falling back to a deterministic stdlib keyword floor with none installed. `ops models` manages the
+  model behind this and every other stage (list/pull/stop/test). See
+  [`docs/search-enrichment.md`](docs/search-enrichment.md).
 - End-to-end-encrypted sharing: `cryptography` (else `ops share --plain` still works).
 - Off-machine backup: [`restic`](https://restic.net).
 - Terminal niceties: [`glow`](https://github.com/charmbracelet/glow) or `bat` (rendering),

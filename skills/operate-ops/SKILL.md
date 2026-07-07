@@ -135,6 +135,15 @@ Discover the live, authoritative set with `ops help`; this is the working summar
     (readable text via trafilatura when installed, crude tag-strip fallback otherwise); `--archive`
     also snapshots the page HTML to `~/files/bookmarks/` against link-rot. Any http(s) URL is
     accepted as a generic link — there's no special x.com/tweet handling.
+    - both `files extract` and `bookmark` auto-call `ops enrich` afterward (best-effort, unless
+      `OPS_ENRICH=off`) to generate `description`/`keywords` for search — see below.
+  - `ops enrich <slug> [--reenrich] | --all` generates `{description, keywords}` for a note's
+    derived text and writes it to frontmatter, feeding both keyword and semantic search; idempotent
+    via a content hash, `--reenrich` forces. Needs a local model pulled (`ollama pull gemma4:e4b`)
+    or it degrades to a deterministic stdlib keyword floor — never crashes. See
+    [`docs/search-enrichment.md`](../../docs/search-enrichment.md).
+  - `ops models list|status|stop|pull|test` — see/download/offload/A-B-test the model behind any
+    stage (stt/ocr/vlm/enrich/embed/rerank); `pull`/`test` are confirm-gated (`--yes`). Same doc.
 - Work scaffolding:  `ops new project|client "<name>"` (asks/uses the routing tree above)
 - Repo lifecycle:    `ops repo health|clone <p>|clone --all` · `ops archive <project>` (dead repo → bundle)
 - Business:          `ops invoice <client>` (DRAFT only; reads tax-formula.md; never sends)

@@ -49,3 +49,13 @@ mlx-vlm>=0.1 ; platform_system == "Darwin" and platform_machine == "arm64"
 #   ocrmac      — Apple Vision framework, Apple Silicon or Intel, install via: pip install ocrmac
 #   tesseract   — system binary, any platform, install via: brew install tesseract
 # Layer 3 (--describe) has no non-model fallback; with neither mlx-vlm nor Ollama, it is skipped.
+#
+# Search enrichment (ops enrich; auto-wired into `ops files extract`/`ops bookmark`; see
+# docs/search-enrichment.md) — NOT a pip dep, a model pulled via Ollama:
+#   ollama pull gemma4:e4b            # default (OPS_ENRICH_MODEL) — EN + Hungarian, ~5 GB
+#   ollama pull OpenEuroLLM-Hungarian # Hungarian-max override
+#   ollama pull gemma4:e2b            # low-RAM alternative
+# With no model reachable, enrichment falls back to a deterministic stdlib keyword floor (no pip
+# deps) — it never crashes. STT model swapping (OPS_STT_MODEL/OPS_STT_RUNTIME) needs no new package
+# here either — it overrides the model id/backend within whichever ASR pip package (parakeet-mlx,
+# mlx-whisper, faster-whisper) `ops files extract`'s audio tier already auto-detects.

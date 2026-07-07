@@ -7,20 +7,29 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
 ## [Unreleased]
 
 ### Added
-- **Search-enrichment pipeline proposal**
-  ([`docs/design/proposals/2026-07-07-search-enrichment-pipeline.md`](docs/design/proposals/2026-07-07-search-enrichment-pipeline.md)).
-  Design for a modality-agnostic "enrich" stage that generates a `description` + `keywords` for every
+- **Search-enrichment pipeline**
+  ([`docs/design/proposals/2026-07-07-search-enrichment-pipeline.md`](docs/design/proposals/2026-07-07-search-enrichment-pipeline.md),
+  [`docs/search-enrichment.md`](docs/search-enrichment.md)).
+  A modality-agnostic **"enrich" stage** that generates a `description` + `keywords` for every
   ingested source (image/voice/video/pdf/link) via a small local LLM (default `gemma4:e4b` for EN+HU;
-  `OpenEuroLLM-Hungarian` as the HU-max override), feeding both keyword and semantic search. The
+  `OpenEuroLLM-Hungarian` as the HU-max override), feeding both keyword and semantic search for free
+  (frontmatter is already the top FTS chunk and leads the embed window — no new index code). The
   `.extract.md` note is the file-based working memory between models; models load per-note and unload
-  (`keep_alive:0`); a deterministic **stdlib** keyword floor (YAKE an optional upgrade) keeps search
-  improving with no model pulled. Revised after an Opus QA pass (value-first sequencing; meta on the
-  shadow note; block-list `keywords`; determinism/idempotency + empty-extraction guards).
-  Sits on a **modular model-provider layer** (`bin/lib/models.py`) with a uniform `OPS_<STAGE>_MODEL`
-  env contract and an **`ops models`** verb (list/pull/stop/status/test) so any Ollama-compatible model
-  — including a swappable **STT** engine (today hardcoded) — can be interchanged and A/B-tested on
-  demand with zero wiring. Also flags the adjacent gap that no verb currently reaches the video/URL
-  extraction tier for a bare URL. Proposed, not yet implemented.
+  (`OPS_ENRICH_KEEP_ALIVE`, default `0`); a deterministic **stdlib** keyword floor keeps search
+  improving with no model pulled, and enrichment is idempotent (a content-hash `enrich_key`, plain
+  re-runs are no-ops, `--reenrich` forces).
+  New **`ops enrich <slug> [--reenrich] | --all`** verb, auto-wired (best-effort, non-fatal) into
+  `ops files extract` and `ops bookmark` unless `OPS_ENRICH=off`. New **`ops models`**
+  verb (`list|status|stop|pull|test`) — a management surface for the model behind every stage
+  (stt/ocr/vlm/enrich/embed/rerank): see what's configured/pulled/resident, offload a resident model,
+  or A/B-test a candidate on a sample before adopting it via its env var (`pull`/`test` are
+  confirm-gated `--yes`). Also ships **`OPS_STT_MODEL`/`OPS_STT_RUNTIME`**, retrofitting the one
+  previously-hardcoded model choice (the audio transcription tier) onto the same env-config pattern.
+  `ops doctor` gained a soft probe for enrich-model reachability. Also flags the adjacent gap that no
+  verb currently reaches the video/URL extraction tier for a bare URL (unaddressed).
+  **Implemented** (commits `d3e617c`/`65cab0e`, CI-green): `bin/lib/enrichlib.py`, `bin/enrich/`,
+  `bin/models/`, the `files extract`/`bookmark` wiring, and the `doctor` probe all ship; the live
+  Ollama call is `# pragma: no cover` pending on-host validation, same discipline as image reading.
 - **Cross-architecture image reading proposal**
   ([#1](https://github.com/gabros20/personal-operating-system/issues/1),
   [`docs/design/proposals/2026-07-06-image-reading.md`](docs/design/proposals/2026-07-06-image-reading.md)).
