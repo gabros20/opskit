@@ -55,6 +55,9 @@ SUITES = [
     ("archive + invoice (§4)", "run_archive_invoice.py"),
     ("image-reading backend (imagelib)", "run_image_backend.py"),
     ("files: imagelib wiring (metadata + OCR + describe)", "run_files_image.py"),
+    ("search enrichment engine", "run_enrich.py"),
+    ("ops models verb", "run_models.py"),
+    ("enrichment pipeline wiring", "run_enrich_pipeline.py"),
 ]
 
 

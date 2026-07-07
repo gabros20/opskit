@@ -123,6 +123,22 @@ def main(argv):
                  "`ops files extract --describe` will skip Layer 3 entirely. Fix: install mlx-vlm "
                  "(Apple Silicon) or run ollama (any host); or unset OPS_VLM.")
 
+    # search enrichment (docs/design/proposals/2026-07-07-search-enrichment-pipeline.md): auto-wired
+    # into `files extract`/`bookmark` unless OPS_ENRICH=off, so a soft probe here mirrors OPS_VLM's.
+    enrich_requested = os.environ.get("OPS_ENRICH", "").strip().lower()
+    if enrich_requested != "off":
+        try:
+            from lib import enrichlib
+            enrich_available = enrichlib.available()
+        except Exception:
+            enrich_available = False
+        if enrich_available:
+            ok(f"enrich model reachable ({enrichlib.DEFAULT_MODEL} via Ollama)")
+        else:
+            warn("enrich model/Ollama not reachable — `files extract`/`bookmark` auto-enrich will "
+                 "fall back to the stdlib keyword floor (no description, no LLM keywords). Fix: run "
+                 "ollama and pull the configured OPS_ENRICH_MODEL; or set OPS_ENRICH=off.")
+
     # 2. folders
     for d in REQUIRED_DIRS:
         p = paths.OPS_HOME / d

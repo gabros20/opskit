@@ -45,6 +45,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import agent, imagelib, notetype, output, paths  # noqa: E402
+from enrich import run as enrichverb  # noqa: E402
 
 YEL, GREEN, DIM, CYAN, RESET = "\033[33m", "\033[32m", "\033[2m", "\033[36m", "\033[0m"
 PERSONAL = ("tax", "szja", "nav", "ado", "adó", "medical", "orvos", "contract", "szerzod", "szerződ",
@@ -103,35 +104,56 @@ def _tier_pdf(src: Path, opts: dict):
     return (None, "pdf", "no PDF extractor — install: pip install pymupdf4llm (or --heavy for docling)")
 
 
+STT_RUNTIMES = ("parakeet", "mlx-whisper", "faster-whisper", "whisper-cli")
+
+
 def _tier_audio(src: Path, opts: dict):
+    """ASR cascade. OPS_STT_MODEL overrides the hardcoded model id of whichever backend runs
+    (kept as its default); OPS_STT_RUNTIME pins one backend instead of cascading through all
+    (search-enrichment proposal §2, S1 — the one real hardcoding retrofit)."""
     if not shutil.which("ffmpeg"):
         return (None, "audio", "audio extraction needs ffmpeg — install: brew install ffmpeg")
     lang = opts.get("lang")
-    if _have_mod("parakeet_mlx"):
+    model = os.environ.get("OPS_STT_MODEL")
+    runtime = os.environ.get("OPS_STT_RUNTIME", "auto").strip().lower()
+    if runtime not in ("auto", *STT_RUNTIMES):
+        runtime = "auto"
+
+    def want(name: str) -> bool:
+        return runtime in ("auto", name)
+
+    if want("parakeet") and _have_mod("parakeet_mlx"):
+        mid = model or "mlx-community/parakeet-tdt-0.6b-v2"
+
         def run() -> str:
             from parakeet_mlx import from_pretrained
-            model = from_pretrained("mlx-community/parakeet-tdt-0.6b-v2")
-            return (model.transcribe(str(src)).text or "").strip()
+            transcriber = from_pretrained(mid)
+            return (transcriber.transcribe(str(src)).text or "").strip()
         return (f"parakeet-mlx {_mod_version('parakeet-mlx')}", "transcript", run)
-    if _have_mod("mlx_whisper"):
+    if want("mlx-whisper") and _have_mod("mlx_whisper"):
         def run() -> str:
             import mlx_whisper
             kw = {"language": lang} if lang else {}
             return (mlx_whisper.transcribe(str(src), **kw).get("text") or "").strip()
         return (f"mlx-whisper {_mod_version('mlx-whisper')}", "transcript", run)
-    if _have_mod("faster_whisper"):
+    if want("faster-whisper") and _have_mod("faster_whisper"):
+        mid = model or "base"
+
         def run() -> str:
             from faster_whisper import WhisperModel
-            segs, _ = WhisperModel("base").transcribe(str(src), language=lang)
+            segs, _ = WhisperModel(mid).transcribe(str(src), language=lang)
             return "\n".join(s.text.strip() for s in segs).strip()
         return (f"faster-whisper {_mod_version('faster-whisper')}", "transcript", run)
-    if shutil.which("whisper-cli") or shutil.which("whisper.cpp"):
+    if want("whisper-cli") and (shutil.which("whisper-cli") or shutil.which("whisper.cpp")):
         binname = "whisper-cli" if shutil.which("whisper-cli") else "whisper.cpp"
 
         def run() -> str:
             out = subprocess.run([binname, "-otxt", "-f", str(src)], capture_output=True, text=True)
             return out.stdout.strip()
         return (f"{binname} (system)", "transcript", run)
+    if runtime != "auto":
+        return (None, "audio", f"OPS_STT_RUNTIME={runtime} pinned but that backend isn't available — "
+                "check its optional dep is installed, or unset OPS_STT_RUNTIME for auto-detect")
     return (None, "audio",
             "no ASR backend — install: pip install parakeet-mlx (Apple Silicon) or mlx-whisper/faster-whisper")
 
@@ -274,6 +296,11 @@ def _extract_one(slug: str, opts: dict, dry: bool = False) -> dict:
         else:
             vlm = (cap, desc, vbackend)
     _write_extract(slug, sha, tool, ntype, text, shadow, vlm=vlm)
+    if os.environ.get("OPS_ENRICH", "").strip().lower() != "off":
+        try:
+            enrichverb.enrich_note(slug)  # best-effort — an enrich failure must never fail the extract
+        except Exception:
+            pass
     paths.append_journal(f"files extract {slug} <- {tool}")
     res = {"slug": slug, "status": "extracted", "note": rel, "tool": tool, "type": ntype,
            "sha256": sha, "chars": len(text)}

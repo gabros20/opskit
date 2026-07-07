@@ -13,10 +13,10 @@ next use, no data loss) stay free of --yes. The two TRANSMITTING/downloading sub
 how `ops share`/`ops backup` gate their own transmitting subactions.
 
 Every real model call goes over urllib to the local Ollama daemon (bin/lib/embed.py's pattern) or an
-existing lib's own dispatch (imagelib for ocr/vlm, embed for embed, rerank for rerank) — never
-`import ollama`. `list`/`status` never load a model or hit the network: stage availability is decided
-by cheap probes (importlib.find_spec, `ollama list`/`ollama ps`), same discipline as imagelib's
-`_has_*` probes.
+existing lib's own dispatch (imagelib for ocr/vlm, embed for embed, enrichlib for enrich, rerank for
+rerank) — never `import ollama`. `list`/`status` never load a model or hit the network: stage
+availability is decided by cheap probes (importlib.find_spec, `ollama list`/`ollama ps`), same
+discipline as imagelib's `_has_*` probes.
 """
 from __future__ import annotations
 import importlib.util
@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import embed, imagelib, output, rerank  # noqa: E402
+from lib import embed, enrichlib, imagelib, output, rerank  # noqa: E402
 
 STAGES = ("stt", "ocr", "vlm", "enrich", "embed", "rerank")
 
@@ -91,7 +91,7 @@ def _ollama_model_for(stage: str) -> str | None:
         m = (os.environ.get("OPS_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip()
         return None if m.lower() == "none" else m
     if stage == "enrich":
-        return os.environ.get("OPS_ENRICH_MODEL", "gemma4:e4b")
+        return enrichlib.DEFAULT_MODEL
     if stage == "embed":
         return os.environ.get("OPS_EMBED_MODEL", "embeddinggemma")
     if stage == "ocr":
@@ -137,7 +137,7 @@ def _stage_info(stage: str) -> dict:
         runtime, available = _vlm_backend(model)
         return {"stage": stage, "model": model, "runtime": runtime, "available": available}
     if stage == "enrich":
-        model = os.environ.get("OPS_ENRICH_MODEL", "gemma4:e4b")
+        model = enrichlib.DEFAULT_MODEL
         return {"stage": stage, "model": model, "runtime": "ollama", "available": _ollama_has(model)}
     if stage == "embed":
         model = os.environ.get("OPS_EMBED_MODEL", embed.model_name())
@@ -277,9 +277,15 @@ def _run_stage_test(stage: str, model: str | None, input_path: str | None) -> st
         docs = ["ops is a local-first personal operating system", "bananas are yellow"]
         scores = rerank.rerank("personal productivity system", docs)
         return f"[{rerank.backend()}] " + ", ".join(f"{d!r}={s:.3f}" for d, s in zip(docs, scores))
-    # enrich (E2, not shipped yet)
-    raise RuntimeError("enrich stage isn't implemented yet — see "
-                       "docs/design/proposals/2026-07-07-search-enrichment-pipeline.md (E2)")
+    # enrich
+    if input_path:
+        text = Path(input_path).read_text(encoding="utf-8", errors="replace")
+    else:
+        text = ("ops is a local-first, git-versioned personal operating system: wiki notes, tasks, "
+                "journal, and one `ops <verb>` command surface across ~/ops, ~/work, and ~/files.")
+    result = enrichlib.enrich(text, model=model)
+    return (f"[{result['backend']}] {result['description']}\n"
+            f"keywords: {', '.join(result['keywords'])}")
 
 
 def cmd_test(argv):

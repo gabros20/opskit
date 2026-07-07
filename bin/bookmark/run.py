@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import notetype, output, paths  # noqa: E402
+from enrich import run as enrichverb  # noqa: E402
 
 GREEN, DIM, YEL, RESET = "\033[32m", "\033[2m", "\033[33m", "\033[0m"
 _TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
@@ -142,6 +143,12 @@ def main(argv: list[str]) -> int:
     d = paths.WIKI / notetype.type_dir("bookmark")
     d.mkdir(parents=True, exist_ok=True)
     f.write_text(notetype.render("bookmark", title=title, url=url, body=body, slug=slug), encoding="utf-8")
+
+    if os.environ.get("OPS_ENRICH", "").strip().lower() != "off":
+        try:
+            enrichverb.enrich_note(slug)  # best-effort — an enrich failure must never fail the save
+        except Exception:
+            pass
 
     archived = None
     if archive:
