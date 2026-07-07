@@ -7,6 +7,15 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
 ## [Unreleased]
 
 ### Added
+- **Search-enrichment pipeline proposal**
+  ([`docs/design/proposals/2026-07-07-search-enrichment-pipeline.md`](docs/design/proposals/2026-07-07-search-enrichment-pipeline.md)).
+  Design for a modality-agnostic "enrich" stage that generates a `description` + `keywords` for every
+  ingested source (image/voice/video/pdf/link) via a small local LLM (default `gemma4:e4b` for EN+HU;
+  `OpenEuroLLM-Hungarian` as the HU-max override), feeding both keyword and semantic search. The
+  `.extract.md` note is the file-based working memory between models; models load per-note and unload
+  (`keep_alive:0`); a deterministic YAKE/RAKE fallback keeps search improving with no model pulled.
+  Also flags the adjacent gap that no verb currently reaches the video/URL extraction tier for a bare
+  URL. Proposed, not yet implemented.
 - **Cross-architecture image reading proposal**
   ([#1](https://github.com/gabros20/personal-operating-system/issues/1),
   [`docs/design/proposals/2026-07-06-image-reading.md`](docs/design/proposals/2026-07-06-image-reading.md)).
