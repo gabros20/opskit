@@ -147,7 +147,9 @@ Discover the live, authoritative set with `ops help`; this is the working summar
 - Work scaffolding:  `ops new project|client "<name>"` (asks/uses the routing tree above)
 - Repo lifecycle:    `ops repo health|clone <p>|clone --all` · `ops archive <project>` (dead repo → bundle)
 - Business:          `ops invoice <client>` (DRAFT only; reads tax-formula.md; never sends)
-- System:            `ops status` · `ops doctor` · `ops backup` · `ops index` · `ops job …` · `ops sweep`
+- System:            `ops status` · `ops doctor` · `ops setup [<layer>] [--all] [--yes]`
+  (layered installer; paired with `ops doctor` as checker; see
+  [`docs/setup.md`](../../docs/setup.md)) · `ops backup` · `ops index` · `ops job …` · `ops sweep`
 
 `triage`, `files ingest`, and `invoice` PROPOSE; the human approves. `archive`, `sweep`,
 and anything mutating support `--dry-run` — use it when unsure what a verb will do.

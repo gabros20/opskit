@@ -710,6 +710,58 @@
       "source": "engine"
     },
     {
+      "verb": "setup",
+      "summary": "layered installer dashboard and idempotent setup runner",
+      "usage": "ops setup [<layer> [--yes] | --all [--yes]]",
+      "risk": "safe_write",
+      "args": [
+        {
+          "name": "layer",
+          "required": false
+        },
+        {
+          "name": "--all",
+          "required": false
+        },
+        {
+          "name": "--yes",
+          "required": false
+        }
+      ],
+      "reads": [
+        "bin/",
+        "jobs/",
+        ".backup/",
+        "~/files",
+        "~/work",
+        "Python package index / configured pip indexes (external, confirm-gated)",
+        "Ollama daemon and model registry (external/local, confirm-gated)"
+      ],
+      "writes": [
+        "wiki/",
+        "tasks/",
+        "journal/",
+        "jobs/launchd/",
+        ".obsidian/",
+        "Python environment / site-packages (pip install, confirm-gated)",
+        "~/.ollama/models (model pulls, confirm-gated)"
+      ],
+      "hints": "Bare `ops setup` is a read-only layered dashboard. `ops setup <layer>` advances one layer idempotently. Search and model layers can install Python packages and pull Ollama models into external stores, so they require `--yes`; backups is a human handoff and is never included in `--all`.",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "id": "string",
+          "title": "string",
+          "status": "string",
+          "required": "bool",
+          "detail": "string",
+          "items": "list",
+          "next": "string"
+        }
+      },
+      "source": "engine"
+    },
+    {
       "verb": "share",
       "summary": "zero-knowledge share: render+encrypt a note (or tag collection) locally, publish only ciphertext",
       "usage": "ops share <slug> [--expires 7d] [--plain|--gist] [--dry-run|--yes] | collection <tag> | list | revoke <id> --yes | init",

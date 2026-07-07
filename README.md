@@ -101,9 +101,10 @@ sh get.sh --demo        # prints the vault path and the one directory to delete
 3. **Make it live:**
    ```sh
    git push -u origin main                                        # your repo, your GitHub
-   pip install -r requirements.txt && ollama pull embeddinggemma  # optional: semantic search
-   ops job apply                                                  # optional: schedule the nightly jobs
+   ops setup                                                      # finish optional local layers
    ```
+   Follow the layered checklist for semantic search, local models, backups, and scheduled jobs:
+   [`docs/setup.md`](docs/setup.md).
 
 Now `ops` works from anywhere. Pull engine improvements later without touching your notes:
 ```sh

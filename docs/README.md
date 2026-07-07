@@ -10,6 +10,7 @@ Start with the project [README](../README.md) (what this is + install). Docs her
 | [`machine-contract.md`](machine-contract.md) | exact shapes: the `--json` envelope, exit codes, `ops.json` v2, `cmd.json` | Reference |
 | [`plugins.md`](plugins.md) | to add your own verbs or install/trust a pack (SDK, `plugin.json`, trust model) | How-to + Reference |
 | [`backup-and-share.md`](backup-and-share.md) | the restic backup family and the encrypted `ops share` surface | How-to |
+| [`setup.md`](setup.md) | finish a new vault with the layered `ops setup` checklist, including agent handoff | How-to |
 | [`mobile-and-capture.md`](mobile-and-capture.md) | capture from phone/share-sheet; read the vault on mobile (git is the only sync) | How-to |
 | [`agent-terminal-search.md`](agent-terminal-search.md) | get semantic search working when an agent terminal (Hermes, dispatch, cron) drives `ops` — venv, PATH, shell init | How-to |
 | [`image-reading.md`](image-reading.md) | set up image metadata/OCR/VLM description (`ops files extract` on images) — install per host, env knobs, degradation | How-to |

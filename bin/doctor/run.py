@@ -12,12 +12,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import guardrail, output, paths  # noqa: E402
+from lib import guardrail, output, paths, setuplib  # noqa: E402
+from lib.setuplib import REQUIRED_DIRS  # noqa: E402
 
 GREEN, RED, YEL, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 BIN = Path(__file__).resolve().parents[1]
-REQUIRED_DIRS = ["wiki", "tasks/inbox", "tasks/active", "tasks/waiting", "tasks/done",
-                 "journal", "inbox", "templates", "jobs", "skills", "bin"]
 checks = []  # (level, msg)
 
 
@@ -150,6 +149,18 @@ def main(argv):
             ok(f"folder: {d}/ (created)")
         else:
             fail(f"folder: {d}/ MISSING (run: ops doctor --init)")
+
+    # 2a. setup layers: required layers gate doctor; optional layers are advisory.
+    for r in setuplib.status():
+        msg = f"setup layer: {r['id']} {r['status']} - {r['detail']}"
+        if r.get("next"):
+            msg += f" (next: {r['next']})"
+        if r["status"] == "ready":
+            ok(msg)
+        elif r.get("required"):
+            fail(msg)
+        else:
+            warn(msg)
 
     # 2b. Obsidian config pack (Part 3.1): with --init, seed .obsidian/ from templates/obsidian/.
     # .obsidian/ is USER-OWNED (never in engine.txt); refuse-don't-overwrite keeps a customized

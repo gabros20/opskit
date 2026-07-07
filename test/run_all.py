@@ -57,6 +57,7 @@ SUITES = [
     ("files: imagelib wiring (metadata + OCR + describe)", "run_files_image.py"),
     ("search enrichment engine", "run_enrich.py"),
     ("ops models verb", "run_models.py"),
+    ("setup layers verb", "run_setup_layers.py"),
     ("enrichment pipeline wiring", "run_enrich_pipeline.py"),
 ]
 

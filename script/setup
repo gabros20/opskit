@@ -103,8 +103,7 @@ fi
 echo
 say "done. next (these are yours to run — setup never pushes):"
 cat <<EOF
-  • optional semantic search:  pip install -r requirements.txt && ollama pull embeddinggemma
-  • schedule the jobs:         ops job apply   (then the printed launchctl step)
+  • finish local layers:       ops setup       (then follow the layered checklist)
   • point at your GitHub:      git -C "$ROOT" remote set-url origin git@github.com:<you>/ops.git
                                git -C "$ROOT" push -u origin main
   • daily:                     ops start  ·  ops capture "…"  ·  ops triage  ·  ops close
