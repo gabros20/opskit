@@ -34,3 +34,6 @@ skills/**/.system/
 .claude/todos/
 .claude/shell-snapshots/
 .claude/history.jsonl
+
+# Per-vault Cloudflare Worker deploy config (KV namespace id). Synced template ships wrangler.toml.example only.
+bin/share/worker/wrangler.toml

@@ -336,6 +336,24 @@ def cmd_revoke(argv):
 # --------------------------------------------------------------------------- init
 
 WORKER_DIR = Path(__file__).resolve().parent / "worker"
+WRANGLER_TOML = WORKER_DIR / "wrangler.toml"
+WRANGLER_EXAMPLE = WORKER_DIR / "wrangler.toml.example"
+
+
+def _ensure_wrangler_toml() -> None:
+    if WRANGLER_TOML.is_file():
+        return
+    if not WRANGLER_EXAMPLE.is_file():
+        output.fail(output.EXIT_UNEXPECTED, "missing wrangler.toml.example in worker dir",
+                    hint=f"re-run script/update from upstream; expected {WRANGLER_EXAMPLE}", verb="share")
+    import shutil
+    shutil.copy2(WRANGLER_EXAMPLE, WRANGLER_TOML)
+
+
+def _wrangler_kv_configured() -> bool:
+    if not WRANGLER_TOML.is_file():
+        return False
+    return "PASTE_KV_NAMESPACE_ID_HERE" not in WRANGLER_TOML.read_text(encoding="utf-8")
 
 
 def cmd_init(argv):
@@ -346,6 +364,7 @@ def cmd_init(argv):
         CONFIG.write_text(json.dumps({"endpoint": endpoint}, indent=2) + "\n", encoding="utf-8")
     steps = [
         f"cd {WORKER_DIR}",
+        "cp wrangler.toml.example wrangler.toml   # once per vault; file is gitignored",
         "wrangler kv namespace create OPS_SHARE",
         "# paste the namespace id into wrangler.toml, then:",
         "wrangler deploy",
@@ -361,6 +380,11 @@ def cmd_init(argv):
     if not shutil.which("wrangler"):
         output.fail(output.EXIT_UNEXPECTED, "wrangler not installed",
                     hint="npm i -g wrangler", verb="share")
+    _ensure_wrangler_toml()
+    if not _wrangler_kv_configured():
+        output.fail(output.EXIT_UNEXPECTED,
+                    "wrangler.toml still has placeholder KV id",
+                    hint=f"edit {WRANGLER_TOML} after `wrangler kv namespace create OPS_SHARE`", verb="share")
     r = subprocess.run(["wrangler", "deploy"], cwd=str(WORKER_DIR))
     return output.emit({"deployed": r.returncode == 0}, "share",
                        human=lambda d: f"wrangler deploy exit {r.returncode}")

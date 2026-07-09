@@ -7,6 +7,7 @@
 # (test/, ref/) that a lean vault drops are never re-introduced, because they aren't listed here.
 #
 # One path per line; blank lines and #comments ignored.
+# Note: bin/share/worker/wrangler.toml is NOT in upstream (per-vault); see wrangler.toml.example.
 
 ops
 VERSION

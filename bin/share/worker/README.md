@@ -32,8 +32,11 @@ Expiry is native KV `expirationTtl` (1:1 from `--expires`, so there is no cleanu
 
 ## Deploy (once)
 
+`wrangler.toml` is **per-vault** (gitignored). The engine ships `wrangler.toml.example` only — `script/update` never overwrites your KV namespace id.
+
 ```sh
 cd bin/share/worker
+cp wrangler.toml.example wrangler.toml
 wrangler kv namespace create OPS_SHARE     # paste the id into wrangler.toml
 wrangler deploy
 ops share init --endpoint https://ops-share.<subdomain>.workers.dev

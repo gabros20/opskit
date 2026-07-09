@@ -1,0 +1,10 @@
+name = "ops-share"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Vault-local: copy this file to wrangler.toml (gitignored) and paste your namespace id.
+#   cp wrangler.toml.example wrangler.toml
+#   wrangler kv namespace create OPS_SHARE
+[[kv_namespaces]]
+binding = "OPS_SHARE"
+id = "PASTE_KV_NAMESPACE_ID_HERE"
