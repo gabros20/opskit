@@ -30,25 +30,53 @@ carries exactly this command; `ops` itself never performs the cloud push.
 `.backup/config.json` and the rendered plist are user-owned (per-vault) and are not in
 `script/engine.txt`.
 
-## `ops share` — zero-knowledge, confirm-gated
+## `ops share` — capability URL, confirm-gated
 
 `ops share <slug>` / `share collection <tag>` renders the note(s) to a self-contained **OPSX**
-bundle (raw wiki markdown + HTML) locally (inline CSS; wikilinks resolve only within the shared set —
-others degrade to plain text; images under a size cap inline as data URIs), encrypts it AES-256-GCM
-with a locally-generated key, and publishes only the **ciphertext** to a vendored Cloudflare Worker
-+ KV (`bin/share/worker/`). The key travels in the URL `#fragment` (PrivateBin pattern) — the
-provider can never read the note in the browser path. **Agent markdown:** `/<id>.md` serves the wiki
-source UTF-8 (key via `X-Ops-Share-Key` or `?k=` — see `docs/share-agent-markdown.md`).
+bundle (raw wiki markdown + rendered HTML) locally — inline CSS; wikilinks resolve only within the
+shared set, others degrade to plain text; images under a size cap inline as data URIs — and PUTs the
+bundle **as plaintext** to a vendored Cloudflare Worker + KV (`bin/share/worker/`) under a 24-char
+unguessable token (`[a-z0-9]{24}`, ~124 bits). That token IS the secret; there is no encryption and
+no key to lose.
 
-- `cryptography` is an auto-detected optional dep. Without it only `--plain` works; E2E prints the
-  install hint.
-- Publishing is a transmission, so every transmitting subaction self-gates `--yes` (EXIT_CONFIRM=3).
-  `--dry-run` renders + encrypts locally and stops. The verb's output is a **draft link** — the
-  human sends it.
+**One link, two ways to read it:**
+
+| You open | You get |
+|---|---|
+| `https://<worker>/<token>` in a browser | the rendered HTML page |
+| `https://<worker>/<token>.md` | raw wiki markdown, `text/markdown` — paste into any chat/coding agent with a fetch tool |
+| `https://<worker>/<token>` from `curl`/`web_fetch` (non-browser `Accept`) | raw markdown too — content negotiation serves the same thing the `.md` suffix does |
+
+There is no second "agent URL" to construct and no header to set — append `.md` (or hand the printed
+`agents:` line straight to the agent) and it reads the exact wiki source. See
+`docs/share-agent-markdown.md`.
+
+- Publishing is still a transmission, so every transmitting subaction self-gates `--yes`
+  (EXIT_CONFIRM=3). `--dry-run` renders locally and stops before the PUT. The verb's output is a
+  **draft link** — the human sends it.
+- `PUT /` requires a matching `X-Publish-Token` header when the `PUBLISH_TOKEN` wrangler secret is
+  set (`ops share init` provisions it), so a discovered endpoint can't be abused as a free file host.
 - Expiry is native KV `expirationTtl`, 1:1 from `--expires` (e.g. `7d`). `share revoke <id>` issues a
   `DELETE` with the admin token recorded in `.share/ledger.json`. `share list` shows every share.
-- `--gist` is a throwaway fallback (`gh gist create`, confirm-gated). `ops share init` deploys the
-  worker (prints the exact `wrangler` commands; `--yes` runs them).
+  Links published under the previous encrypted model return **410** on every route — re-publish.
+- `--gist` is a throwaway fallback (`gh gist create`, confirm-gated) — same trust model as this
+  capability-URL scheme, just hosted by GitHub instead of the vendored worker.
 - `ops sweep` warns on expired shares and on notes edited since they were shared.
+
+**Threat model — what changed, and why.** The worker (Cloudflare, an infrastructure provider we
+already trust for DNS/edge) can technically read anything published through it — that's the
+tradeoff, made explicit and accepted. The property given up is zero-knowledge: previously the
+decryption key rode the URL `#fragment`, which HTTP never sends to a server, so the provider held
+only ciphertext. That design cannot also satisfy the operator's actual requirement — one URL that a
+browser renders AND a headless agent can fetch — because a `#fragment`-only key is, by construction,
+never on the wire for a server-side fetch to use. Every variant that tried to bridge the two
+(`?k=` query key, an `X-Ops-Share-Key` header, a second `agent_url`, client-side `ops share pull`
+math) produced either a two-link contract or a "install something first" step, both rejected on
+ergonomics. Once the key has to be visible to the server for *any* agent-fetchable route to work, ZK
+buys nothing over a plain unguessable token — so we drop it and get the one-link contract for free.
+The remaining exposure (secrecy = link + TTL, holder-of-URL can read) is exactly the trust model
+already accepted for `--gist`: a secret gist. Full writeup, alternatives tried, and the URL-pattern
+decision: `docs/design/proposals/2026-07-10-capability-url-share.md`; ADR: `docs/DECISIONS.md`
+(ADR-008).
 
 See `bin/share/worker/README.md` for the worker API and deploy steps.

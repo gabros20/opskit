@@ -176,3 +176,38 @@ EmbeddingGemma (OPS_VECTORS=1) → fastembed cross-encoder rerank (OPS_RERANK=1)
 local / no-server, opt-in, rebuildable. Remaining: scale-out *plumbing* (repo sharding + resumable
 batched backfill + file-watcher), which earns its keep only as the vault approaches 100k — the
 architecture itself does not change.
+
+## ADR-008 — Drop zero-knowledge sharing for capability URLs (2026-07-10)
+**Context.** The operator's actual job with `ops share` is "paste one link into any chat/coding
+agent and it reads the note" — no headers, no second URL, no local tooling. The shipped
+zero-knowledge design (AES-256-GCM, key in the URL `#fragment`, PrivateBin pattern) cannot clear that
+bar, because HTTP never sends `#fragment` to a server: a server-side agent-fetchable route
+structurally cannot receive a fragment-only key. Every variant tried to bridge the gap failed the
+same way or worse: `?k=<key>` query param (key lands in worker access logs and browser history),
+`X-Ops-Share-Key` header (unusable by generic fetch tools that can't set custom headers), a second
+`agent_url` printed alongside the human link (two-link contract — the exact ergonomics failure being
+fixed), `ops share pull` local decrypt (requires `ops` installed — fails for "any chat/coding agent"),
+and mechanical URL-math instructions for agents to derive the fetch URL themselves (fragile, another
+thing to get wrong). See `docs/design/proposals/2026-07-10-ops-share-agent-markdown-url.md` §11.5 and
+`docs/design/proposals/2026-07-10-capability-url-share.md` for the full exhausted-alternatives table.
+**Decision.** Remove zero-knowledge encryption entirely (not kept as a flag). `ops share <slug>
+--yes` now PUTs the plaintext OPSX bundle to the worker under a single 24-char unguessable token
+(~124 bits, up from the old 10-char id). ONE link: the bare URL renders HTML in a browser; append
+`.md` (or let content negotiation handle a bare non-browser fetch) and the same link returns raw wiki
+markdown. `PUT /` additionally requires an `X-Publish-Token` when the `PUBLISH_TOKEN` wrangler secret
+is set, so a discovered endpoint can't be abused as an anonymous file host. Links published under the
+old encrypted model return `410` on every route — re-publish.
+**Why.** Zero-knowledge and "one link an agent can fetch" are logically incompatible, not just
+hard to engineer: a fragment is by definition never transmitted, so any route a server-side fetch
+tool can use must carry the key somewhere the server (and therefore anyone with log access) can see
+it — at which point ZK has already been given up in substance, and keeping the fragment charade only
+costs a second URL. The content being shared is, by definition, content the operator chose to
+publish (never `~/files`, never anything outside the explicit `ops share` invocation) — so "the
+provider can technically read it" is a narrower exposure than it sounds, not a new category of risk.
+An unguessable token over TLS with a TTL is exactly the trust model already accepted for the
+`--gist` fallback (a GitHub secret gist); this makes the primary path match the trust model of the
+fallback instead of promising a stronger property it can't structurally deliver.
+**Status.** Implemented (this refactor: `bin/share/worker/worker.js`, `bin/lib/sharelib.py`,
+`bin/share/run.py`). Requires a worker redeploy (`wrangler deploy` + `wrangler secret put
+PUBLISH_TOKEN`) before publish/fetch routes reflect this ADR in production; `ops share init` prints
+the exact steps.

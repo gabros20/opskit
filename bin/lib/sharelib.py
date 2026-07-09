@@ -1,28 +1,20 @@
 """
 sharelib.py — pure, dependency-light helpers for `ops share` (proposal Part 5.2). Kept free of any
 `from lib import …` so a test can load it by file path (the bin/lib-namespace-vs-test/lib gotcha),
-and free of network I/O so encryption / HTML rendering are unit-testable offline.
+and network-free except for the one lazily-imported fetch helper, so bundling / HTML rendering are
+unit-testable offline.
 
-The zero-knowledge model (PrivateBin pattern): the note renders to ONE self-contained HTML blob
-LOCALLY, that blob is encrypted with a locally-generated AES-256-GCM key, only the CIPHERTEXT is
-published, and the key travels in the URL fragment (never reaches the worker). `cryptography` is an
-AUTO-DETECTED optional dep — without it only `--plain` works and E2E prints the install hint.
+The capability-URL model: the note renders to ONE self-contained HTML blob plus its raw markdown,
+those are packed into a plaintext OPSX bundle, and the bundle is stored AS-IS on the worker under a
+long unguessable token. Secrecy = the unguessable link + a TTL; there is no encryption. A SINGLE link
+serves both audiences: `https://<worker>/<token>` returns HTML to browsers, and `<worker>/<token>.md`
+returns the raw markdown to agents. Anyone with the link can read it, so treat the link as the secret.
 """
 from __future__ import annotations
 import base64
 import html
-import os
 import re
 import struct
-
-try:
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # type: ignore
-    HAVE_CRYPTO = True
-except Exception:  # pragma: no cover - exercised only on the zero-install path
-    AESGCM = None  # type: ignore
-    HAVE_CRYPTO = False
-
-CRYPTO_HINT = "install the AES layer: pip install cryptography  (or use --plain)"
 
 _LINK = re.compile(r"\[\[([^\]]+)\]\]")
 _IMG = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
@@ -104,41 +96,6 @@ _CSS = (
     "td code{white-space:nowrap}"
     ".ops-note{margin-bottom:2rem}"
 )
-
-
-# --------------------------------------------------------------------------- encryption (E2E)
-
-def have_crypto() -> bool:
-    return HAVE_CRYPTO
-
-
-def _b64u(b: bytes) -> str:
-    return base64.urlsafe_b64encode(b).decode("ascii").rstrip("=")
-
-
-def _b64u_dec(s: str) -> bytes:
-    pad = "=" * (-len(s) % 4)
-    return base64.urlsafe_b64decode(s + pad)
-
-
-def encrypt(plaintext: bytes) -> tuple[str, str]:
-    """AES-256-GCM. Returns (ciphertext_b64url, key_b64url). The blob is nonce||ct so decrypt is
-    self-contained; the key is what travels in the URL fragment `#<key>`."""
-    if not HAVE_CRYPTO:
-        raise RuntimeError(CRYPTO_HINT)
-    key = AESGCM.generate_key(bit_length=256)
-    nonce = os.urandom(12)
-    ct = AESGCM(key).encrypt(nonce, plaintext, None)
-    return _b64u(nonce + ct), _b64u(key)
-
-
-def decrypt(blob_b64: str, key_b64: str) -> bytes:
-    """Inverse of encrypt() — used by the round-trip test (the browser does this in JS in production)."""
-    if not HAVE_CRYPTO:
-        raise RuntimeError(CRYPTO_HINT)
-    raw = _b64u_dec(blob_b64)
-    nonce, ct = raw[:12], raw[12:]
-    return AESGCM(_b64u_dec(key_b64)).decrypt(nonce, ct, None)
 
 
 # --------------------------------------------------------------------------- expiry
@@ -362,67 +319,48 @@ def unpack_bundle(data: bytes) -> tuple[bytes, bytes] | None:
     return md, html
 
 
-# --------------------------------------------------------------------------- pull (human link → markdown, client-side decrypt)
+# --------------------------------------------------------------------------- pull (capability link → markdown)
 
-_SHARE_ID = re.compile(r"^[a-z0-9]{10}$", re.I)
+_SHARE_ID = re.compile(r"^[a-z0-9]{10,32}$", re.I)
 
 
-def parse_share_link(url: str) -> tuple[str, str, str]:
-    """Parse a human share URL. Returns (origin, share_id, key_b64_or_empty).
+def parse_share_link(url: str) -> tuple[str, str]:
+    """Parse a capability share URL. Returns (origin, share_id).
 
-    Accepts `https://host/<id>#key` only (optional trailing `.md` on id path is stripped).
-    The `#key` fragment is the same value `encrypt()` puts in the published link.
+    Accepts `https://host/<token>`, tolerating a trailing `.md` (agent link) and IGNORING any
+    `#fragment` (old zero-knowledge links pasted from history still carry a stale key — harmless
+    now). Tokens are `[a-z0-9]{10,32}` (current tokens are 24 chars; legacy ids were 10).
     """
-    from urllib.parse import unquote, urlparse
+    from urllib.parse import urlparse
 
     u = urlparse((url or "").strip())
     if not u.scheme or not u.netloc:
-        raise ValueError("not a share URL (need https://<worker>/<id>#…)")
+        raise ValueError("not a share URL (need https://<worker>/<token>)")
     path = (u.path or "").strip("/")
     if path.lower().endswith(".md"):
         path = path[:-3]
     if not _SHARE_ID.fullmatch(path or ""):
-        raise ValueError(f"bad share id in URL (expected 10-char id): {path!r}")
+        raise ValueError(f"bad share token in URL (expected 10–32 char token): {path!r}")
     sid = path.lower()
-    key = unquote(u.fragment or "")
     origin = f"{u.scheme}://{u.netloc}"
-    return origin, sid, key
+    return origin, sid
 
 
-def markdown_from_blob(blob: bytes, key_b64: str | None) -> str:
-    """Decrypt (if key given) an OPSX or legacy blob and return wiki markdown UTF-8.
-
-    Mirrors the browser viewer path: fetch ciphertext with `?raw=1`, decrypt locally, unpack md half.
-    """
-    key = (key_b64 or "").strip()
-    if key:
-        if not HAVE_CRYPTO:
-            raise RuntimeError(CRYPTO_HINT)
-        plain = decrypt(blob.decode("ascii"), key)
-    elif blob[:4] == BUNDLE_MAGIC:
-        plain = blob
-    else:
-        head = blob[:256].decode("utf-8", errors="replace").lstrip()
-        if head.startswith("<"):
-            raise ValueError("legacy HTML-only share — re-publish with current ops share")
-        raise ValueError(
-            "encrypted link missing #key — use the FULL link from ops share (fragment is the decryption key)"
-        )
-    unpacked = unpack_bundle(plain)
-    if unpacked:
+def markdown_from_blob(blob: bytes) -> str:
+    """Plaintext OPSX bundle → wiki markdown UTF-8 (the md half). Legacy encrypted blobs no longer
+    carry a key we can use, so they are rejected with a re-publish hint rather than silently failing."""
+    unpacked = unpack_bundle(blob)
+    if unpacked is not None:
         return unpacked[0].decode("utf-8")
-    text = plain.decode("utf-8")
-    if text.lstrip().startswith("<"):
-        raise ValueError("legacy HTML-only share — re-publish with current ops share")
-    return text
+    raise ValueError("legacy encrypted share — re-publish with current ops share")
 
 
 class SharePullError(Exception):
-    """Fetch or decrypt failure for pull (standalone callers)."""
+    """Fetch failure for pull (standalone callers)."""
 
 
 def fetch_share_blob(origin: str, share_id: str, *, timeout: int = 30) -> bytes:
-    """GET /<id>?raw=1 — ciphertext only; same path as the browser viewer (no key on the wire)."""
+    """GET /<token>?raw=1 — the raw plaintext OPSX bundle the worker stored (same token the browser hits)."""
     from urllib.parse import urljoin
     import urllib.error
     import urllib.request
@@ -438,40 +376,15 @@ def fetch_share_blob(origin: str, share_id: str, *, timeout: int = 30) -> bytes:
     except urllib.error.HTTPError as e:
         if e.code == 404:
             raise SharePullError("share expired or revoked") from e
+        if e.code == 410:
+            raise SharePullError("legacy encrypted share — re-publish with current ops share") from e
         raise SharePullError(f"fetch failed: HTTP {e.code}") from e
     except Exception as e:
         raise SharePullError(f"fetch failed: {e}") from e
 
 
 def pull_markdown_from_url(url: str) -> str:
-    """Human share URL → wiki markdown. No ops ledger, no dispatcher — for any Python caller."""
-    origin, sid, key = parse_share_link(url)
+    """Capability share URL → wiki markdown. No ops ledger, no dispatcher — for any Python caller."""
+    origin, sid = parse_share_link(url)
     blob = fetch_share_blob(origin, sid)
-    return markdown_from_blob(blob, key or None)
-
-
-def agent_fetch_url(url: str) -> str:
-    """Turn a human/browser link into one HTTP GET that returns wiki markdown (Claude, Codex, curl).
-
-    Fetch tools never receive the URL #fragment. This is the same key as after #, in ?k= on /<id>.md
-    (TLS only — key touches the worker for that one request). Ops publish prints this line for you.
-    """
-    from urllib.parse import quote, unquote, urlparse
-
-    raw = url.strip()
-    if not raw:
-        raise ValueError("empty URL")
-    u = urlparse(raw)
-    if u.scheme != "https" or not u.netloc:
-        raise ValueError("not a share URL (need https://<worker>/<id>#…)")
-    path = unquote(u.path or "").strip("/")
-    if path.endswith(".md"):
-        path = path[:-3]
-    if not path or "/" in path:
-        raise ValueError("bad share id in URL path")
-    origin = f"{u.scheme}://{u.netloc}"
-    key = unquote((u.fragment or "").strip())
-    base = f"{origin}/{path}.md"
-    if not key:
-        return base
-    return f"{base}?k={quote(key, safe='')}"
+    return markdown_from_blob(blob)

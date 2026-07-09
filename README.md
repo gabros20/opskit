@@ -131,7 +131,6 @@ auto-detected — nothing is required to run `ops`:
   falling back to a deterministic stdlib keyword floor with none installed. `ops models` manages the
   model behind this and every other stage (list/pull/stop/test). See
   [`docs/search-enrichment.md`](docs/search-enrichment.md).
-- End-to-end-encrypted sharing: `cryptography` (else `ops share --plain` still works).
 - Off-machine backup: [`restic`](https://restic.net).
 - Terminal niceties: [`glow`](https://github.com/charmbracelet/glow) or `bat` (rendering),
   [`fzf`](https://github.com/junegunn/fzf) (fuzzy pickers, live search sessions),
@@ -157,7 +156,7 @@ discoverable via `ops help`. The full surface:
 | **Knowledge** | `search` · `open` (one resolver for anything) · `wiki` (open / edit / new / backlinks / stale / orphans / canvas) · `bookmark` (URL → note) · `organize` (scan → review → apply) |
 | **Tasks** | `task` (list / add / show / move / done — folder = status) |
 | **Work** | `new` (scaffold project/client/**verb**) · `repo` (fleet health/clone/adopt) · `archive` · `files` (ingest/extract/distill/link binaries) · `sweep` (Desktop/Downloads decay) |
-| **Business** | `invoice` (draft only — never sends) · `share` (encrypted, expiring links — never auto-sends) |
+| **Business** | `invoice` (draft only — never sends) · `share` (expiring capability links, agent-readable `.md` — never auto-sends) |
 | **Jobs** | `job` (list / run / apply — schedule the nightly verbs via launchd) |
 
 (Plus two hidden plumbing verbs: `ops mcp`, the agent transport, and `__complete`, which powers
@@ -364,9 +363,11 @@ The scheduled cloud push runs from launchd invoking restic **directly with an ap
 outside the agent/verb surface entirely, so even a fully compromised agent can only *add* to backup
 history, never erase it.
 
-**`ops share`** publishes a single self-contained, **AES-256-GCM-encrypted** HTML rendering of a note
-(or a collection) to your own Cloudflare Worker — the key travels only in the URL fragment, so the
-server can never read your note. Expiring, revocable, ledgered in git, and confirm-gated: the verb's
+**`ops share`** publishes a note (or a collection) to your own Cloudflare Worker under a single
+**capability URL** — a 24-char unguessable token. The bare link renders HTML in a browser; append
+`.md` and the same link returns the raw wiki markdown, so any chat or coding agent can read it with
+a plain fetch (ADR-008 deliberately trades zero-knowledge for one-link agent ergonomics). Expiring,
+revocable, ledgered in git, and confirm-gated: the verb's
 output is a link, and *you* send it. `ops publish` (a public digital garden) is deliberately a
 separate future verb. Details: [`docs/backup-and-share.md`](docs/backup-and-share.md).
 

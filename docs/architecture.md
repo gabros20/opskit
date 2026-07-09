@@ -141,9 +141,10 @@ Backup precedes sharing because `~/files` is the one root where loss is irrevers
 sharpest trick: the scheduled cloud push runs from launchd invoking restic **directly with an
 append-only key** — outside the verb surface entirely. The human consents once at `init`; thereafter
 even a fully compromised agent (or laptop) can only *add* to backup history, never erase it.
-`ops share` applies the same zero-trust posture to sharing: encrypt locally, publish ciphertext to
-your own worker, key in the URL fragment — the provider can never read the note, and the verb's
-output is a *draft link* the human sends. See [backup-and-share.md](backup-and-share.md).
+`ops share` keeps the same consent discipline for sharing: publish to your own worker under a long
+unguessable capability URL (secrecy = the link + a TTL; ADR-008 traded zero-knowledge for a link any
+agent can fetch — HTML in a browser, raw markdown at `<url>.md`), and the verb's output is a
+*draft link* the human sends. See [backup-and-share.md](backup-and-share.md).
 
 ## What ops deliberately refuses to become
 

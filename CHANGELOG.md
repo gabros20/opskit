@@ -6,6 +6,26 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING: `ops share` moved from zero-knowledge encryption to capability URLs**
+  ([`docs/design/proposals/2026-07-10-capability-url-share.md`](docs/design/proposals/2026-07-10-capability-url-share.md),
+  [`docs/DECISIONS.md`](docs/DECISIONS.md) ADR-008). HTTP never sends the URL `#fragment` to a
+  server, so zero-knowledge encryption and "one link an agent can fetch" turned out to be mutually
+  exclusive — every bridge attempted (`?k=` query key, `X-Ops-Share-Key` header, a second `agent_url`
+  line, `--plain`) either leaked the key onto the wire or produced a two-link contract. Dropped
+  entirely: AES-256-GCM encryption, the `#fragment` key, the in-browser JS decrypt viewer, `?k=`,
+  `X-Ops-Share-Key`, and the `--plain` flag (plaintext is now the only mode, so the flag is
+  meaningless). `ops share <slug> --yes` now PUTs the plaintext OPSX bundle to the worker under a
+  single 24-char unguessable token (~124 bits): the bare URL renders HTML in a browser, `<url>.md`
+  (or content negotiation on the bare URL) returns raw wiki markdown for any chat/coding agent's
+  fetch tool — no headers, no second link. `PUT /` now requires a matching `X-Publish-Token` header
+  when the `PUBLISH_TOKEN` wrangler secret is set, so a discovered endpoint can't be abused as a free
+  file host; `ops share init --yes` provisions it alongside the existing `wrangler deploy` step.
+  **Links published under the old encrypted model return HTTP 410 on every route** — they must be
+  re-published. `ops share pull <url>` keeps its surface (fetch + local unpack, now key-less).
+  **Action required:** redeploy the worker (`wrangler deploy`) and run `ops share init --yes` to set
+  the publish token before publishing again.
+
 ### Added
 - **Search-enrichment pipeline**
   ([`docs/design/proposals/2026-07-07-search-enrichment-pipeline.md`](docs/design/proposals/2026-07-07-search-enrichment-pipeline.md),

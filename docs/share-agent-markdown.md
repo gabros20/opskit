@@ -1,57 +1,54 @@
 # Agent access — read shared wiki notes
 
-## The constraint (why two URLs exist)
+There is one link. Append `.md` and any agent with a fetch tool reads the exact wiki source.
 
-E2E encryption puts the AES key in the URL **`#fragment`**. Browsers send that to JavaScript; **`curl`, Claude `web_fetch`, Codex fetch, and most agents never receive `#…` on HTTP GET.**
+## The link
 
-So:
-
-| Audience | URL | What happens |
-|----------|-----|----------------|
-| **People (browser)** | `https://<worker>/<id>#<key>` | Viewer decrypts in the page; key stays off server logs |
-| **Agents without ops** | `https://<worker>/<id>.md?k=<key>` | Worker decrypts once, returns **wiki markdown** (key on wire over TLS) |
-
-You do **not** construct the agent URL yourself. **`ops share … --yes` prints it** as `agent_url` in `--json` and in the yellow **agents** line.
-
-## Claude Code / Codex / any fetch tool (no ops)
-
-Paste the **agent** line from publish (or `agent_url` from `ops share list --json`):
+`ops share <slug> --yes` prints:
 
 ```text
-https://ops-share.example.workers.dev/abc123xyz.md?k=b64urlKey…
+shared note <slug>
+  https://ops-share.example.workers.dev/abc123def456ghi789jkl012
+  agents / LLMs: https://ops-share.example.workers.dev/abc123def456ghi789jkl012.md   (raw markdown — paste into any chat/coding agent)
+  revoke: ops share revoke abc123def456ghi789jkl012 --yes
 ```
 
-Then: `curl`, `web_fetch`, `browse_page` — you get raw markdown (YAML frontmatter + body).
+- **A browser** opening the bare URL gets the rendered HTML page.
+- **An agent** (Claude Code, Codex, `curl`, `web_fetch`, any fetch tool) — append `.md`, or paste
+  the printed `agents:` line as-is — gets `text/markdown; charset=utf-8`: the wiki source, YAML
+  frontmatter and body, byte-identical to what was published.
 
-**Do not** paste only the browser link (`…/id#key`) into fetch tools — they will get the HTML shell or an error, not the note.
+No headers, no keys, no query strings, no URL math beyond "add `.md`". `agent_url` in `--json` output
+and `ops share list --json` is always `url + ".md"`.
 
-If you only have the human link, derive the fetch URL (same key, no manual editing):
+## Content negotiation (the lazy-paste bonus)
 
-```python
-# sharelib.agent_fetch_url — also: ops share pull for local decrypt without ?k= on wire
-from lib import sharelib
-fetch_url = sharelib.agent_fetch_url("https://worker/id#key")
+The bare URL (no `.md`) also serves markdown to anything that isn't a browser: the worker checks
+`Accept` and returns HTML only when it contains `text/html`; `curl`'s default `*/*` and most agent
+fetch tools get markdown straight off the bare link. `.md` stays the documented, deterministic
+contract — negotiation just means pasting the plain link into an agent tends to work too.
+
+```sh
+curl https://<worker>/<token>.md      # markdown, guaranteed
+curl https://<worker>/<token>         # markdown too, via negotiation (non-browser Accept)
 ```
 
 ## With `ops` on the machine
 
 ```bash
-ops share pull 'https://<worker>/<id>#<key>'   # decrypt locally; key never sent to worker
+ops share pull 'https://<worker>/<token>'   # fetch + unpack locally, same markdown, no browser
 ```
 
-## Plain shares (`--plain`)
+`ops share pull <url> [--out file.md]` works on the bare link or the `.md` link interchangeably —
+it normalizes either into the same fetch.
 
-Agent URL is `https://<worker>/<id>.md` (no `?k=`).
+## Legacy links
 
-## On-wire bundle (v1)
-
-Markdown is the wiki **md** half of the OPSX bundle at publish time (collections joined with `\n\n---\n\n`).
-
-## Legacy
-
-HTML-only shares return HTTP 415 on `.md` — re-publish.
+Anything published under the previous encrypted (`#fragment` / `?k=` / `X-Ops-Share-Key`) model is
+dead: every route for a legacy blob returns **HTTP 410** with a `re-publish with current ops share`
+hint. There is no key to recover it with — re-run `ops share <slug> --yes` to get a current link.
 
 ## Tests
 
-- `sharelib.agent_fetch_url`, `pull_markdown_from_url`
+- `bin/lib/sharelib.py`: `parse_share_link`, `markdown_from_blob`, `pull_markdown_from_url`
 - `test/run_backup_share.py`

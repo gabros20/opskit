@@ -3,6 +3,9 @@
 run_backup_share.py — offline suite for the backup family (Part 5.1) + `ops share` (Part 5.2) +
 sweep share hygiene. NEVER contacts a network endpoint: the share transport is short-circuited by
 OPS_SHARE_FAKE, and restic paths run only their graceful-degrade branches (restic is not required).
+
+`ops share` is a plaintext capability-URL model now — no crypto anywhere. The JS half of the worker
+is covered by a Node route-contract test (below), which replaces the old Web-Crypto known-answer test.
 """
 from __future__ import annotations
 import importlib.util
@@ -50,51 +53,133 @@ def run(verb, *args, home, roots=None, extra_env=None):
                           capture_output=True, text=True, env=env)
 
 
+# The JS route-contract test. Drives bin/share/worker/worker.js through its real routes with a
+# Map-backed KV stub. `__WORKER_URL__` is replaced with the worker.js file:// URL before running.
+_WORKER_MJS = r"""
+import worker from '__WORKER_URL__';
+
+function kvStub() {
+  const m = new Map();
+  return {
+    _map: m,
+    async get(key, type) {
+      const v = m.get(key);
+      if (v === undefined || v === null) return null;
+      if (type === "arrayBuffer") {
+        if (v instanceof ArrayBuffer) return v;
+        if (v instanceof Uint8Array) return v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength);
+        return v;
+      }
+      return v;
+    },
+    async put(key, value) { m.set(key, value); },
+    async delete(key) { m.delete(key); },
+  };
+}
+
+function buildOpsx(md, html) {
+  const enc = new TextEncoder();
+  const mdB = enc.encode(md), htmlB = enc.encode(html);
+  const out = new Uint8Array(16 + mdB.length + htmlB.length);
+  out[0] = 0x4f; out[1] = 0x50; out[2] = 0x53; out[3] = 0x58; out[4] = 1; // "OPSX" + version 1
+  const dv = new DataView(out.buffer);
+  dv.setUint32(8, mdB.length, false);   // BE uint32
+  dv.setUint32(12, htmlB.length, false);
+  out.set(mdB, 16);
+  out.set(htmlB, 16 + mdB.length);
+  return out;
+}
+
+const fails = [];
+const A = (cond, msg) => { if (!cond) fails.push(msg); };
+
+(async () => {
+  const env = { OPS_SHARE: kvStub(), PUBLISH_TOKEN: undefined };
+  const blob = buildOpsx("# hello agent", "<!doctype html><p>hi</p>");
+
+  // PUT / → 200 JSON with a 24-char id + admin_token
+  let r = await worker.fetch(new Request("https://w/", { method: "PUT", body: blob }), env);
+  A(r.status === 200, "PUT status " + r.status);
+  const j = await r.json();
+  A(typeof j.id === "string" && /^[a-z0-9]{24}$/.test(j.id), "PUT id " + j.id);
+  A(typeof j.admin_token === "string" && j.admin_token.length > 0, "PUT missing admin_token");
+  const id = j.id, admin = j.admin_token;
+
+  // PUBLISH_TOKEN gating: missing header → 401; matching header → 200
+  const envT = { OPS_SHARE: kvStub(), PUBLISH_TOKEN: "sekret" };
+  r = await worker.fetch(new Request("https://w/", { method: "PUT", body: blob }), envT);
+  A(r.status === 401, "PUT no-token status " + r.status);
+  r = await worker.fetch(new Request("https://w/", { method: "PUT", body: blob, headers: { "X-Publish-Token": "sekret" } }), envT);
+  A(r.status === 200, "PUT good-token status " + r.status);
+
+  // GET /<id> Accept: text/html → the html half, with CSP + Link headers
+  r = await worker.fetch(new Request("https://w/" + id, { headers: { Accept: "text/html" } }), env);
+  A(r.status === 200, "GET html status " + r.status);
+  A((r.headers.get("Content-Type") || "").startsWith("text/html"), "GET html ct " + r.headers.get("Content-Type"));
+  const htmlBody = await r.text();
+  A(htmlBody.includes("<p>hi</p>"), "GET html body");
+  A(!!r.headers.get("Content-Security-Policy"), "GET html missing CSP");
+  A(!!r.headers.get("Link"), "GET html missing Link");
+
+  // GET /<id> Accept: */* → the markdown half
+  r = await worker.fetch(new Request("https://w/" + id, { headers: { Accept: "*/*" } }), env);
+  A((r.headers.get("Content-Type") || "").startsWith("text/markdown"), "GET md ct " + r.headers.get("Content-Type"));
+  A((await r.text()) === "# hello agent", "GET md body");
+
+  // GET /<id>.md → markdown half even when Accept prefers html
+  r = await worker.fetch(new Request("https://w/" + id + ".md", { headers: { Accept: "text/html" } }), env);
+  A((r.headers.get("Content-Type") || "").startsWith("text/markdown"), "GET .md ct " + r.headers.get("Content-Type"));
+  A((await r.text()) === "# hello agent", "GET .md body");
+
+  // GET /<id>?raw=1 → octet-stream, exact stored bytes
+  r = await worker.fetch(new Request("https://w/" + id + "?raw=1"), env);
+  A((r.headers.get("Content-Type") || "").startsWith("application/octet-stream"), "raw ct " + r.headers.get("Content-Type"));
+  const raw = new Uint8Array(await r.arrayBuffer());
+  A(raw.length === blob.length && raw.every((b, i) => b === blob[i]), "raw bytes mismatch");
+
+  // non-OPSX stored blob → 410 on GET
+  const id2 = "b".repeat(24);
+  env.OPS_SHARE._map.set("blob:" + id2, new Uint8Array([1, 2, 3, 4, 5]));
+  r = await worker.fetch(new Request("https://w/" + id2 + ".md"), env);
+  A(r.status === 410, "non-OPSX status " + r.status);
+
+  // unknown id → 404
+  r = await worker.fetch(new Request("https://w/nonexistent24charidxxxxxx"), env);
+  A(r.status === 404, "404 status " + r.status);
+
+  // DELETE wrong token → 403, right token → 204, then GET → 404
+  r = await worker.fetch(new Request("https://w/" + id, { method: "DELETE", headers: { "X-Admin-Token": "wrong" } }), env);
+  A(r.status === 403, "DELETE wrong-token status " + r.status);
+  r = await worker.fetch(new Request("https://w/" + id, { method: "DELETE", headers: { "X-Admin-Token": admin } }), env);
+  A(r.status === 204, "DELETE right-token status " + r.status);
+  r = await worker.fetch(new Request("https://w/" + id, { headers: { Accept: "*/*" } }), env);
+  A(r.status === 404, "GET after DELETE status " + r.status);
+
+  if (fails.length) { process.stderr.write(fails.join("\n") + "\n"); process.exit(1); }
+  process.stdout.write("WORKER-OK");
+})().catch((e) => { process.stderr.write(String((e && e.stack) || e)); process.exit(1); });
+"""
+
+
 def main() -> int:
     sl = _load_sharelib()
 
-    # ---------- E2E known-answer: the viewer's Web Crypto decrypts sharelib's ciphertext (issue #2 part 2) ----------
-    # A frozen (text, blob, key) triple produced by sharelib.encrypt(). The worker VIEWER decrypts in
-    # the browser with Web Crypto; Node's identical Web Crypto here pins byte-compatibility of the
-    # nonce||ct||tag / b64url wire format. Runs in CI (only needs `node`) even without `cryptography`.
+    # ---------- worker route contract (Node): the JS half of the capability-URL model ----------
+    # Replaces the old Web-Crypto KAT as the JS-side coverage. Needs only `node`; skips gracefully
+    # (informational PASS) when node is absent, mirroring how the old KAT block handled node's absence.
     import shutil as _sh
-    kat = json.loads((REPO / "test" / "fixtures" / "share_kat.json").read_text(encoding="utf-8"))
-    if sl.have_crypto():
-        check("KAT: python sharelib.decrypt round-trips the fixture",
-              sl.decrypt(kat["blob"], kat["key"]).decode("utf-8") == kat["text"])
+    worker_url = (REPO / "bin" / "share" / "worker" / "worker.js").as_uri()
     if _sh.which("node"):
-        js = (
-            'function d(s){s=s.replace(/-/g,"+").replace(/_/g,"/");s+="=".repeat((4-s.length%4)%4);'
-            'return new Uint8Array(Buffer.from(s,"base64"));}'
-            '(async()=>{const r=d(process.argv[2]),n=r.slice(0,12),c=r.slice(12);'
-            'const k=await crypto.subtle.importKey("raw",d(process.argv[3]),{name:"AES-GCM"},false,["decrypt"]);'
-            'const p=await crypto.subtle.decrypt({name:"AES-GCM",iv:n,tagLength:128},k,c);'
-            'process.stdout.write(new TextDecoder().decode(p));})()'
-            '.catch(e=>{process.stderr.write(String(e));process.exit(1);});')
         with tempfile.NamedTemporaryFile("w", suffix=".mjs", delete=False) as f:
-            f.write(js); mjs = f.name
-        p = subprocess.run(["node", mjs, kat["blob"], kat["key"]], capture_output=True, text=True)
+            f.write(_WORKER_MJS.replace("__WORKER_URL__", worker_url)); mjs = f.name
+        p = subprocess.run(["node", mjs], capture_output=True, text=True)
         os.unlink(mjs)
-        check("KAT: Web Crypto (Node) decrypts sharelib ciphertext to the same plaintext",
-              p.stdout == kat["text"], p.stdout + p.stderr)
+        check("worker routes: PUT/GET(html·md·.md·raw)/410/404/DELETE all pass (Node)",
+              "WORKER-OK" in p.stdout, (p.stdout + p.stderr).strip()[-300:])
     else:
-        check("KAT: node absent — Web Crypto cross-check skipped (informational)", True)
+        check("worker routes: node absent — JS route cross-check skipped (informational)", True)
 
-    # ---------- sharelib: encrypt/decrypt round-trip + expiry + HTML rendering ----------
-    if sl.have_crypto():
-        pt = b"the quick brown fox <secret>"
-        ct, key = sl.encrypt(pt)
-        check("encrypt/decrypt round-trips", sl.decrypt(ct, key) == pt)
-        check("ciphertext differs from plaintext", ct.encode() != pt and len(ct) > 0)
-        bad = sl.encrypt(pt)[1]  # a different random key
-        try:
-            sl.decrypt(ct, bad); ok = False
-        except Exception:
-            ok = True
-        check("decrypt with wrong key fails", ok)
-    else:
-        check("no crypto → install hint constant present", bool(sl.CRYPTO_HINT))
-
+    # ---------- sharelib: expiry parsing ----------
     check("parse_expires 7d", sl.parse_expires("7d") == 7 * 86400)
     check("parse_expires 12h", sl.parse_expires("12h") == 12 * 3600)
     try:
@@ -137,24 +222,47 @@ def main() -> int:
     pipe_only = "| not a table without separator |\n"
     check("render: lone pipe line stays paragraph", "<table>" not in sl.render_note_html(pipe_only, set()))
 
+    # ---------- sharelib: OPSX bundle pack/unpack + markdown bundling + capability-link parsing ----------
     md_b = sl.render_markdown_bundle(docs).encode("utf-8")
     html_b = htmldoc.encode("utf-8")
     packed = sl.pack_bundle(md_b, html_b)
     check("pack/unpack round-trips markdown + html", sl.unpack_bundle(packed) == (md_b, html_b))
     check("pack starts with OPSX magic", packed[:4] == sl.BUNDLE_MAGIC)
+
+    # render_markdown_bundle: a single note is file-identical; a collection joins notes with a --- rule
     check("markdown bundle single note is file-identical",
           sl.render_markdown_bundle([docs[0]]) == docs[0]["md"])
+    coll_md = sl.render_markdown_bundle(docs)
+    check("markdown bundle collection joins notes with a --- rule",
+          docs[0]["md"] in coll_md and docs[1]["md"] in coll_md and "\n---\n" in coll_md)
+
+    # markdown_from_blob: single-arg OPSX unpack → the md half; non-OPSX bytes → ValueError('re-publish')
     md_one = sl.render_markdown_bundle([docs[0]]).encode("utf-8")
     packed_one = sl.pack_bundle(md_one, html_b)
-    check("markdown_from_blob plain OPSX", sl.markdown_from_blob(packed_one, None) == docs[0]["md"])
-    if sl.have_crypto():
-        ct, k = sl.encrypt(packed_one)
-        check("encrypted bundle decrypts to OPSX", sl.decrypt(ct, k)[:4] == sl.BUNDLE_MAGIC)
-        check("markdown_from_blob E2E ciphertext", sl.markdown_from_blob(ct.encode("ascii"), k) == docs[0]["md"])
-        o, sid, key = sl.parse_share_link(f"https://w.example/{'a' * 10}#{k}")
-        check("parse_share_link", o == "https://w.example" and sid == "a" * 10 and key == k)
-        agent = sl.agent_fetch_url(f"https://w.example/{'a' * 10}#{k}")
-        check("agent_fetch_url", agent == f"https://w.example/{'a' * 10}.md?k={k}", agent)
+    check("markdown_from_blob returns the md half of an OPSX blob",
+          sl.markdown_from_blob(packed_one) == docs[0]["md"])
+    try:
+        sl.markdown_from_blob(b"not-an-opsx-blob!!"); ok, msg = False, ""
+    except ValueError as e:
+        ok, msg = True, str(e)
+    check("markdown_from_blob non-OPSX → ValueError containing 're-publish'",
+          ok and "re-publish" in msg, msg)
+
+    # parse_share_link → (origin, share_id); tolerates .md, ignores stale #fragment; rejects garbage
+    tok = "a" * 24
+    o, sid_ = sl.parse_share_link(f"https://w.example/{tok}")
+    check("parse_share_link: 24-char token URL", o == "https://w.example" and sid_ == tok, f"{o} {sid_}")
+    o, sid_ = sl.parse_share_link(f"https://w.example/{tok}.md")
+    check("parse_share_link: trailing .md agent link stripped", o == "https://w.example" and sid_ == tok, f"{o} {sid_}")
+    o, sid_ = sl.parse_share_link(f"https://w.example/{tok}#stalekeyfragment")
+    check("parse_share_link: stale #fragment ignored", o == "https://w.example" and sid_ == tok, f"{o} {sid_}")
+    o, sid_ = sl.parse_share_link(f"https://w.example/{'b' * 10}")
+    check("parse_share_link: legacy 10-char id", sid_ == "b" * 10, f"{o} {sid_}")
+    try:
+        sl.parse_share_link("not a url"); ok = False
+    except ValueError:
+        ok = True
+    check("parse_share_link rejects garbage → ValueError", ok)
 
     # ---------- share: dry-run render (offline), confirm-gate, fake-transport bookkeeping ----------
     with tempfile.TemporaryDirectory() as td:
@@ -166,17 +274,9 @@ def main() -> int:
         (h / "wiki" / "notes" / "beta.md").write_text(
             "---\ntype: note\ntitle: Beta\ntags: [pub]\n---\n# Beta\nhi\n")
 
-        # `cryptography` is an optional dep and CI runs this suite stdlib-only, so drive the share
-        # CLI in --plain mode when crypto is absent. Plain exercises the identical render / ledger /
-        # list / revoke / collection bookkeeping; only the E2E #key URL fragment (asserted
-        # separately below) needs the AES layer. On a machine with `cryptography`, PM is empty and
-        # the full E2E path runs exactly as before.
-        HAVE_CRYPTO = sl.have_crypto()
-        PM = [] if HAVE_CRYPTO else ["--plain"]
-
-        # dry-run writes the HTML blob and never publishes
+        # dry-run writes the HTML blob and never publishes / never touches the ledger
         outp = Path(td) / "alpha.html"
-        r = run("share", "alpha", "--dry-run", "--out", str(outp), *PM, home=h)
+        r = run("share", "alpha", "--dry-run", "--out", str(outp), home=h)
         check("share dry-run exits 0", r.returncode == 0, r.stdout + r.stderr)
         check("share dry-run wrote HTML, no ledger",
               outp.exists() and not (h / ".share" / "ledger.json").exists())
@@ -185,35 +285,50 @@ def main() -> int:
               "beta" in blob and "ghost" in blob and 'href="#note-' not in blob, blob[:200])
 
         # confirm-gate: no --yes → EXIT_CONFIRM(3)
-        r = run("share", "alpha", *PM, home=h)
+        r = run("share", "alpha", home=h)
         check("share without --yes → exit 3 (needs-yes)", r.returncode == 3, r.stdout + r.stderr)
 
         # not-found slug
-        r = run("share", "nonesuch", "--dry-run", *PM, home=h)
+        r = run("share", "nonesuch", "--dry-run", home=h)
         check("share unknown slug → exit 4", r.returncode == 4, r.stdout + r.stderr)
 
-        # full flow with fake transport: ledger + frontmatter + list + revoke
+        # full flow with fake transport: JSON contract + ledger + frontmatter + journal
         fenv = {"OPS_SHARE_FAKE": "1"}
-        r = run("share", "alpha", "--expires", "1d", "--yes", "--json", *PM, home=h, extra_env=fenv)
+        r = run("share", "alpha", "--expires", "1d", "--yes", "--json", home=h, extra_env=fenv)
         check("share --yes (fake) exits 0", r.returncode == 0, r.stdout + r.stderr)
         env = json.loads(r.stdout.splitlines()[0]) if r.stdout.strip() else {}
-        sid = env.get("data", {}).get("id", "")
-        url = env.get("data", {}).get("url", "")
+        data = env.get("data", {})
+        sid = data.get("id", "")
+        url = data.get("url", "")
+        agent_url = data.get("agent_url", "")
         check("share returns an id", bool(sid), r.stdout)
-        if HAVE_CRYPTO:
-            check("E2E share url carries the #key fragment", "#" in url, r.stdout)
-        else:
-            check("plain share url has no #key fragment", bool(url) and "#" not in url, r.stdout)
+        check("share url is a plain capability URL (no #key fragment)",
+              bool(url) and "#" not in url, r.stdout)
+        check("share agent_url == url + '.md'", bool(url) and agent_url == url + ".md", r.stdout)
+        check("share JSON has no 'encrypted' key", "encrypted" not in data, r.stdout)
         led = json.loads((h / ".share" / "ledger.json").read_text())
-        check("ledger records the share", any(s["id"] == sid for s in led["shares"]))
+        entry = next((s for s in led["shares"] if s["id"] == sid), None)
+        check("ledger records the share", entry is not None)
+        check("ledger entry has no 'plain' key", entry is not None and "plain" not in entry, str(entry))
         check("frontmatter stamped with share:", "share:" in (h / "wiki" / "notes" / "alpha.md").read_text())
+        jtext = ("".join(f.read_text() for f in (h / "journal").rglob("*.md"))
+                 if (h / "journal").exists() else "")
+        check("journal line appended for the share", "share" in jtext and sid in jtext, jtext[:120])
 
+        # a second --dry-run publishes nothing and leaves the ledger untouched
+        before = len(led["shares"])
+        r = run("share", "beta", "--dry-run", "--json", home=h, extra_env=fenv)
+        check("share --dry-run exits 0 (no publish)", r.returncode == 0, r.stdout + r.stderr)
+        led_after = json.loads((h / ".share" / "ledger.json").read_text())
+        check("share --dry-run adds no ledger entry", len(led_after["shares"]) == before, r.stdout)
+
+        # list shows the active share
         r = run("share", "list", "--json", home=h)
         rows = [json.loads(l) for l in r.stdout.splitlines()]
         check("share list shows the active share",
               any(x.get("id") == sid and x.get("state") == "active" for x in rows[1:]), r.stdout)
 
-        # revoke: confirm-gate then delete
+        # revoke: confirm-gate then mark revoked
         r = run("share", "revoke", sid, home=h)
         check("revoke without --yes → exit 3", r.returncode == 3, r.stdout + r.stderr)
         r = run("share", "revoke", sid, "--yes", home=h, extra_env=fenv)
@@ -223,15 +338,15 @@ def main() -> int:
 
         # collection by tag renders both notes
         r = run("share", "collection", "pub", "--dry-run", "--out", str(Path(td) / "coll.html"),
-                "--json", *PM, home=h)
+                "--json", home=h)
         cenv = json.loads(r.stdout.splitlines()[0]) if r.stdout.strip() else {}
         check("collection selects both tagged notes",
               set(cenv.get("data", {}).get("notes", [])) == {"alpha", "beta"}, r.stdout)
 
         # ---------- transport: a REAL publish carries a named User-Agent (issue #2 part 1) ----------
         # Cloudflare bot-management 403s the default `Python-urllib/x.y` UA. Point the client at a
-        # one-shot local server (no OPS_SHARE_FAKE) and assert the PUT's UA. --plain keeps it
-        # stdlib-only. This exercises the real _publish() path, header included.
+        # one-shot local server (no OPS_SHARE_FAKE) and assert the PUT's UA + OPSX body. This
+        # exercises the real _publish() path, header included.
         import http.server, threading
         cap = {}
 
@@ -250,14 +365,14 @@ def main() -> int:
         (h / ".share").mkdir(exist_ok=True)
         (h / ".share" / "config.json").write_text(
             json.dumps({"endpoint": f"http://127.0.0.1:{srv.server_address[1]}"}))
-        run("share", "alpha", "--yes", "--plain", "--json", home=h)  # real transport, no FAKE
+        run("share", "alpha", "--yes", "--json", home=h)  # real transport, no FAKE
         th.join(timeout=5); srv.server_close()
         check("real publish sends a named User-Agent (Cloudflare 403 fix)",
               cap.get("ua") == "ops-share/1.0", str(cap))
         check("real publish body is OPSX bundle (agent .md capable)",
               cap.get("body", b"")[:4] == b"OPSX", str(cap)[:80])
 
-        # ---------- share pull: ?raw=1 + local decrypt (Tier A human link) ----------
+        # ---------- share pull: ?raw=1 fetch → wiki markdown (capability link) ----------
         pull_body = cap.get("body", b"")
         stored = {"body": pull_body}
         share_id = "abcdefghij"
@@ -284,19 +399,8 @@ def main() -> int:
         r = run("share", "pull", human, home=h)
         pth.join(timeout=5)
         psrv.server_close()
-        check("pull plain share prints wiki markdown", r.returncode == 0 and "# Alpha" in r.stdout, r.stdout[:120] + r.stderr[:120])
-        if HAVE_CRYPTO:
-            ct, k = sl.encrypt(pull_body)
-            stored["body"] = ct.encode("ascii")
-            psrv2 = http.server.HTTPServer(("127.0.0.1", 0), _PullH)
-            pth2 = threading.Thread(target=psrv2.handle_request, daemon=True)
-            pth2.start()
-            port2 = psrv2.server_address[1]
-            enc_url = f"http://127.0.0.1:{port2}/{share_id}#{k}"
-            r = run("share", "pull", enc_url, home=h)
-            pth2.join(timeout=5)
-            psrv2.server_close()
-            check("pull E2E share decrypts to markdown", r.returncode == 0 and "# Alpha" in r.stdout, r.stdout[:120])
+        check("pull capability share prints wiki markdown",
+              r.returncode == 0 and "# Alpha" in r.stdout, r.stdout[:120] + r.stderr[:120])
 
         # ---------- sweep share hygiene: expired + edited-since warnings ----------
         import time as _t

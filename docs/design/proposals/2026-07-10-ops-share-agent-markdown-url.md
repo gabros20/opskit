@@ -1,6 +1,10 @@
 # Proposal — zero-config agent markdown URLs for ops share
 
-**Status:** SUPERSEDED (2026-07-10) — shipped **Tier A**: `ops share pull '<human url>'` (see `docs/share-agent-markdown.md`). Worker `/<id>.md` + `?k=` remains deprecated backward compat only.
+**Status:** SUPERSEDED by ADR-008 / `docs/design/proposals/2026-07-10-capability-url-share.md`
+(2026-07-10) — `ops share` moved to **capability URLs**: no encryption, no key, one unguessable
+token per link. The `?k=` query key and the Tier A/B contract analyzed below are both **removed**
+(not deprecated compat) — legacy encrypted links now 410. See `docs/share-agent-markdown.md` for the
+current (trivial) agent-access contract.
 **Author:** Hermes (vault operator request) + design pass for personal-operating-system  
 **Related:** `docs/share-agent-markdown.md`, `wiki/research/ops-share-architecture.md` (vault), Part 5.2 share worker
 

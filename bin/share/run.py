@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """
-ops share <slug> | collection <tag> | list | pull <url> | revoke <id> | init — zero-knowledge, confirm-gated
-sharing (proposal Part 5.2). Render a note (or a tag collection) to ONE self-contained HTML blob
-LOCALLY, encrypt it AES-256-GCM with a locally-generated key, PUT only the CIPHERTEXT to a vendored
-Cloudflare Worker + KV, and hand back a link whose `#fragment` carries the key (the provider can
-never read the note). The verb's output is a DRAFT link — the human sends it.
+ops share <slug> | collection <tag> | list | pull <url> | revoke <id> | init — capability-URL,
+confirm-gated sharing (proposal Part 5.2). Render a note (or a tag collection) to ONE self-contained
+HTML blob plus its raw markdown LOCALLY, pack them into a plaintext OPSX bundle, PUT that bundle to a
+vendored Cloudflare Worker + KV, and hand back ONE link. The verb's output is a DRAFT link — the
+human sends it.
+
+The model is a capability URL: there is NO encryption. The worker stores the bundle in the clear and
+serves `https://<worker>/<token>` as HTML to browsers and `<worker>/<token>.md` as raw markdown to
+agents/LLMs. Secrecy = an unguessable 24-char token + a TTL; whoever holds the link can read it, so
+treat the link as the secret. The worker requires an `X-Publish-Token` header (its PUBLISH_TOKEN
+secret, mirrored in `.share/config.json` as `publish_token`) so only this vault can publish.
 
 Governance: risk safe_write at the surface so `list` stays free, but every TRANSMITTING subaction
-(share/collection/revoke, and `init` deploy) self-gates `--yes` → EXIT_CONFIRM(3). Publishing
-ciphertext off-machine IS a transmission; the transport is factored into _publish()/_revoke_remote()
-and is NEVER exercised by tests (OPS_SHARE_FAKE short-circuits it deterministically). `--dry-run`
-renders + encrypts locally and stops before the PUT. `--plain` = unguessable slug, no E2E.
-Fallback for the unprovisioned: `--gist` (secret gist via `gh gist create`, confirm-gated).
+(share/collection/revoke, and `init` deploy) self-gates `--yes` → EXIT_CONFIRM(3). Publishing the
+note off-machine IS a transmission; the transport is factored into _publish()/_revoke_remote() and is
+NEVER exercised by tests (OPS_SHARE_FAKE short-circuits it deterministically). `--dry-run` renders
+locally and stops before the PUT. Fallback for the unprovisioned: `--gist` (secret gist via
+`gh gist create`, confirm-gated).
 """
 import json
 import os
@@ -46,6 +52,15 @@ def _config() -> dict:
         return json.loads(CONFIG.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+def _merge_config(**updates) -> dict:
+    """Merge `updates` into `.share/config.json`, PRESERVING existing keys (endpoint, publish_token)."""
+    cfg = _config()
+    cfg.update({k: v for k, v in updates.items() if v is not None})
+    SHARE_DIR.mkdir(parents=True, exist_ok=True)
+    CONFIG.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+    return cfg
 
 
 def _ledger() -> dict:
@@ -91,16 +106,18 @@ def _fake() -> bool:
     return os.environ.get("OPS_SHARE_FAKE", "").lower() in ("1", "true", "yes")
 
 
-def _publish(endpoint: str, body: bytes, ttl: int) -> dict:
-    """PUT ciphertext to the worker; returns {id, admin_token}. Deterministic no-network stub under
-    OPS_SHARE_FAKE (the ONLY path tests take)."""
+def _publish(endpoint: str, body: bytes, ttl: int, publish_token: str = "") -> dict:
+    """PUT the plaintext OPSX bundle to the worker; returns {id, admin_token}. Deterministic
+    no-network stub under OPS_SHARE_FAKE (the ONLY path tests take)."""
     if _fake():
         import hashlib
         h = hashlib.sha256(body).hexdigest()[:16]
         return {"id": h, "admin_token": "fake-" + h}
-    req = urllib.request.Request(endpoint.rstrip("/") + "/", data=body, method="PUT",
-                                 headers={"Content-Type": "application/octet-stream",
-                                          "X-Expire-Seconds": str(ttl), "User-Agent": UA})
+    headers = {"Content-Type": "application/octet-stream",
+               "X-Expire-Seconds": str(ttl), "User-Agent": UA}
+    if publish_token:
+        headers["X-Publish-Token"] = publish_token
+    req = urllib.request.Request(endpoint.rstrip("/") + "/", data=body, method="PUT", headers=headers)
     with urllib.request.urlopen(req, timeout=30) as r:  # pragma: no cover - never run in tests
         return json.loads(r.read().decode("utf-8"))
 
@@ -171,7 +188,6 @@ def _positional(argv):
 def cmd_share(argv):
     dry = "--dry-run" in argv
     yes = ("--yes" in argv) or ("-y" in argv)
-    plain = "--plain" in argv
     gist = "--gist" in argv
     expires = argv[argv.index("--expires") + 1] if "--expires" in argv else "7d"
     out = argv[argv.index("--out") + 1] if "--out" in argv else None
@@ -190,36 +206,23 @@ def cmd_share(argv):
     base = sel[0][1].parent
     html_bytes = sharelib.render_bundle(docs, image_resolver=_image_resolver(base)).encode("utf-8")
     md_bytes = sharelib.render_markdown_bundle(docs).encode("utf-8")
-    blob = sharelib.pack_bundle(md_bytes, html_bytes)
-
-    if not plain and not sharelib.have_crypto():
-        output.fail(output.EXIT_UNEXPECTED,
-                    "AES-256-GCM unavailable — E2E encryption needs `cryptography`",
-                    hint=sharelib.CRYPTO_HINT, verb="share")
-
-    url_key = None
-    if plain:
-        body = blob
-    else:
-        cipher_b64, url_key = sharelib.encrypt(blob)
-        body = cipher_b64.encode("ascii")
+    body = sharelib.pack_bundle(md_bytes, html_bytes)
 
     if dry:
         if out:
-            Path(out).write_bytes(html_bytes)  # pre-encryption HTML for inspection
+            Path(out).write_bytes(html_bytes)  # rendered HTML for inspection
         data = {"kind": kind, "key": key, "notes": [d["slug"] for d in docs],
-                "plain": plain, "bytes": len(body), "encrypted": not plain,
-                "expires_seconds": ttl, "out": out}
+                "bytes": len(body), "expires_seconds": ttl, "out": out}
         return output.emit(data, "share", human=lambda _:
-                           f"{DIM}dry-run{RESET}: rendered {len(docs)} note(s), {len(body)} bytes"
-                           f" ({'plain' if plain else 'AES-256-GCM'}), not published.")
+                           f"{DIM}dry-run{RESET}: rendered {len(docs)} note(s), {len(body)} bytes,"
+                           f" not published.")
 
     if gist:
         return _gist(docs, yes)
 
     if not yes:
         output.fail(output.EXIT_CONFIRM,
-                    f"publishing ciphertext off-machine is a transmission ({len(body)} bytes)",
+                    f"publishing the note off-machine is a transmission ({len(body)} bytes)",
                     hint=f"re-run: ops share {' '.join(pos)} --yes", verb="share")
 
     cfg = _config()
@@ -227,16 +230,14 @@ def cmd_share(argv):
     if not endpoint and not _fake():
         output.fail(output.EXIT_UNEXPECTED, "no share endpoint configured",
                     hint="run: ops share init  (or use --gist)", verb="share")
-    res = _publish(endpoint or "https://fake.invalid", body, ttl)
+    res = _publish(endpoint or "https://fake.invalid", body, ttl, cfg.get("publish_token", ""))
     sid, token = res["id"], res.get("admin_token", "")
     pub_origin = (endpoint or "https://fake.invalid").rstrip("/")
-    base_url = f"{pub_origin}/{sid}"
-    url = base_url
-    if url_key:
-        url += f"#{url_key}"
+    url = f"{pub_origin}/{sid}"
+    agent_url = url + ".md"
 
     entry = {"id": sid, "kind": kind, "key": key, "url": url, "admin_token": token,
-             "plain": plain, "notes": [d["slug"] for d in docs],
+             "notes": [d["slug"] for d in docs],
              "note_paths": [str(p.relative_to(paths.OPS_HOME)) for _, p in sel],
              "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
              "created_ts": int(datetime.now(timezone.utc).timestamp()),
@@ -248,20 +249,13 @@ def cmd_share(argv):
         _stamp_frontmatter(p, url)
     paths.append_journal(f"share {kind} {key} -> {sid}")
 
-    agent_url = sharelib.agent_fetch_url(url)
-
     data = {"id": sid, "url": url, "agent_url": agent_url, "kind": kind, "key": key,
-            "expires_ts": entry["expires_ts"], "encrypted": not plain}
-    keynote = "" if plain else (
-        f"\n  {YEL}browser: send the FULL link including #… (fragment never hits the server){RESET}")
-    agent_line = (
-        f"\n  {YEL}agents (Claude / Codex / web_fetch — no ops): paste this URL:{RESET}\n"
-        f"  {agent_url}"
-    )
-    ops_line = f"\n  {DIM}ops / Hermes on this Mac: ops share pull '{url}'{RESET}"
+            "expires_ts": entry["expires_ts"]}
     return output.emit(data, "share", human=lambda _:
                        f"{GREEN}shared{RESET} {kind} {key}\n"
-                       f"  {url}{keynote}{agent_line}{ops_line}\n"
+                       f"  {url}\n"
+                       f"  {YEL}agents / LLMs: {agent_url}   (raw markdown — paste into any chat or "
+                       f"coding agent){RESET}\n"
                        f"  {DIM}revoke: ops share revoke {sid} --yes{RESET}")
 
 
@@ -357,7 +351,7 @@ def _wrangler_kv_configured() -> bool:
 
 
 def cmd_pull(argv):
-    """Fetch ciphertext from the worker, decrypt locally with #key, print wiki markdown."""
+    """Fetch the plaintext OPSX bundle from the worker and print its wiki markdown."""
     pos = [a for a in argv if not a.startswith("-")]
     url = pos[0] if pos else ""
     out = None
@@ -365,24 +359,24 @@ def cmd_pull(argv):
         out = argv[argv.index("--out") + 1]
     if not url:
         output.fail(output.EXIT_USAGE,
-                    "usage: ops share pull <https://<worker>/<id>#key> [--out file.md]",
+                    "usage: ops share pull <https://<worker>/<id>> [--out file.md]",
                     verb="share")
     try:
-        origin, sid, key = sharelib.parse_share_link(url)
+        origin, sid = sharelib.parse_share_link(url)
     except ValueError as e:
         output.fail(output.EXIT_USAGE, str(e), verb="share")
     try:
         md = sharelib.pull_markdown_from_url(url)
     except sharelib.SharePullError as e:
+        # "expired"/"revoked" → the share is simply gone (404). The legacy-410 re-publish hint is a
+        # different situation (the share exists but is a dead encrypted blob) → EXIT_UNEXPECTED.
         code = output.EXIT_NOT_FOUND if "expired" in str(e) or "revoked" in str(e) else output.EXIT_UNEXPECTED
         output.fail(code, str(e), verb="share")
-    except RuntimeError as e:
-        output.fail(output.EXIT_UNEXPECTED, str(e), hint=sharelib.CRYPTO_HINT, verb="share")
     except ValueError as e:
         output.fail(output.EXIT_UNEXPECTED, str(e), verb="share")
     if out:
         Path(out).write_text(md, encoding="utf-8")
-    data = {"id": sid, "bytes": len(md), "out": out, "encrypted": bool(key)}
+    data = {"id": sid, "bytes": len(md), "out": out}
     if output.json_mode():
         data["markdown"] = md
 
@@ -398,15 +392,18 @@ def cmd_init(argv):
     yes = ("--yes" in argv) or ("-y" in argv)
     endpoint = argv[argv.index("--endpoint") + 1] if "--endpoint" in argv else None
     if endpoint:
-        SHARE_DIR.mkdir(parents=True, exist_ok=True)
-        CONFIG.write_text(json.dumps({"endpoint": endpoint}, indent=2) + "\n", encoding="utf-8")
+        _merge_config(endpoint=endpoint)  # merge, never clobber an existing publish_token
     steps = [
         f"cd {WORKER_DIR}",
         "cp wrangler.toml.example wrangler.toml   # once per vault; file is gitignored",
         "wrangler kv namespace create OPS_SHARE",
         "# paste the namespace id into wrangler.toml, then:",
         "wrangler deploy",
+        'python3 -c "import secrets; print(secrets.token_urlsafe(24))" | wrangler secret put '
+        "PUBLISH_TOKEN   # then put the same value in .share/config.json as publish_token",
         "ops share init --endpoint https://<your-worker>.workers.dev",
+        "# canonical flow: once wrangler.toml has its KV id, just re-run `ops share init --yes` —",
+        "# it deploys, generates + sets PUBLISH_TOKEN, and mirrors it into .share/config.json.",
     ]
     if not yes:
         return output.emit({"deployed": False, "worker": str(WORKER_DIR), "steps": steps},
@@ -414,7 +411,7 @@ def cmd_init(argv):
                            "deploy the share worker once (confirm with --yes to run wrangler):\n  "
                            + "\n  ".join(steps))
     # pragma: no cover - confirm-gated wrangler deploy, never in tests
-    import shutil, subprocess
+    import secrets, shutil, subprocess
     if not shutil.which("wrangler"):
         output.fail(output.EXIT_UNEXPECTED, "wrangler not installed",
                     hint="npm i -g wrangler", verb="share")
@@ -424,8 +421,19 @@ def cmd_init(argv):
                     "wrangler.toml still has placeholder KV id",
                     hint=f"edit {WRANGLER_TOML} after `wrangler kv namespace create OPS_SHARE`", verb="share")
     r = subprocess.run(["wrangler", "deploy"], cwd=str(WORKER_DIR))
-    return output.emit({"deployed": r.returncode == 0}, "share",
-                       human=lambda d: f"wrangler deploy exit {r.returncode}")
+    deployed = r.returncode == 0
+    token_set = bool(_config().get("publish_token"))
+    if deployed and not token_set:
+        token = secrets.token_urlsafe(24)
+        sr = subprocess.run(["wrangler", "secret", "put", "PUBLISH_TOKEN"], cwd=str(WORKER_DIR),
+                            input=token, text=True)
+        if sr.returncode == 0:
+            _merge_config(publish_token=token)  # preserve endpoint; mirror the worker secret locally
+            token_set = True
+    return output.emit({"deployed": deployed, "token_set": token_set}, "share",
+                       human=lambda d: f"wrangler deploy exit {r.returncode}"
+                                       + (f"; PUBLISH_TOKEN {'set' if token_set else 'NOT set'}"
+                                          if deployed else ""))
 
 
 def main(argv):
