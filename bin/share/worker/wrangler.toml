@@ -1,9 +1,0 @@
-name = "ops-share"
-main = "worker.js"
-compatibility_date = "2024-11-01"
-
-# Create the namespace once, then paste its id here:
-#   wrangler kv namespace create OPS_SHARE
-[[kv_namespaces]]
-binding = "OPS_SHARE"
-id = "PASTE_KV_NAMESPACE_ID_HERE"
