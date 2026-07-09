@@ -12,15 +12,20 @@ never sees the key — the key travels in the URL `#fragment` and is decrypted i
 | `PUT`  | `/`          | `X-Expire-Seconds` | blob | `{ id, admin_token }` |
 | `GET`  | `/<id>`      | `Accept: text/html` (browser) | — | the **viewer** page (decrypts client-side) |
 | `GET`  | `/<id>?raw=1` | —                 | —    | the raw stored blob (what the viewer fetches) |
+| `GET`  | `/<id>.md`   | `X-Ops-Share-Key` or `?k=` (E2E) | — | **UTF-8 wiki markdown** for agents (OPSX v1, 1:1 source) |
 | `GET`  | `/<id>`      | any other `Accept` (curl) | — | the raw stored blob |
 | `DELETE` | `/<id>`    | `X-Admin-Token`    | —    | `204` (admin only) |
 
 **The viewer.** A browser opening `/<id>#<key>` gets a small self-contained page that fetches the
 raw ciphertext (`?raw=1`) and decrypts it in-page with Web Crypto using the key from the URL
 `#fragment` — byte-compatible with `bin/lib/sharelib.py` (`nonce[12] ‖ ct ‖ tag[16]`, base64url).
-The decrypted note renders inside a **scriptless sandboxed iframe** (it can never read the key), and
-the `#fragment` is stripped from the address bar after load. `--plain` shares (no `#fragment`) render
-their HTML directly. Without the viewer the browser would just download opaque ciphertext.
+The decrypted note renders inside a **scriptless sandboxed iframe** (it can never read the key).
+`--plain` shares (no `#fragment`) render their HTML directly. Without the viewer the browser would
+just download opaque ciphertext.
+
+**Agent markdown.** Publish bundles **OPSX** (raw wiki markdown + HTML). Fetch `/<id>.md` for the
+**exact wiki source** (single note) or collection join. Pass the key via `X-Ops-Share-Key` or `?k=`.
+See `docs/share-agent-markdown.md`.
 
 Expiry is native KV `expirationTtl` (1:1 from `--expires`, so there is no cleanup code). Revoke is a
 `DELETE` with the `admin_token` returned at publish time and recorded in `.share/ledger.json`.

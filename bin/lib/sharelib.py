@@ -13,6 +13,7 @@ import base64
 import html
 import os
 import re
+import struct
 
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # type: ignore
@@ -320,3 +321,42 @@ def render_bundle(notes: list[dict], image_resolver=None) -> str:
 
 def data_uri(data: bytes, mime: str) -> str:
     return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
+# --------------------------------------------------------------------------- multipart bundle (HTML + agent markdown)
+
+BUNDLE_MAGIC = b"OPSX"
+BUNDLE_VERSION = 1
+
+
+def render_markdown_bundle(notes: list[dict]) -> str:
+    """Wiki source bytes for agent / .md — single note is file-identical; collections join with ---."""
+    if len(notes) == 1:
+        return notes[0]["md"]
+    parts: list[str] = []
+    for i, n in enumerate(notes):
+        if i:
+            parts.append("\n\n---\n\n")
+        parts.append(n["md"])
+    return "".join(parts)
+
+
+def pack_bundle(md: bytes, html: bytes) -> bytes:
+    """Single publish payload: raw markdown + rendered HTML (v1 OPSX)."""
+    if len(md) > 0xFFFFFFFF or len(html) > 0xFFFFFFFF:
+        raise ValueError("bundle part too large")
+    header = BUNDLE_MAGIC + bytes([BUNDLE_VERSION, 0, 0, 0]) + struct.pack(">II", len(md), len(html))
+    return header + md + html
+
+
+def unpack_bundle(data: bytes) -> tuple[bytes, bytes] | None:
+    """Return (md, html) or None if legacy HTML-only blob."""
+    if len(data) < 16 or data[:4] != BUNDLE_MAGIC or data[4] != BUNDLE_VERSION:
+        return None
+    md_len, html_len = struct.unpack(">II", data[8:16])
+    off = 16
+    if off + md_len + html_len > len(data):
+        return None
+    md = data[off : off + md_len]
+    html = data[off + md_len : off + md_len + html_len]
+    return md, html

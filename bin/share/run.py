@@ -188,7 +188,9 @@ def cmd_share(argv):
     docs = [{"slug": s, "title": paths.title_of(p), "md": p.read_text(encoding="utf-8")}
             for s, p in sel]
     base = sel[0][1].parent
-    blob = sharelib.render_bundle(docs, image_resolver=_image_resolver(base)).encode("utf-8")
+    html_bytes = sharelib.render_bundle(docs, image_resolver=_image_resolver(base)).encode("utf-8")
+    md_bytes = sharelib.render_markdown_bundle(docs).encode("utf-8")
+    blob = sharelib.pack_bundle(md_bytes, html_bytes)
 
     if not plain and not sharelib.have_crypto():
         output.fail(output.EXIT_UNEXPECTED,
@@ -204,7 +206,7 @@ def cmd_share(argv):
 
     if dry:
         if out:
-            Path(out).write_bytes(blob)  # the pre-encryption HTML, for inspection
+            Path(out).write_bytes(html_bytes)  # pre-encryption HTML for inspection
         data = {"kind": kind, "key": key, "notes": [d["slug"] for d in docs],
                 "plain": plain, "bytes": len(body), "encrypted": not plain,
                 "expires_seconds": ttl, "out": out}
@@ -227,7 +229,8 @@ def cmd_share(argv):
                     hint="run: ops share init  (or use --gist)", verb="share")
     res = _publish(endpoint or "https://fake.invalid", body, ttl)
     sid, token = res["id"], res.get("admin_token", "")
-    url = f"{(endpoint or '').rstrip('/')}/{sid}"
+    base_url = f"{(endpoint or '').rstrip('/')}/{sid}"
+    url = base_url
     if url_key:
         url += f"#{url_key}"
 
@@ -244,13 +247,21 @@ def cmd_share(argv):
         _stamp_frontmatter(p, url)
     paths.append_journal(f"share {kind} {key} -> {sid}")
 
+    agent = f"{base_url}.md"
     data = {"id": sid, "url": url, "kind": kind, "key": key, "expires_ts": entry["expires_ts"],
-            "encrypted": not plain}
+            "encrypted": not plain, "agent_md": agent}
     keynote = "" if plain else (
         f"\n  {YEL}send the FULL link — the #… after the id is the decryption key; "
         f"a truncated link cannot be opened{RESET}")
+    if url_key:
+        agent_hint = (
+            f"\n  {DIM}agent md:{RESET} {agent}\n"
+            f"  {DIM}  key: header X-Ops-Share-Key: {url_key}  (or ?k=… for fetch tools; may log){RESET}"
+        )
+    else:
+        agent_hint = f"\n  {DIM}agent md:{RESET} {agent}"
     return output.emit(data, "share", human=lambda _:
-                       f"{GREEN}shared{RESET} {kind} {key}\n  {url}{keynote}\n"
+                       f"{GREEN}shared{RESET} {kind} {key}\n  {url}{keynote}{agent_hint}\n"
                        f"  {DIM}revoke: ops share revoke {sid} --yes{RESET}")
 
 

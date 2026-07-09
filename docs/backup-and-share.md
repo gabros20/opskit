@@ -32,11 +32,13 @@ carries exactly this command; `ops` itself never performs the cloud push.
 
 ## `ops share` — zero-knowledge, confirm-gated
 
-`ops share <slug>` / `share collection <tag>` renders the note(s) to ONE self-contained HTML blob
-locally (inline CSS; wikilinks resolve only within the shared set — others degrade to plain text;
-images under a size cap inline as data URIs), encrypts it AES-256-GCM with a locally-generated key,
-and publishes only the **ciphertext** to a vendored Cloudflare Worker + KV (`bin/share/worker/`).
-The key travels in the URL `#fragment` (PrivateBin pattern) — the provider can never read the note.
+`ops share <slug>` / `share collection <tag>` renders the note(s) to a self-contained **OPSX**
+bundle (raw wiki markdown + HTML) locally (inline CSS; wikilinks resolve only within the shared set —
+others degrade to plain text; images under a size cap inline as data URIs), encrypts it AES-256-GCM
+with a locally-generated key, and publishes only the **ciphertext** to a vendored Cloudflare Worker
++ KV (`bin/share/worker/`). The key travels in the URL `#fragment` (PrivateBin pattern) — the
+provider can never read the note in the browser path. **Agent markdown:** `/<id>.md` serves the wiki
+source UTF-8 (key via `X-Ops-Share-Key` or `?k=` — see `docs/share-agent-markdown.md`).
 
 - `cryptography` is an auto-detected optional dep. Without it only `--plain` works; E2E prints the
   install hint.

@@ -137,6 +137,17 @@ def main() -> int:
     pipe_only = "| not a table without separator |\n"
     check("render: lone pipe line stays paragraph", "<table>" not in sl.render_note_html(pipe_only, set()))
 
+    md_b = sl.render_markdown_bundle(docs).encode("utf-8")
+    html_b = htmldoc.encode("utf-8")
+    packed = sl.pack_bundle(md_b, html_b)
+    check("pack/unpack round-trips markdown + html", sl.unpack_bundle(packed) == (md_b, html_b))
+    check("pack starts with OPSX magic", packed[:4] == sl.BUNDLE_MAGIC)
+    check("markdown bundle single note is file-identical",
+          sl.render_markdown_bundle([docs[0]]) == docs[0]["md"])
+    if sl.have_crypto():
+        ct, k = sl.encrypt(packed)
+        check("encrypted bundle decrypts to OPSX", sl.decrypt(ct, k)[:4] == sl.BUNDLE_MAGIC)
+
     # ---------- share: dry-run render (offline), confirm-gate, fake-transport bookkeeping ----------
     with tempfile.TemporaryDirectory() as td:
         h = Path(td) / "ops"; roots = Path(td) / "roots"
@@ -219,7 +230,7 @@ def main() -> int:
         class _H(http.server.BaseHTTPRequestHandler):
             def do_PUT(self):
                 cap["ua"] = self.headers.get("User-Agent")
-                self.rfile.read(int(self.headers.get("Content-Length", "0") or "0"))
+                cap["body"] = self.rfile.read(int(self.headers.get("Content-Length", "0") or "0"))
                 self.send_response(200); self.send_header("Content-Type", "application/json"); self.end_headers()
                 self.wfile.write(b'{"id":"testid","admin_token":"tok"}')
 
@@ -235,6 +246,8 @@ def main() -> int:
         th.join(timeout=5); srv.server_close()
         check("real publish sends a named User-Agent (Cloudflare 403 fix)",
               cap.get("ua") == "ops-share/1.0", str(cap))
+        check("real publish body is OPSX bundle (agent .md capable)",
+              cap.get("body", b"")[:4] == b"OPSX", str(cap)[:80])
 
         # ---------- sweep share hygiene: expired + edited-since warnings ----------
         import time as _t
