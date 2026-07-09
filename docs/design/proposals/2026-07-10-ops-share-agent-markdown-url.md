@@ -174,10 +174,68 @@ No KV format change.
 
 ---
 
+## 11. Research — how others solve “human link” vs “agent fetch” (2026-07-10)
+
+### 11.1 Zero-knowledge pastebins (PrivateBin, ZeroBin, PasteRef, textdrop.sh)
+
+**Pattern:** ciphertext on server; **decryption key only in `#fragment`**. Browsers never send `#` to origin (MDN URI fragment; RFC 3986).
+
+**Agent story:** There is **no** standard “append `.md`” server route. Programmatic access is either:
+
+- **Browser-only:** fetch ciphertext `GET /?pasteid=…`, decrypt in JS with key from `location.hash` (same as human).
+- **API wrappers** (e.g. PrivateBinAPI): client holds key; not “one URL = markdown.”
+
+**Lesson for ops:** Human ZK **requires** fragment. Any **server-returned plaintext** (our `/<id>.md`) **cannot** use fragment-only keys — industry accepts that split.
+
+### 11.2 Firefox Send / MEGA-style file links (historical pattern)
+
+Key in fragment; server stores encrypted blob. **No** first-class “curl this markdown” URL without moving the secret to query/path or decrypting client-side.
+
+### 11.3 Jina Reader (`r.jina.ai/<url>`)
+
+**Different problem:** public HTML → cleaned markdown. Prefix URL; no E2E. **Not comparable** to encrypted shares (they fetch what the server can already see).
+
+**Relevant UX idea:** **one mechanical transform** on a URL string (prefix/suffix) — operators love that. Our analog: **human link → agent link** as a **published second line**, not mental crypto.
+
+### 11.4 Bitwarden Send / 1Password secure share
+
+Often **separate retrieval tokens** or **authenticated API** — convenience trades away pure “link-only ZK” for machine consumers.
+
+### 11.5 Realistic convenience tiers (ranked)
+
+| Tier | Operator gives agent | ZK vs server | Fits ops today? |
+|------|----------------------|--------------|-----------------|
+| **A** | Human link only | ZK if **local** `ops share pull '<url>'` decrypts | **Best UX; not built** |
+| **B** | One URL `/<id>.md?k=` from CLI | Key in query (logged) | **Proposed default** |
+| **C** | `/<id>.md` + header | Key off URL | Shipped; rejected by operator |
+| **D** | `/<id>.md` only | N/A for E2E | Impossible without server key |
+| **E** | `--plain` `/<id>.md` | No E2E | Works; weaker secrecy |
+| **F** | Proxy `GET /open?u=<encoded human URL>` | Key inside `u` | One paste; ugly; same log risk |
+| **G** | Client-side agent page | Fetch blob + `#key` in headless browser | Heavy; fragile |
+
+**No surveyed system** offers **encrypted server-side markdown** with **only** `path + .md` and **fragment key** — that combination is **logically inconsistent** (fragment not on wire).
+
+### 11.6 Recommendation after research
+
+1. **Stop positioning headers** as the happy path.
+2. **Ship Tier B** (`agent:` line at publish) — matches “one string to paste.”
+3. **Ship Tier A** (`ops share pull` / MCP) so operator can **always paste the human link**; tool parses `#` and talks to worker — **true** “I only have the browser URL.”
+4. Optional **Tier F** only if query strings feel ugly; security equivalent to `?k=`.
+
+### 11.7 References (web)
+
+- MDN: URI fragment not sent on request  
+- PrivateBin: key in URL fragment  
+- Jina Reader: `r.jina.ai` URL prefix pattern  
+- OWASP / common guidance: secrets in query strings logged (accepted tradeoff for agent tier)
+
+---
+
 ## Executive summary
 
 1. **You cannot** serve E2E markdown with **only** `/<id>.md` and the human `#key` — HTTP never sends the fragment to the server.  
 2. **Zero-config for agents** means a **single full URL** with `?k=<key>`, not headers.  
 3. **Canonical:** `https://<worker>/<id>.md?k=<key>`; **alias:** `/<id>/md?k=<key>`.  
 4. Human link stays `/#key` for browser ZK; CLI prints a separate **agent** line at publish.  
-5. Headers remain supported but are **not** the operator-facing default.
+5. Headers remain supported but are **not** the operator-facing default.  
+6. **Research:** No E2E product offers server markdown with fragment-only key; **human link + local pull** or **`?k=` agent URL** are the realistic max-convenience options.
