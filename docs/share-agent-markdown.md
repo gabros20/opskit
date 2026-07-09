@@ -1,55 +1,51 @@
-# Agent-accessible markdown (`/{id}.md`)
+# Agent access — human link + `ops share pull`
 
-Extension to **ops share** (Part 5.2) so coding agents and cloud chat tools can **fetch raw markdown** from a share link—not only the human HTML viewer.
+Coding agents (Hermes, Claude Code, MCP) read shared wiki notes using the **same URL** you send humans. No `.md` suffix, no `?k=`, no `X-Ops-Share-Key`.
 
-## URL pattern
+## URL (one link for everyone)
 
-| URL | Purpose |
-|-----|---------|
-| `https://<worker>/<id>#<key>` | Human browser viewer (HTML, zero-knowledge fragment) |
-| `https://<worker>/<id>.md` | **Agent** — same UTF-8 as the wiki file(s) on disk (no wrapper, no llms.txt header) |
+```text
+https://<worker>/<id>#<key>
+```
 
-`<id>` is the existing 10-character share id; `.md` is a suffix, not part of the id.
+| Who | How |
+|-----|-----|
+| **Human** | Open in browser — viewer fetches `?raw=1`, decrypts with `#key` in JS, shows HTML |
+| **Agent** | `ops share pull '<full url>'` — fetches `?raw=1`, decrypts locally, prints wiki markdown |
 
-**Single note:** `GET /{id}.md` body is **byte-identical** to `read_text()` of that wiki path at publish time.
+The worker **never** receives the AES key on either path.
 
-**Collection:** notes are concatenated with `\n\n---\n\n` between files (each file’s content unchanged).
+## CLI
 
-## Security model
+```bash
+ops share pull 'https://ops-share.example.workers.dev/abc123xyz#b64urlKey…'
+ops share pull 'https://…' --out /tmp/note.md
+ops share pull 'https://…' --json   # markdown in data.markdown
+```
 
-**Zero-knowledge is unchanged for humans:** the AES key stays in the URL `#fragment` for the HTML viewer (fragments are not sent to the server).
+After `ops share <slug> --yes`, the CLI prints the human link and:
 
-**Agents cannot use fragments:** HTTP clients do not send `#…` to the origin. The same key via:
+```text
+agents: ops share pull '<url>'
+```
 
-1. **Preferred:** header `X-Ops-Share-Key: <key>` (same value as the `#fragment`, without `#`).
-2. **Convenience:** query `?k=<key>` — may appear in CDN/proxy logs. Documented tradeoff.
+## Plain shares (`--plain`)
 
-Without a key on an **encrypted** share, `GET /{id}.md` returns **401** with a short JSON hint—not the ciphertext.
-
-**Plain shares** (`--plain`): no key; `/{id}.md` returns markdown directly (secrecy = unguessable id + TTL).
+URL has **no** `#key`. Pull still works: blob is an OPSX bundle in the clear.
 
 ## On-wire bundle (v1)
 
-Publish encrypts **one** payload: **OPSX** multipart (wiki markdown + rendered HTML). Agent route returns only the **md** half, unchanged.
+Publish encrypts one OPSX payload (wiki markdown + rendered HTML). Pull returns only the **md** half, byte-identical to the wiki file(s) at publish time (collections joined with `\n\n---\n\n`).
 
-```text
-OPSX  (4 bytes magic)
-u8 version = 1
-3 bytes reserved (0)
-u32 md_len BE
-u32 html_len BE
-md bytes (UTF-8, wiki source)
-html bytes (UTF-8, self-contained HTML from sharelib)
-```
+## Legacy
 
-**Legacy** HTML-only shares still open in the browser; `/{id}.md` returns **415** until re-published.
+HTML-only shares (pre-OPSX) fail pull with a re-publish hint.
 
-## Operator output
+## Deprecated (do not use for agents)
 
-After `ops share <slug> --yes`, the CLI prints the human link and `agent md:` URL + key instructions.
+`GET /<id>.md` with header or `?k=` still exists on the worker for backward compatibility but is **not** the operator or agent contract. Prefer **pull**.
 
 ## Tests
 
-- `sharelib.pack_bundle` / `unpack_bundle` round-trip
-- Fake publish: decrypted payload has `OPSX` magic
-- `test/run_backup_share.py`
+- `sharelib.parse_share_link`, `markdown_from_blob`
+- `test/run_backup_share.py` (pull round-trip via local HTTP stub)

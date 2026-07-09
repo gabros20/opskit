@@ -1,6 +1,6 @@
 # Proposal — zero-config agent markdown URLs for ops share
 
-**Status:** PROPOSED (2026-07-10)  
+**Status:** SUPERSEDED (2026-07-10) — shipped **Tier A**: `ops share pull '<human url>'` (see `docs/share-agent-markdown.md`). Worker `/<id>.md` + `?k=` remains deprecated backward compat only.
 **Author:** Hermes (vault operator request) + design pass for personal-operating-system  
 **Related:** `docs/share-agent-markdown.md`, `wiki/research/ops-share-architecture.md` (vault), Part 5.2 share worker
 

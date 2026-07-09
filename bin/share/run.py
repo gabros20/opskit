@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops share <slug> | collection <tag> | list | revoke <id> | init — zero-knowledge, confirm-gated
+ops share <slug> | collection <tag> | list | pull <url> | revoke <id> | init — zero-knowledge, confirm-gated
 sharing (proposal Part 5.2). Render a note (or a tag collection) to ONE self-contained HTML blob
 LOCALLY, encrypt it AES-256-GCM with a locally-generated key, PUT only the CIPHERTEXT to a vendored
 Cloudflare Worker + KV, and hand back a link whose `#fragment` carries the key (the provider can
@@ -16,9 +16,11 @@ Fallback for the unprovisioned: `--gist` (secret gist via `gh gist create`, conf
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urljoin
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import output, paths, sharelib  # noqa: E402
@@ -110,6 +112,22 @@ def _revoke_remote(endpoint: str, sid: str, token: str) -> None:
                                  headers={"X-Admin-Token": token, "User-Agent": UA})
     with urllib.request.urlopen(req, timeout=30):  # pragma: no cover - never run in tests
         pass
+
+
+def _fetch_share_blob(origin: str, share_id: str) -> bytes:
+    """GET /<id>?raw=1 — same ciphertext path the browser viewer uses (no key on the wire)."""
+    url = urljoin(origin.rstrip("/") + "/", f"{share_id}?raw=1")
+    req = urllib.request.Request(url, headers={"Accept": "application/octet-stream", "User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            output.fail(output.EXIT_NOT_FOUND, "share expired or revoked", verb="share")
+        output.fail(output.EXIT_UNEXPECTED, f"fetch failed: HTTP {e.code}", verb="share")
+    except Exception as e:  # pragma: no cover - network errors in production only
+        output.fail(output.EXIT_UNEXPECTED, f"fetch failed: {e}", verb="share")
+    raise AssertionError("unreachable")  # output.fail exits
 
 
 # --------------------------------------------------------------------------- frontmatter share block
@@ -247,21 +265,14 @@ def cmd_share(argv):
         _stamp_frontmatter(p, url)
     paths.append_journal(f"share {kind} {key} -> {sid}")
 
-    agent = f"{base_url}.md"
     data = {"id": sid, "url": url, "kind": kind, "key": key, "expires_ts": entry["expires_ts"],
-            "encrypted": not plain, "agent_md": agent}
+            "encrypted": not plain}
     keynote = "" if plain else (
         f"\n  {YEL}send the FULL link — the #… after the id is the decryption key; "
         f"a truncated link cannot be opened{RESET}")
-    if url_key:
-        agent_hint = (
-            f"\n  {DIM}agent md:{RESET} {agent}\n"
-            f"  {DIM}  key: header X-Ops-Share-Key: {url_key}  (or ?k=… for fetch tools; may log){RESET}"
-        )
-    else:
-        agent_hint = f"\n  {DIM}agent md:{RESET} {agent}"
+    pull_hint = f"\n  {DIM}agents:{RESET} ops share pull '{url}'"
     return output.emit(data, "share", human=lambda _:
-                       f"{GREEN}shared{RESET} {kind} {key}\n  {url}{keynote}{agent_hint}\n"
+                       f"{GREEN}shared{RESET} {kind} {key}\n  {url}{keynote}{pull_hint}\n"
                        f"  {DIM}revoke: ops share revoke {sid} --yes{RESET}")
 
 
@@ -356,6 +367,42 @@ def _wrangler_kv_configured() -> bool:
     return "PASTE_KV_NAMESPACE_ID_HERE" not in WRANGLER_TOML.read_text(encoding="utf-8")
 
 
+def cmd_pull(argv):
+    """Fetch ciphertext from the worker, decrypt locally with #key, print wiki markdown."""
+    pos = [a for a in argv if not a.startswith("-")]
+    url = pos[0] if pos else ""
+    out = None
+    if "--out" in argv:
+        out = argv[argv.index("--out") + 1]
+    if not url:
+        output.fail(output.EXIT_USAGE,
+                    "usage: ops share pull <https://<worker>/<id>#key> [--out file.md]",
+                    verb="share")
+    try:
+        origin, sid, key = sharelib.parse_share_link(url)
+    except ValueError as e:
+        output.fail(output.EXIT_USAGE, str(e), verb="share")
+    blob = _fetch_share_blob(origin, sid)
+    try:
+        md = sharelib.markdown_from_blob(blob, key or None)
+    except RuntimeError as e:
+        output.fail(output.EXIT_UNEXPECTED, str(e), hint=sharelib.CRYPTO_HINT, verb="share")
+    except ValueError as e:
+        output.fail(output.EXIT_UNEXPECTED, str(e), verb="share")
+    if out:
+        Path(out).write_text(md, encoding="utf-8")
+    data = {"id": sid, "bytes": len(md), "out": out, "encrypted": bool(key)}
+    if output.json_mode():
+        data["markdown"] = md
+
+    def _human(_):
+        if out:
+            return f"{DIM}pulled {len(md)} bytes → {out}{RESET}"
+        sys.stdout.write(md)
+
+    return output.emit(data, "share", human=_human)
+
+
 def cmd_init(argv):
     yes = ("--yes" in argv) or ("-y" in argv)
     endpoint = argv[argv.index("--endpoint") + 1] if "--endpoint" in argv else None
@@ -399,11 +446,13 @@ def main(argv):
         return cmd_revoke(argv[1:])
     if action == "init":
         return cmd_init(argv[1:])
+    if action == "pull":
+        return cmd_pull(argv[1:])
     if action == "collection":
         return cmd_share(argv)
     if not action or action.startswith("-"):
         output.fail(output.EXIT_USAGE,
-                    "usage: ops share <slug> [--expires 7d] | collection <tag> | list | revoke <id> | init",
+                    "usage: ops share <slug> [--expires 7d] | collection <tag> | list | pull <url> | revoke <id> | init",
                     verb="share")
     return cmd_share(argv)
 

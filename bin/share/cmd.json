@@ -1,7 +1,7 @@
 {
   "verb": "share",
   "summary": "zero-knowledge share: render+encrypt a note (or tag collection) locally, publish only ciphertext",
-  "usage": "ops share <slug> [--expires 7d] [--plain|--gist] [--dry-run|--yes] | collection <tag> | list | revoke <id> --yes | init",
+  "usage": "ops share <slug> [--expires 7d] [--plain|--gist] [--dry-run|--yes] | collection <tag> | list | pull <url> | revoke <id> --yes | init",
   "risk": "safe_write",
   "args": [
     {
@@ -17,7 +17,7 @@
     ".share/",
     "journal/"
   ],
-  "hints": "Share a note or `collection <tag>` as ONE self-contained HTML blob, encrypted AES-256-GCM LOCALLY; only CIPHERTEXT is published to a Cloudflare Worker+KV and the key rides the URL `#fragment` (the provider can never read it). Transmitting subactions (share/collection/revoke) self-gate --yes -> EXIT_CONFIRM(3); `list` is free. `--dry-run` renders+encrypts locally and stops. `--plain` = unguessable slug, no E2E. `--gist` = secret gist fallback. Run `ops share init` once to deploy the worker. Common mistake: expecting it to send the link — output is a DRAFT link, the human sends it.",
+  "hints": "Share a note or `collection <tag>` as ONE self-contained HTML blob, encrypted AES-256-GCM LOCALLY; only CIPHERTEXT is published to a Cloudflare Worker+KV and the key rides the URL `#fragment` (the provider can never read it). Agents: `ops share pull '<full url>'` decrypts locally — same link as humans, no headers or ?k=. Transmitting subactions (share/collection/revoke) self-gate --yes -> EXIT_CONFIRM(3); `list` and `pull` are free reads. `--dry-run` renders+encrypts locally and stops. `--plain` = unguessable slug, no E2E. `--gist` = secret gist fallback. Run `ops share init` once to deploy the worker. Common mistake: expecting it to send the link — output is a DRAFT link, the human sends it.",
   "output": {
     "mode": "rows",
     "fields": {

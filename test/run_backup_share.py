@@ -144,9 +144,15 @@ def main() -> int:
     check("pack starts with OPSX magic", packed[:4] == sl.BUNDLE_MAGIC)
     check("markdown bundle single note is file-identical",
           sl.render_markdown_bundle([docs[0]]) == docs[0]["md"])
+    md_one = sl.render_markdown_bundle([docs[0]]).encode("utf-8")
+    packed_one = sl.pack_bundle(md_one, html_b)
+    check("markdown_from_blob plain OPSX", sl.markdown_from_blob(packed_one, None) == docs[0]["md"])
     if sl.have_crypto():
-        ct, k = sl.encrypt(packed)
+        ct, k = sl.encrypt(packed_one)
         check("encrypted bundle decrypts to OPSX", sl.decrypt(ct, k)[:4] == sl.BUNDLE_MAGIC)
+        check("markdown_from_blob E2E ciphertext", sl.markdown_from_blob(ct.encode("ascii"), k) == docs[0]["md"])
+        o, sid, key = sl.parse_share_link(f"https://w.example/{'a' * 10}#{k}")
+        check("parse_share_link", o == "https://w.example" and sid == "a" * 10 and key == k)
 
     # ---------- share: dry-run render (offline), confirm-gate, fake-transport bookkeeping ----------
     with tempfile.TemporaryDirectory() as td:
@@ -248,6 +254,47 @@ def main() -> int:
               cap.get("ua") == "ops-share/1.0", str(cap))
         check("real publish body is OPSX bundle (agent .md capable)",
               cap.get("body", b"")[:4] == b"OPSX", str(cap)[:80])
+
+        # ---------- share pull: ?raw=1 + local decrypt (Tier A human link) ----------
+        pull_body = cap.get("body", b"")
+        stored = {"body": pull_body}
+        share_id = "abcdefghij"
+
+        class _PullH(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                if "raw=1" in self.path:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.end_headers()
+                    self.wfile.write(stored["body"])
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+
+            def log_message(self, format, *args):  # noqa: A002
+                pass
+
+        psrv = http.server.HTTPServer(("127.0.0.1", 0), _PullH)
+        pth = threading.Thread(target=psrv.handle_request, daemon=True)
+        pth.start()
+        port = psrv.server_address[1]
+        human = f"http://127.0.0.1:{port}/{share_id}"
+        r = run("share", "pull", human, home=h)
+        pth.join(timeout=5)
+        psrv.server_close()
+        check("pull plain share prints wiki markdown", r.returncode == 0 and "# Alpha" in r.stdout, r.stdout[:120] + r.stderr[:120])
+        if HAVE_CRYPTO:
+            ct, k = sl.encrypt(pull_body)
+            stored["body"] = ct.encode("ascii")
+            psrv2 = http.server.HTTPServer(("127.0.0.1", 0), _PullH)
+            pth2 = threading.Thread(target=psrv2.handle_request, daemon=True)
+            pth2.start()
+            port2 = psrv2.server_address[1]
+            enc_url = f"http://127.0.0.1:{port2}/{share_id}#{k}"
+            r = run("share", "pull", enc_url, home=h)
+            pth2.join(timeout=5)
+            psrv2.server_close()
+            check("pull E2E share decrypts to markdown", r.returncode == 0 and "# Alpha" in r.stdout, r.stdout[:120])
 
         # ---------- sweep share hygiene: expired + edited-since warnings ----------
         import time as _t

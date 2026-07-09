@@ -360,3 +360,58 @@ def unpack_bundle(data: bytes) -> tuple[bytes, bytes] | None:
     md = data[off : off + md_len]
     html = data[off + md_len : off + md_len + html_len]
     return md, html
+
+
+# --------------------------------------------------------------------------- pull (human link → markdown, client-side decrypt)
+
+_SHARE_ID = re.compile(r"^[a-z0-9]{10}$", re.I)
+
+
+def parse_share_link(url: str) -> tuple[str, str, str]:
+    """Parse a human share URL. Returns (origin, share_id, key_b64_or_empty).
+
+    Accepts `https://host/<id>#key` only (optional trailing `.md` on id path is stripped).
+    The `#key` fragment is the same value `encrypt()` puts in the published link.
+    """
+    from urllib.parse import unquote, urlparse
+
+    u = urlparse((url or "").strip())
+    if not u.scheme or not u.netloc:
+        raise ValueError("not a share URL (need https://<worker>/<id>#…)")
+    path = (u.path or "").strip("/")
+    if path.lower().endswith(".md"):
+        path = path[:-3]
+    if not _SHARE_ID.fullmatch(path or ""):
+        raise ValueError(f"bad share id in URL (expected 10-char id): {path!r}")
+    sid = path.lower()
+    key = unquote(u.fragment or "")
+    origin = f"{u.scheme}://{u.netloc}"
+    return origin, sid, key
+
+
+def markdown_from_blob(blob: bytes, key_b64: str | None) -> str:
+    """Decrypt (if key given) an OPSX or legacy blob and return wiki markdown UTF-8.
+
+    Mirrors the browser viewer path: fetch ciphertext with `?raw=1`, decrypt locally, unpack md half.
+    """
+    key = (key_b64 or "").strip()
+    if key:
+        if not HAVE_CRYPTO:
+            raise RuntimeError(CRYPTO_HINT)
+        plain = decrypt(blob.decode("ascii"), key)
+    elif blob[:4] == BUNDLE_MAGIC:
+        plain = blob
+    else:
+        head = blob[:256].decode("utf-8", errors="replace").lstrip()
+        if head.startswith("<"):
+            raise ValueError("legacy HTML-only share — re-publish with current ops share")
+        raise ValueError(
+            "encrypted link missing #key — use the FULL link from ops share (fragment is the decryption key)"
+        )
+    unpacked = unpack_bundle(plain)
+    if unpacked:
+        return unpacked[0].decode("utf-8")
+    text = plain.decode("utf-8")
+    if text.lstrip().startswith("<"):
+        raise ValueError("legacy HTML-only share — re-publish with current ops share")
+    return text
