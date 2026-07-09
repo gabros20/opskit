@@ -153,6 +153,8 @@ def main() -> int:
         check("markdown_from_blob E2E ciphertext", sl.markdown_from_blob(ct.encode("ascii"), k) == docs[0]["md"])
         o, sid, key = sl.parse_share_link(f"https://w.example/{'a' * 10}#{k}")
         check("parse_share_link", o == "https://w.example" and sid == "a" * 10 and key == k)
+        agent = sl.agent_fetch_url(f"https://w.example/{'a' * 10}#{k}")
+        check("agent_fetch_url", agent == f"https://w.example/{'a' * 10}.md?k={k}", agent)
 
     # ---------- share: dry-run render (offline), confirm-gate, fake-transport bookkeeping ----------
     with tempfile.TemporaryDirectory() as td:

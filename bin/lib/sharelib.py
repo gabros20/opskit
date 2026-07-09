@@ -415,3 +415,63 @@ def markdown_from_blob(blob: bytes, key_b64: str | None) -> str:
     if text.lstrip().startswith("<"):
         raise ValueError("legacy HTML-only share — re-publish with current ops share")
     return text
+
+
+class SharePullError(Exception):
+    """Fetch or decrypt failure for pull (standalone callers)."""
+
+
+def fetch_share_blob(origin: str, share_id: str, *, timeout: int = 30) -> bytes:
+    """GET /<id>?raw=1 — ciphertext only; same path as the browser viewer (no key on the wire)."""
+    from urllib.parse import urljoin
+    import urllib.error
+    import urllib.request
+
+    url = urljoin(origin.rstrip("/") + "/", f"{share_id}?raw=1")
+    req = urllib.request.Request(
+        url,
+        headers={"Accept": "application/octet-stream", "User-Agent": "ops-share-pull/1"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise SharePullError("share expired or revoked") from e
+        raise SharePullError(f"fetch failed: HTTP {e.code}") from e
+    except Exception as e:
+        raise SharePullError(f"fetch failed: {e}") from e
+
+
+def pull_markdown_from_url(url: str) -> str:
+    """Human share URL → wiki markdown. No ops ledger, no dispatcher — for any Python caller."""
+    origin, sid, key = parse_share_link(url)
+    blob = fetch_share_blob(origin, sid)
+    return markdown_from_blob(blob, key or None)
+
+
+def agent_fetch_url(url: str) -> str:
+    """Turn a human/browser link into one HTTP GET that returns wiki markdown (Claude, Codex, curl).
+
+    Fetch tools never receive the URL #fragment. This is the same key as after #, in ?k= on /<id>.md
+    (TLS only — key touches the worker for that one request). Ops publish prints this line for you.
+    """
+    from urllib.parse import quote, unquote, urlparse
+
+    raw = url.strip()
+    if not raw:
+        raise ValueError("empty URL")
+    u = urlparse(raw)
+    if u.scheme != "https" or not u.netloc:
+        raise ValueError("not a share URL (need https://<worker>/<id>#…)")
+    path = unquote(u.path or "").strip("/")
+    if path.endswith(".md"):
+        path = path[:-3]
+    if not path or "/" in path:
+        raise ValueError("bad share id in URL path")
+    origin = f"{u.scheme}://{u.netloc}"
+    key = unquote((u.fragment or "").strip())
+    base = f"{origin}/{path}.md"
+    if not key:
+        return base
+    return f"{base}?k={quote(key, safe='')}"

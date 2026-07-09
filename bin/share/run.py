@@ -114,24 +114,6 @@ def _revoke_remote(endpoint: str, sid: str, token: str) -> None:
         pass
 
 
-def _fetch_share_blob(origin: str, share_id: str) -> bytes:
-    """GET /<id>?raw=1 — same ciphertext path the browser viewer uses (no key on the wire)."""
-    url = urljoin(origin.rstrip("/") + "/", f"{share_id}?raw=1")
-    req = urllib.request.Request(url, headers={"Accept": "application/octet-stream", "User-Agent": UA})
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return r.read()
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            output.fail(output.EXIT_NOT_FOUND, "share expired or revoked", verb="share")
-        output.fail(output.EXIT_UNEXPECTED, f"fetch failed: HTTP {e.code}", verb="share")
-    except Exception as e:  # pragma: no cover - network errors in production only
-        output.fail(output.EXIT_UNEXPECTED, f"fetch failed: {e}", verb="share")
-    raise AssertionError("unreachable")  # output.fail exits
-
-
-# --------------------------------------------------------------------------- frontmatter share block
-
 def _stamp_frontmatter(path: Path, url: str) -> None:
     """Splice/replace a `share:` line in the note's frontmatter (audit trail; sweep reads the ledger)."""
     try:
@@ -247,7 +229,8 @@ def cmd_share(argv):
                     hint="run: ops share init  (or use --gist)", verb="share")
     res = _publish(endpoint or "https://fake.invalid", body, ttl)
     sid, token = res["id"], res.get("admin_token", "")
-    base_url = f"{(endpoint or '').rstrip('/')}/{sid}"
+    pub_origin = (endpoint or "https://fake.invalid").rstrip("/")
+    base_url = f"{pub_origin}/{sid}"
     url = base_url
     if url_key:
         url += f"#{url_key}"
@@ -265,14 +248,20 @@ def cmd_share(argv):
         _stamp_frontmatter(p, url)
     paths.append_journal(f"share {kind} {key} -> {sid}")
 
-    data = {"id": sid, "url": url, "kind": kind, "key": key, "expires_ts": entry["expires_ts"],
-            "encrypted": not plain}
+    agent_url = sharelib.agent_fetch_url(url)
+
+    data = {"id": sid, "url": url, "agent_url": agent_url, "kind": kind, "key": key,
+            "expires_ts": entry["expires_ts"], "encrypted": not plain}
     keynote = "" if plain else (
-        f"\n  {YEL}send the FULL link — the #… after the id is the decryption key; "
-        f"a truncated link cannot be opened{RESET}")
-    pull_hint = f"\n  {DIM}agents:{RESET} ops share pull '{url}'"
+        f"\n  {YEL}browser: send the FULL link including #… (fragment never hits the server){RESET}")
+    agent_line = (
+        f"\n  {YEL}agents (Claude / Codex / web_fetch — no ops): paste this URL:{RESET}\n"
+        f"  {agent_url}"
+    )
+    ops_line = f"\n  {DIM}ops / Hermes on this Mac: ops share pull '{url}'{RESET}"
     return output.emit(data, "share", human=lambda _:
-                       f"{GREEN}shared{RESET} {kind} {key}\n  {url}{keynote}{pull_hint}\n"
+                       f"{GREEN}shared{RESET} {kind} {key}\n"
+                       f"  {url}{keynote}{agent_line}{ops_line}\n"
                        f"  {DIM}revoke: ops share revoke {sid} --yes{RESET}")
 
 
@@ -382,9 +371,11 @@ def cmd_pull(argv):
         origin, sid, key = sharelib.parse_share_link(url)
     except ValueError as e:
         output.fail(output.EXIT_USAGE, str(e), verb="share")
-    blob = _fetch_share_blob(origin, sid)
     try:
-        md = sharelib.markdown_from_blob(blob, key or None)
+        md = sharelib.pull_markdown_from_url(url)
+    except sharelib.SharePullError as e:
+        code = output.EXIT_NOT_FOUND if "expired" in str(e) or "revoked" in str(e) else output.EXIT_UNEXPECTED
+        output.fail(code, str(e), verb="share")
     except RuntimeError as e:
         output.fail(output.EXIT_UNEXPECTED, str(e), hint=sharelib.CRYPTO_HINT, verb="share")
     except ValueError as e:
