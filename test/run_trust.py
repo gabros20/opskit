@@ -40,7 +40,7 @@ def git(repo, *a):
 
 
 def _git_init(repo):
-    git(repo, "init", "-q")
+    git(repo, "init", "-q", "-b", "main")  # explicit: script/update defaults to --branch main
     git(repo, "config", "user.email", "t@example.com")
     git(repo, "config", "user.name", "Test")
 
