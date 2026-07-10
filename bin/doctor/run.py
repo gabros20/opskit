@@ -150,21 +150,11 @@ def main(argv):
         else:
             fail(f"folder: {d}/ MISSING (run: ops doctor --init)")
 
-    # 2a. setup layers: required layers gate doctor; optional layers are advisory.
-    for r in setuplib.status():
-        msg = f"setup layer: {r['id']} {r['status']} - {r['detail']}"
-        if r.get("next"):
-            msg += f" (next: {r['next']})"
-        if r["status"] == "ready":
-            ok(msg)
-        elif r.get("required"):
-            fail(msg)
-        else:
-            warn(msg)
-
-    # 2b. Obsidian config pack (Part 3.1): with --init, seed .obsidian/ from templates/obsidian/.
+    # 2a. Obsidian config pack (Part 3.1): with --init, seed .obsidian/ from templates/obsidian/.
     # .obsidian/ is USER-OWNED (never in engine.txt); refuse-don't-overwrite keeps a customized
     # config safe. URIs open, writes go through verbs — the pack only sets link/attachment policy.
+    # Runs BEFORE the layer gate: the skeleton layer counts these seed files, and on a fresh clone
+    # --init is what creates them (checking first made every first `doctor --init` fail itself).
     pack = paths.OPS_HOME / "templates" / "obsidian"
     dest = paths.OPS_HOME / ".obsidian"
     if pack.is_dir():
@@ -184,6 +174,18 @@ def main(argv):
             warn("obsidian: config pack not installed (run: ops doctor --init to seed .obsidian/)")
         else:
             ok("obsidian: .obsidian/ config present")
+
+    # 2b. setup layers: required layers gate doctor; optional layers are advisory.
+    for r in setuplib.status():
+        msg = f"setup layer: {r['id']} {r['status']} - {r['detail']}"
+        if r.get("next"):
+            msg += f" (next: {r['next']})"
+        if r["status"] == "ready":
+            ok(msg)
+        elif r.get("required"):
+            fail(msg)
+        else:
+            warn(msg)
 
     # 3. manifest <-> bin  (hidden verbs, e.g. __complete, are intentionally absent from ops.json)
     def _hidden(v):
