@@ -15,7 +15,7 @@ shared note <slug>
 
 - **A browser** opening the bare URL gets the rendered HTML page.
 - **An agent** (Claude Code, Codex, `curl`, `web_fetch`, any fetch tool) — append `.md`, or paste
-  the printed `agents:` line as-is — gets `text/markdown; charset=utf-8`: the wiki source, YAML
+  the printed `agents / LLMs:` line as-is — gets `text/markdown; charset=utf-8`: the wiki source, YAML
   frontmatter and body, byte-identical to what was published.
 
 No headers, no keys, no query strings, no URL math beyond "add `.md`". `agent_url` in `--json` output

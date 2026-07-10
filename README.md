@@ -6,7 +6,7 @@ a terminal, on a schedule, through Obsidian or Raycast, or through any AI agent.
 no lock-in. Your notes are Markdown files in your own git repo; you can read them, grep them, and walk
 away from this tool at any time with nothing stranded.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · 27 verbs · 36 test suites · CI · macOS / Linux · Python 3 + git · zero required deps
+[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · 30 verbs · 42 test suites · CI · macOS / Linux · Python 3 + git · zero required deps
 
 > 🖱️ **Want the 2-minute tour first?** Open **[`docs/how-it-works.html`](docs/how-it-works.html)** —
 > a single self-contained interactive walkthrough (no install, just open it in a browser). Click
@@ -151,9 +151,9 @@ discoverable via `ops help`. The full surface:
 
 | Group | Verbs |
 |---|---|
-| **System** | `help` · `status` · `orient` (one-call session bootstrap) · `doctor` (self-check) · `backup` (nag + restic family) · `index` · `consolidate` · `plugin` |
+| **System** | `help` · `status` · `orient` (one-call session bootstrap) · `doctor` (self-check) · `setup` (layered installer — doctor's fixer twin) · `backup` (nag + restic family) · `index` · `consolidate` · `models` (local-model stack: list/pull/stop/test) · `plugin` |
 | **Flow** | `capture` · `triage` · `start` · `close` · `week` |
-| **Knowledge** | `search` · `open` (one resolver for anything) · `wiki` (open / edit / new / backlinks / stale / orphans / canvas) · `bookmark` (URL → note) · `organize` (scan → review → apply) |
+| **Knowledge** | `search` · `open` (one resolver for anything) · `wiki` (open / edit / new / backlinks / stale / orphans / canvas) · `bookmark` (URL → note) · `enrich` (description/keywords for search) · `organize` (scan → review → apply) |
 | **Tasks** | `task` (list / add / show / move / done — folder = status) |
 | **Work** | `new` (scaffold project/client/**verb**) · `repo` (fleet health/clone/adopt) · `archive` · `files` (ingest/extract/distill/link binaries) · `sweep` (Desktop/Downloads decay) |
 | **Business** | `invoice` (draft only — never sends) · `share` (expiring capability links, agent-readable `.md` — never auto-sends) |
@@ -390,7 +390,7 @@ templates/           # scaffolds: project-repo/, obsidian/ (config pack + Bases)
 jobs/registry.json   # scheduled-job definitions (ops job apply → launchd)
 script/              # get (installer) · setup · update (3-way merge) · engine.txt · completions/
 docs/                # the docs set — see docs/README.md
-test/                # 36 offline suites (dev-only; dropped from a lean vault)
+test/                # 42 offline suites (dev-only; dropped from a lean vault)
 ```
 
 The other roots (`~/work`, `~/files`, `~/dotfiles`) are created next to this one at setup.
@@ -399,8 +399,8 @@ The other roots (`~/work`, `~/files`, `~/dotfiles`) are created next to this one
 
 ## Status & tests
 
-**v4-complete.** All 27 verbs (+ the hidden MCP transport) are built, guardrail-gated, documented in
-the machine contract, and tested: **36 offline suites** run in CI, covering the guardrail model, the
+**v4-complete.** All 30 verbs (+ the hidden MCP transport) are built, guardrail-gated, documented in
+the machine contract, and tested: **42 offline suites** run in CI, covering the guardrail model, the
 exit-code protocol, the `--json` contract (round-tripped against every verb's declared schema), the
 plugin resolver + trust ceiling, the MCP handshake, the extraction/organize pipeline, and backup/share
 — all stdlib-only, no network.

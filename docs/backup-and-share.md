@@ -48,7 +48,7 @@ no key to lose.
 | `https://<worker>/<token>` from `curl`/`web_fetch` (non-browser `Accept`) | raw markdown too — content negotiation serves the same thing the `.md` suffix does |
 
 There is no second "agent URL" to construct and no header to set — append `.md` (or hand the printed
-`agents:` line straight to the agent) and it reads the exact wiki source. See
+`agents / LLMs:` line straight to the agent) and it reads the exact wiki source. See
 `docs/share-agent-markdown.md`.
 
 - Publishing is still a transmission, so every transmitting subaction self-gates `--yes`

@@ -327,6 +327,9 @@ def main() -> int:
         rows = [json.loads(l) for l in r.stdout.splitlines()]
         check("share list shows the active share",
               any(x.get("id") == sid and x.get("state") == "active" for x in rows[1:]), r.stdout)
+        check("share list rows carry agent_url = url + '.md'",
+              all(x.get("agent_url") == (x.get("url") or "") + ".md"
+                  for x in rows[1:] if x.get("url")), r.stdout)
 
         # revoke: confirm-gate then mark revoked
         r = run("share", "revoke", sid, home=h)

@@ -789,7 +789,8 @@
           "key": "string",
           "state": "string",
           "expires_ts": "int",
-          "url": "string"
+          "url": "string",
+          "agent_url": "string"
         }
       },
       "dry_run": true,

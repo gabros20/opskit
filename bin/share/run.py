@@ -291,8 +291,10 @@ def cmd_list():
             state = "expired"
         else:
             state = "active"
+        url = s.get("url")
         rows.append({"id": s["id"], "kind": s.get("kind"), "key": s.get("key"),
-                     "state": state, "expires_ts": s.get("expires_ts"), "url": s.get("url")})
+                     "state": state, "expires_ts": s.get("expires_ts"), "url": url,
+                     "agent_url": (url + ".md") if url else None})
 
     def render(rs):
         if not rs:
