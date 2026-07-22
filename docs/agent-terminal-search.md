@@ -6,7 +6,7 @@ cron job) rather than your interactive shell. If keyword search works but vector
 `ops index` warns that `lancedb` is missing even though you installed it — this is the page.
 
 > [!NOTE]
-> **Stage 1 (keyword + wikilink graph) needs nothing but Python 3.9+ stdlib** and always works. This
+> **Stage 1 (keyword + wikilink graph) needs nothing but Python 3.10+ stdlib** and always works. This
 > page is only about the *optional* vector/rerank planes. Everything here is setup, not code.
 
 ## The one durable fact

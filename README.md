@@ -6,7 +6,7 @@ a terminal, on a schedule, through Obsidian or Raycast, or through any AI agent.
 no lock-in. Your notes are Markdown files in your own git repo; you can read them, grep them, and walk
 away from this tool at any time with nothing stranded.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · 30 verbs · 42 test suites · CI · macOS / Linux · Python 3 + git · zero required deps
+[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · verbs generated (see `ops.json`) · offline test suites in CI · macOS / Linux · Python 3.10+ + git · zero required deps
 
 > 🖱️ **Want the 2-minute tour first?** Open **[`docs/how-it-works.html`](docs/how-it-works.html)** —
 > a single self-contained interactive walkthrough (no install, just open it in a browser). Click
@@ -399,8 +399,8 @@ The other roots (`~/work`, `~/files`, `~/dotfiles`) are created next to this one
 
 ## Status & tests
 
-**v4-complete.** All 30 verbs (+ the hidden MCP transport) are built, guardrail-gated, documented in
-the machine contract, and tested: **42 offline suites** run in CI, covering the guardrail model, the
+**v4-complete.** Every verb (the full set is generated — see `ops.json`) plus the hidden MCP transport is built, guardrail-gated, documented in
+the machine contract, and tested: the **offline suites** run in CI, covering the guardrail model, the
 exit-code protocol, the `--json` contract (round-tripped against every verb's declared schema), the
 plugin resolver + trust ceiling, the MCP handshake, the extraction/organize pipeline, and backup/share
 — all stdlib-only, no network.

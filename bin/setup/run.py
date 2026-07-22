@@ -26,19 +26,10 @@ def _fake() -> bool:
     return (os.environ.get("OPS_SETUP_FAKE") or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def _row_next(row: dict) -> str:
-    if row["status"] == "ready":
-        return ""
-    if row["id"] == "backups":
-        return row.get("next") or "ops backup init"
-    if row["id"] in ("search", "models"):
-        return f"ops setup {row['id']} --yes"
-    return f"ops setup {row['id']}"
-
-
 def _dashboard_rows() -> list[dict]:
-    rows = setuplib.status()
-    return [{**row, "next": _row_next(row)} for row in rows]
+    # setuplib is the single source of truth for each layer's `next` remediation string; the
+    # dashboard surfaces it verbatim rather than re-deriving a divergent one.
+    return setuplib.status()
 
 
 def _render_dashboard(rows: list[dict]) -> str:

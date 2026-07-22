@@ -1,7 +1,8 @@
 # Personal OS — optional dependencies.
 #
-# Stage-1 search (ops index/search, keyword + wikilink graph) needs NOTHING beyond Python 3.9+
-# stdlib (sqlite3 with FTS5). The deterministic test suites are stdlib-only too.
+# Stage-1 search (ops index/search, keyword + wikilink graph) needs NOTHING beyond Python 3.10+
+# stdlib (sqlite3 with FTS5). The deterministic test suites are stdlib-only too. (3.10 is the true
+# floor: the verbs use PEP 604 `str | None` syntax.)
 #
 # WHICH interpreter: `ops` dispatches via BARE `python3` on your PATH (see the `ops` script). These
 # packages must be importable by THAT interpreter — not some other venv. If you use a venv, put its

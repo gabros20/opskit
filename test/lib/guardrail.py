@@ -14,7 +14,7 @@ Reliability hardening (v3.7, found by the test/ adversarial suite):
   - external transmit is confirm-class for ANY tool (deploy/publish/upload/exfil), not just git.
 
 Decision classes (§5): read | safe_write | draft_only | confirm | deny.
-No third-party deps. Python 3.9+.
+No third-party deps. Python 3.10+.
 """
 from __future__ import annotations
 import os

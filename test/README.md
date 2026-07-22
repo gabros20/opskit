@@ -167,5 +167,5 @@ Try it: `./ops index` then `./ops search "webhook retry"`. `run_search_impl.py` 
 Rebuild rule: `rm -rf .index && ./ops index`.
 
 ## Requirements
-Python 3.9+ (stdlib only). For the simulation: the `claude` CLI on `PATH` (or pass your own
+Python 3.10+ (stdlib only). For the simulation: the `claude` CLI on `PATH` (or pass your own
 operator command). The deterministic suite needs nothing but Python.

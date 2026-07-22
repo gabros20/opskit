@@ -128,15 +128,21 @@ def _row(layer: Layer, state: str, detail: str, items: list[dict], next_: str = 
 
 
 def _status_skeleton(layer: Layer) -> dict:
-    items = [{"id": str(rel), "title": str(rel), "ok": (paths.OPS_HOME / rel).is_dir()} for rel in REQUIRED_DIRS]
+    # Required-readiness depends ONLY on REQUIRED_DIRS. The .obsidian/* config-pack items stay
+    # visible in the row (so `ops setup` shows their state) but are advisory: they report ok/not-ok
+    # and never flip this required layer to non-ready (a fresh clone that hasn't seeded .obsidian/
+    # must still let `ops doctor` pass). Seeding is handled by `ops doctor --init`.
+    required = [{"id": str(rel), "title": str(rel), "ok": (paths.OPS_HOME / rel).is_dir()} for rel in REQUIRED_DIRS]
+    items = list(required)
     pack = paths.OPS_HOME / "templates" / "obsidian"
     if pack.is_dir():
         for src in sorted(pack.glob("*.json")):
             rel = f".obsidian/{src.name}"
-            items.append({"id": rel, "title": rel, "ok": (paths.OPS_HOME / ".obsidian" / src.name).is_file()})
-    state = _items_status(items, optional=False)
+            items.append({"id": rel, "title": rel, "advisory": True,
+                          "ok": (paths.OPS_HOME / ".obsidian" / src.name).is_file()})
+    state = _items_status(required, optional=False)
     detail = "vault skeleton ready" if state == "ready" else "required vault structure is incomplete"
-    return _row(layer, state, detail, items, "ops doctor --init" if state != "ready" else "")
+    return _row(layer, state, detail, items, "ops setup skeleton" if state != "ready" else "")
 
 
 def _status_search(layer: Layer) -> dict:
@@ -148,7 +154,7 @@ def _status_search(layer: Layer) -> dict:
     ]
     state = _items_status(items)
     detail = "semantic search ready" if state == "ready" else "semantic search prerequisites are missing"
-    return _row(layer, state, detail, items, "install requirements and pull embed model" if state != "ready" else "")
+    return _row(layer, state, detail, items, "ops setup search --yes" if state != "ready" else "")
 
 
 def _status_backups(layer: Layer) -> dict:
@@ -174,7 +180,7 @@ def _status_models(layer: Layer) -> dict:
     ]
     state = _items_status(items)
     detail = "file-processing models ready" if state == "ready" else "file-processing model layer is incomplete"
-    return _row(layer, state, detail, items, "ops models pull --all --yes" if state != "ready" else "")
+    return _row(layer, state, detail, items, "ops setup models --yes" if state != "ready" else "")
 
 
 def _status_automation(layer: Layer) -> dict:
@@ -183,7 +189,7 @@ def _status_automation(layer: Layer) -> dict:
     items = [{"id": "launchd", "title": "jobs/launchd/*.plist", "ok": bool(plists)}]
     state = "ready" if plists else "absent"
     detail = "job plists rendered" if state == "ready" else "job plists have not been rendered"
-    return _row(layer, state, detail, items, "ops job apply" if state != "ready" else "")
+    return _row(layer, state, detail, items, "ops setup automation" if state != "ready" else "")
 
 
 def status(layer_id=None) -> list[dict]:

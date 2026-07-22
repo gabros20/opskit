@@ -96,30 +96,37 @@ def main() -> int:
         check("fake skeleton advance records doctor init", a0["ran"] and "doctor" in a0["ran"][0], str(a0))
         seed_skeleton(mod, home)
         s1 = mod.status("skeleton")[0]
-        check("skeleton ready after required dirs and obsidian exist", s1["status"] == "ready", str(s1))
+        check("skeleton ready after required dirs exist", s1["status"] == "ready", str(s1))
         a1 = mod.advance("skeleton", yes=False, fake=True)
         check("skeleton advance is idempotent when ready", not a1["ran"] and "skeleton" in a1["skipped"], str(a1))
 
-        # When an Obsidian template pack exists, every JSON template must be seeded into .obsidian/.
+        # The Obsidian config pack is ADVISORY: its .obsidian/*.json items stay VISIBLE in the
+        # skeleton row (so `ops setup` surfaces their state) but never flip the required layer to
+        # non-ready — skeleton readiness depends only on REQUIRED_DIRS. A fresh clone that hasn't
+        # seeded .obsidian/ yet must still let `ops doctor` pass.
         (home / "templates" / "obsidian").mkdir(parents=True, exist_ok=True)
         (home / "templates" / "obsidian" / "app.json").write_text("{}", encoding="utf-8")
         (home / "templates" / "obsidian" / "appearance.json").write_text("{}", encoding="utf-8")
         (home / ".obsidian" / "app.json").unlink(missing_ok=True)
         (home / ".obsidian" / "appearance.json").unlink(missing_ok=True)
         s_pack_missing = mod.status("skeleton")[0]
-        check("empty obsidian dir is not ready when template pack exists",
-              s_pack_missing["status"] != "ready"
-              and any(i["id"] == ".obsidian/app.json" and not i["ok"] for i in s_pack_missing["items"]),
+        check("skeleton stays ready when obsidian pack unseeded (advisory), but reports the item",
+              s_pack_missing["status"] == "ready"
+              and any(i["id"] == ".obsidian/app.json" and not i["ok"] and i.get("advisory")
+                      for i in s_pack_missing["items"]),
               str(s_pack_missing))
         (home / ".obsidian" / "app.json").write_text("{}", encoding="utf-8")
         s_pack_partial = mod.status("skeleton")[0]
-        check("partial obsidian pack is not ready and reports missing file",
-              s_pack_partial["status"] != "ready"
-              and any(i["id"] == ".obsidian/appearance.json" and not i["ok"] for i in s_pack_partial["items"]),
+        check("skeleton ready with a partially-seeded obsidian pack; missing file still reported",
+              s_pack_partial["status"] == "ready"
+              and any(i["id"] == ".obsidian/appearance.json" and not i["ok"] and i.get("advisory")
+                      for i in s_pack_partial["items"]),
               str(s_pack_partial))
         (home / ".obsidian" / "appearance.json").write_text("{}", encoding="utf-8")
         s_pack_seeded = mod.status("skeleton")[0]
-        check("all obsidian json templates seed pack readiness", s_pack_seeded["status"] == "ready",
+        check("skeleton ready with all obsidian json templates seeded (advisory items ok)",
+              s_pack_seeded["status"] == "ready"
+              and all(i["ok"] for i in s_pack_seeded["items"] if i.get("advisory")),
               str(s_pack_seeded))
 
         # Search: absent / partial / ready and confirm gate.

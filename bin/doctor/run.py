@@ -153,8 +153,9 @@ def main(argv):
     # 2a. Obsidian config pack (Part 3.1): with --init, seed .obsidian/ from templates/obsidian/.
     # .obsidian/ is USER-OWNED (never in engine.txt); refuse-don't-overwrite keeps a customized
     # config safe. URIs open, writes go through verbs — the pack only sets link/attachment policy.
-    # Runs BEFORE the layer gate: the skeleton layer counts these seed files, and on a fresh clone
-    # --init is what creates them (checking first made every first `doctor --init` fail itself).
+    # This runs BEFORE the setup-layer status below so --init seeds .obsidian/ (and the skeleton dirs
+    # above) before that status is computed and reported (checking first made every first
+    # `doctor --init` on a fresh clone fail itself).
     pack = paths.OPS_HOME / "templates" / "obsidian"
     dest = paths.OPS_HOME / ".obsidian"
     if pack.is_dir():
@@ -175,7 +176,9 @@ def main(argv):
         else:
             ok("obsidian: .obsidian/ config present")
 
-    # 2b. setup layers: required layers gate doctor; optional layers are advisory.
+    # 2b. setup layers: required layers gate doctor; optional layers are advisory. The skeleton
+    # layer's readiness depends only on REQUIRED_DIRS (the .obsidian/* items are advisory), so a
+    # not-yet-seeded config pack never fails doctor.
     for r in setuplib.status():
         msg = f"setup layer: {r['id']} {r['status']} - {r['detail']}"
         if r.get("next"):
