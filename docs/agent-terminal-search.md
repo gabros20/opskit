@@ -9,66 +9,50 @@ cron job) rather than your interactive shell. If keyword search works but vector
 > **Stage 1 (keyword + wikilink graph) needs nothing but Python 3.10+ stdlib** and always works. This
 > page is only about the *optional* vector/rerank planes. Everything here is setup, not code.
 
-## The one durable fact
+## The one install story
 
-**`ops` runs whichever `python3` is first on `PATH`.** The dispatcher (the `ops` script) shells to
-bare `python3` for the guardrail, the resolver, and every verb (`bin/*/run.py`) — it does **not**
-activate `$OPS_HOME/.venv` for you. So the optional packages (`lancedb`, `fastembed`) must be
-importable by *that* interpreter.
-
-Everything below is a consequence of this one fact. The trap is that your **interactive** shell and
-an **agent's** shell often resolve `python3` to *different* interpreters, because an agent terminal
-usually doesn't source `~/.zshrc`.
-
-```
-ops  ──►  python3 (first on PATH)  ──►  import lancedb ?
-                                          ├─ yes → stage-2 vectors
-                                          └─ no  → keyword-only (with a warning, never a crash)
-```
-
-## 1. Provision the interpreter
-
-Put the optional deps in a venv that lives with the vault:
+**`ops setup search --yes` provisions everything, and the dispatcher finds it automatically.** That
+one command creates `$OPS_HOME/.venv`, installs *only* the search deps (`lancedb` + `fastembed`, from
+`requirements-search.txt`) into it, pulls the embedding model, and builds the index. The `ops`
+dispatcher then **prefers `$OPS_HOME/.venv/bin/python3` whenever it exists** — for the guardrail, the
+resolver, and every verb — so `ops index` / `ops search` import the vector plane with no manual `PATH`
+surgery. If there is no venv, the dispatcher falls back to bare `python3` (the stdlib keyword floor).
 
 ```bash
-cd "$OPS_HOME"                       # e.g. ~/ops
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-ollama pull embeddinggemma           # the local embedder (or your OPS_EMBED_MODEL)
+cd "$OPS_HOME"          # e.g. ~/ops
+ops setup search --yes  # .venv + lancedb/fastembed + embed model + index — one command
 ```
+
+```
+ops  ──►  $OPS_HOME/.venv/bin/python3   (if it exists — created by `ops setup search`)
+          └─ else bare python3 on PATH  ──►  import lancedb ?
+                                               ├─ yes → stage-2 vectors
+                                               └─ no  → keyword-only (a warning, never a crash)
+```
+
+This is the whole contract (ADR-008): bare `python3` is the stdlib floor; the optional `.venv` holds
+the search deps; the dispatcher prefers it when present; **agent terminals inherit that for free** —
+they run the same `ops` script, so they get the same interpreter without any per-agent PATH ordering.
+Preview it first with `ops setup search --dry-run` (writes nothing, needs no `--yes`).
 
 > [!NOTE]
 > On **macOS Intel (x86_64)** `pip` resolves `lancedb` to 0.25.x — that is expected and works;
-> `requirements.txt` carries platform-aware markers so this installs cleanly. See the header of
-> `requirements.txt` for the why.
+> `requirements-search.txt` carries platform-aware markers so this installs cleanly on every host.
 
-## 2. Order PATH so the venv wins
+## What the agent terminal still needs: `OPS_HOME` and the `OPS_*` flags
 
-The venv's `bin` must come **before** any other `python3` shim (`~/.local/bin`, Homebrew):
+The interpreter is now handled for you, but two things still must reach the agent's shell:
 
-```bash
-export OPS_HOME="$HOME/ops"
-export PATH="$OPS_HOME/.venv/bin:$HOME/.local/bin:$PATH"
-export OPS_VECTORS=1                  # optional: enable the vector plane
-export OPS_RERANK=1                   # optional: enable the rerank plane
-```
+- **`OPS_HOME`** — so `ops` (and its venv) resolve to *your* vault, not a default.
+- **`OPS_VECTORS=1` / `OPS_RERANK=1`** — the opt-in flags that turn the vector/rerank arms *on* at
+  query time (the venv makes them importable; these env flags make search *use* them).
 
-> [!WARNING]
-> Putting `~/.local/bin` **before** `.venv/bin` is a real, silent failure: `ops` then runs a
-> Homebrew/PEP-668 `python3` with no optional deps while your fully-provisioned venv sits unused.
-> `ops doctor` will report `lancedb` missing even though you "installed" it — because it checks the
-> interpreter on PATH, not the venv.
-
-## 3. Make the agent terminal inherit the same environment
-
-An interactive login shell sources `~/.zshrc`, so the exports above are present. **An agent terminal
-frequently does not** — it builds its own environment per session and may source only bash profiles
-(`~/.profile`, `~/.bash_profile`), which on a zsh-only Mac often don't exist. Result: the agent's
-`python3` and `OPS_*` are wrong, and semantic search silently falls back to keyword-only.
-
-The fix is generic: **point the agent's terminal at an init file that sets `OPS_HOME`, `PATH`, and
-the `OPS_*` flags, and make that file bash-safe** (`export` statements only — no zsh-only syntax),
-because agent terminals typically source init files with `bash`.
+An interactive login shell sources `~/.zshrc`, so these are present. **An agent terminal frequently
+is not** — it builds its own environment per session and may source only bash profiles
+(`~/.profile`, `~/.bash_profile`), which on a zsh-only Mac often don't exist. The fix is generic:
+**point the agent's terminal at a bash-safe init file that exports `OPS_HOME` and the `OPS_*` flags**
+(`export` statements only — no zsh-only syntax), because agent terminals typically source init files
+with `bash`. You no longer need to prepend `.venv/bin` to `PATH` — the dispatcher does that job.
 
 ### Worked example — Hermes (`~/.hermes/config.yaml`)
 
@@ -94,8 +78,7 @@ If your `~/.zshrc` has zsh-only constructs, don't source it with bash — use a 
 ```bash
 # ~/.hermes/ops-shell-init.sh   (bash-safe: export only)
 export OPS_HOME="$HOME/ops"
-export PATH="$OPS_HOME/.venv/bin:$HOME/.local/bin:$PATH"
-export OPS_VECTORS=1
+export OPS_VECTORS=1     # the dispatcher already prefers $OPS_HOME/.venv/bin/python3 — no PATH surgery
 export OPS_RERANK=1
 ```
 
@@ -110,26 +93,27 @@ sessions keep their old environment snapshot** — start a **new** session (`/ne
 The gateway can't restart itself from inside a running session; restart it from a separate terminal
 if a full reload is needed.
 
-## 4. Verify — from inside the agent's terminal
+## Verify — from inside the agent's terminal
 
-Run these *in the agent's terminal*, not your own — the whole point is that they can differ:
+Run these *in the agent's terminal*, not your own — the whole point is that its environment can
+differ from yours:
 
 ```bash
-which python3                        # must be $OPS_HOME/.venv/bin/python3
-python3 -c 'import lancedb; print(lancedb.__version__)'   # must import
-ops doctor                           # expect: "optional: lancedb present (stage-2 vectors)"
-OPS_VECTORS=1 ops index              # embeds notes → vectors.lance (no fallback warning)
-ops search "some idea"               # semantic hits, not just keyword
+ops setup search           # expect: search "ready" (deps-importable ✓ · model-pulled ✓ · index-built ✓)
+ops doctor                 # expect: "optional: lancedb present (stage-2 vectors)"
+ops index                  # embeds notes → vectors.lance (no fallback warning)
+ops search "some idea"     # semantic hits, not just keyword
 ```
 
-If `ops doctor` prints **"OPS_VECTORS=1 but lancedb is NOT importable by this python3"**, the
-interpreter on PATH is wrong — recheck steps 2 and 3. `ops index` will still succeed keyword-only; it
-never crashes on a missing vector plane (that graceful fallback is by design — see the CHANGELOG /
-issue #3).
+If `ops setup search` reports `blocked`, its `next` field is the exact command to run (e.g. install
+ollama). If `ops doctor` prints **"OPS_VECTORS=1 but lancedb is NOT importable by this python3"**, the
+venv wasn't created or is missing the deps — re-run `ops setup search --yes` (or preview with
+`--dry-run`). `ops index` still succeeds keyword-only; it never crashes on a missing vector plane
+(that graceful fallback is by design — see the CHANGELOG / issue #3).
 
 ## What this deliberately does not require
 
-No change to how `ops` runs — it stays a bare-`python3`-on-PATH dispatcher, so any agent terminal
-that can set environment variables works the same way (Hermes is just the worked example). No daemon,
-no vault-side config, no second interpreter. Get the three layers to agree on one `python3` and
-semantic search follows.
+No manual venv, no `PATH` ordering, no vault-side daemon. `ops setup search` creates the one venv and
+the dispatcher prefers it; the stdlib keyword floor still runs on bare `python3` when there is no
+venv. An agent terminal only needs `OPS_HOME` and the `OPS_*` flags in its environment — it runs the
+same `ops` script, so it inherits the same interpreter. One install story, everywhere.

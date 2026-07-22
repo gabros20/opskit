@@ -15,6 +15,10 @@
     {
       "name": "--yes",
       "required": false
+    },
+    {
+      "name": "--dry-run",
+      "required": false
     }
   ],
   "reads": [
@@ -35,7 +39,8 @@
     "Python environment / site-packages (pip install, confirm-gated)",
     "~/.ollama/models (model pulls, confirm-gated)"
   ],
-  "hints": "Bare `ops setup` is a read-only layered dashboard. `ops setup <layer>` advances one layer idempotently. Search and model layers can install Python packages and pull Ollama models into external stores, so they require `--yes`; backups is a human handoff and is never included in `--all`.",
+  "hints": "Bare `ops setup` is a read-only layered dashboard. `ops setup <layer>` advances one layer idempotently. Search and model layers can install Python packages and pull Ollama models into external stores, so they require `--yes`; backups is a human handoff and is never included in `--all`. `--dry-run` previews any advance (single layer or `--all`) without installing/writing and needs no `--yes`.",
+  "dry_run": true,
   "output": {
     "mode": "rows",
     "fields": {

@@ -9,6 +9,12 @@ test/last-run-*.json
 # Search index — disposable, rebuilt from content (rm -rf .index && ops index)
 .index/
 
+# Optional search venv — the isolated interpreter `ops setup search` provisions (lancedb/fastembed).
+# Lives inside OPS_HOME (allowed by the path-wall) but is a machine-local, rebuildable cache, never
+# source of truth: `rm -rf .venv && ops setup search --yes` recreates it. The dispatcher prefers its
+# python3 when present (see the `ops` script + docs/agent-terminal-search.md).
+/.venv/
+
 # Run logs — append-only, regenerable
 .logs/
 

@@ -83,7 +83,7 @@ def main() -> int:
               str(mod.REQUIRED_DIRS))
 
         rows = mod.status()
-        valid = {"ready", "partial", "absent", "blocked"}
+        valid = {"ready", "partial", "absent", "blocked", "not_applicable"}
         check("status returns public rows", len(rows) == 5 and all({"id", "title", "status", "required", "detail", "items", "next"}.issubset(r) for r in rows), str(rows))
         check("status values are valid", {r["status"] for r in rows} <= valid, str(rows))
         check("single-layer status filters", [r["id"] for r in mod.status("search")] == ["search"])
@@ -129,57 +129,72 @@ def main() -> int:
               and all(i["ok"] for i in s_pack_seeded["items"] if i.get("advisory")),
               str(s_pack_seeded))
 
-        # Search: absent / partial / ready and confirm gate.
-        old = patch_probe(mod,
-                          _has=lambda name: False,
-                          _ollama_has=lambda model: False)
+        # Search: absent / partial / ready / blocked and the confirm gate. Readiness is OPERATIONAL
+        # now (Task 10): deps-importable (probed via the venv/dispatcher interpreter) + model-pulled +
+        # index-built; OPS_VECTORS/OPS_RERANK are advisory. ollama is the hard external prerequisite.
+        # Patch the probes hermetically so the machine's real ollama/venv state never leaks in.
+        def _search_probes(deps, model, index, ollama=True):
+            return patch_probe(mod,
+                               _deps_importable=lambda: deps,
+                               _ollama_has=lambda m: model,
+                               _index_built=lambda: index,
+                               _ollama_present=lambda: ollama)
+
+        old = _search_probes(False, False, False)
         try:
             search_absent = mod.status("search")[0]
             check("search absent when no components ready", search_absent["status"] == "absent", str(search_absent))
         finally:
             restore(mod, old)
 
-        old = patch_probe(mod,
-                          _has=lambda name: name == "lancedb",
-                          _ollama_has=lambda model: False)
+        old = _search_probes(True, False, False)
         try:
             search_partial = mod.status("search")[0]
             check("search partial reports item state", search_partial["status"] == "partial"
-                  and any(i["id"] == "lancedb" and i["ok"] for i in search_partial["items"]), str(search_partial))
+                  and any(i["id"] == "deps-importable" and i["ok"] for i in search_partial["items"]), str(search_partial))
         finally:
             restore(mod, old)
 
-        old = patch_probe(mod,
-                          _has=lambda name: name in {"lancedb", "fastembed"},
-                          _ollama_has=lambda model: True)
+        old = _search_probes(True, True, True)
         try:
             search_ready = mod.status("search")[0]
-            check("search ready when deps and embed model are ready", search_ready["status"] == "ready", str(search_ready))
+            check("search ready when deps, model, and index are operational", search_ready["status"] == "ready", str(search_ready))
         finally:
             restore(mod, old)
 
-        old = patch_probe(mod,
-                          _has=lambda name: False,
-                          _ollama_has=lambda model: False)
+        # Task 8: ollama absent → blocked with the EXACT install command, never absent/partial.
+        old = _search_probes(True, False, False, ollama=False)
+        try:
+            search_blocked = mod.status("search")[0]
+            check("search blocked with install hint when ollama is missing",
+                  search_blocked["status"] == "blocked" and "install ollama" in search_blocked["next"],
+                  str(search_blocked))
+        finally:
+            restore(mod, old)
+
+        old = _search_probes(False, False, False)
         try:
             gated = mod.advance("search", yes=False, fake=True)
             check("search advance without yes asks for confirmation", gated["confirm_needed"] and not gated["ran"], str(gated))
             allowed = mod.advance("search", yes=True, fake=True)
-            check("search fake advance records pip and ollama only after yes", len(allowed["ran"]) == 2
-                  and "pip" in allowed["ran"][0] and "ollama pull" in allowed["ran"][1], str(allowed))
+            joined = " | ".join(allowed["ran"])
+            check("search fake advance records venv, search-only pip, ollama pull, index build",
+                  len(allowed["ran"]) == 4 and "venv" in allowed["ran"][0] and "pip install" in allowed["ran"][1]
+                  and "ollama pull" in allowed["ran"][2] and "index" in allowed["ran"][3]
+                  and "lancedb" in joined and "fastembed" in joined
+                  and "Pillow" not in joined and "trafilatura" not in joined,  # search-only, NOT the models deps
+                  str(allowed))
         finally:
             restore(mod, old)
 
-        old = patch_probe(mod,
-                          _has=lambda name: False,
-                          _ollama_has=lambda model: False)
+        old = _search_probes(False, False, False)
         real_run = mod.subprocess.run
         def boom(*args, **kwargs):
             raise AssertionError(f"subprocess.run should not execute in fake mode: {args}")
         mod.subprocess.run = boom
         try:
             fake_safe = mod.advance("search", yes=True, fake=True)
-            check("OPS_SETUP_FAKE records without subprocess execution", len(fake_safe["ran"]) == 2, str(fake_safe))
+            check("OPS_SETUP_FAKE records without subprocess execution", len(fake_safe["ran"]) == 4, str(fake_safe))
         except AssertionError as e:
             check("OPS_SETUP_FAKE records without subprocess execution", False, str(e))
         finally:
@@ -191,15 +206,41 @@ def main() -> int:
         check("backups advance is blocked handoff", backups["handoff"] == ["ops backup init"] and not backups["ran"], str(backups))
 
         # Models: fake command recording includes conditional package support but no real execution.
+        # Patch ollama present (else Task 8 reports the layer `blocked` and advance would skip it).
         old = patch_probe(mod,
                           _platform_system=lambda: "Darwin",
-                          _platform_machine=lambda: "arm64")
+                          _platform_machine=lambda: "arm64",
+                          _ollama_present=lambda: True,
+                          _ollama_has=lambda model: False)
         try:
             models = mod.advance("models", yes=True, fake=True)
             joined = " | ".join(models["ran"])
             check("models fake advance records model pull and package installs",
                   "models" in joined and "pull" in joined and "Pillow" in joined and "trafilatura" in joined and "mlx-vlm" in joined,
                   str(models))
+        finally:
+            restore(mod, old)
+
+        # Task 8: automation off macOS is not_applicable (advisory), with a one-line reason.
+        old = patch_probe(mod, _platform_system=lambda: "Linux")
+        try:
+            auto_na = mod.status("automation")[0]
+            check("automation not_applicable off macOS with a reason",
+                  auto_na["status"] == "not_applicable" and "macOS" in auto_na["detail"], str(auto_na))
+            na_adv = mod.advance("automation", yes=True, fake=True)
+            check("advance skips a not_applicable layer (never attempts it)",
+                  not na_adv["ran"] and "automation" in na_adv["skipped"], str(na_adv))
+        finally:
+            restore(mod, old)
+
+        # Task 8: models blocked (ollama absent) → advance skips with the install hint, never crashes.
+        old = patch_probe(mod, _ollama_present=lambda: False, _ollama_has=lambda model: False)
+        try:
+            m_blocked = mod.status("models")[0]
+            blk_adv = mod.advance("models", yes=True, fake=True)
+            check("models blocked when ollama missing → advance skips with hint, no run",
+                  m_blocked["status"] == "blocked" and not blk_adv["ran"]
+                  and any("install ollama" in h for h in blk_adv["handoff"]), str((m_blocked, blk_adv)))
         finally:
             restore(mod, old)
 
@@ -225,6 +266,50 @@ def main() -> int:
         except ValueError as e:
             unknown_advance_ok = "unknown layer" in str(e)
         check("unknown layer advance is clear error", unknown_advance_ok)
+
+        # --- Best-effort --all (Task 8): a failure in ONE attempted AUTO layer must not abort the
+        # others; only an ATTEMPTED failure yields a nonzero exit; ready/blocked/not_applicable layers
+        # are skipped (not attempted). Drive the real bin/setup/run.py:_advance_all with stubbed
+        # status/advance so no real installs run. ---
+        import contextlib as _ctx
+        import io as _io
+        import importlib.util as _ilu
+        _spec = _ilu.spec_from_file_location("setup_run_besteffort", REPO / "bin" / "setup" / "run.py")
+        setup_run = _ilu.module_from_spec(_spec)
+        _spec.loader.exec_module(setup_run)
+
+        _ALL_STATUS = {"skeleton": "partial", "search": "absent", "backups": "blocked",
+                       "models": "not_applicable", "automation": "absent"}
+
+        def fake_status(layer_id=None):
+            def row(i):
+                return {"id": i, "title": i, "status": _ALL_STATUS[i], "required": i == "skeleton",
+                        "detail": "", "items": [], "next": f"next-{i}"}
+            order = ["skeleton", "search", "backups", "models", "automation"]
+            return [row(layer_id)] if layer_id else [row(i) for i in order]
+
+        def fake_advance(layer_id, *, yes, fake):
+            if layer_id == "search":
+                raise subprocess.CalledProcessError(1, ["ops", "index"])
+            r = mod._result()
+            r["ran"].append(f"did {layer_id}")
+            return r
+
+        _saved = (setup_run.setuplib.status, setup_run.setuplib.advance)
+        setup_run.setuplib.status = fake_status
+        setup_run.setuplib.advance = fake_advance
+        try:
+            _buf = _io.StringIO()
+            with _ctx.redirect_stdout(_buf):
+                rc = setup_run._advance_all(yes=True)
+            out = _buf.getvalue()
+            check("best-effort --all: one failing layer does not abort the rest (exit 1)", rc == 1, out)
+            check("best-effort --all: layers after the failure still ran",
+                  "did skeleton" in out and "did automation" in out and "FAILED" in out, out)
+            check("best-effort --all: not_applicable/blocked layers are skipped, not attempted",
+                  "models: skipped" in out and "did models" not in out, out)
+        finally:
+            setup_run.setuplib.status, setup_run.setuplib.advance = _saved
 
         os.environ.pop("OPS_SETUP_FAKE", None)
 
@@ -305,6 +390,33 @@ def main() -> int:
             fail_json.stderr += str(e)
         check("setup action failure --json emits error envelope without traceback", fail_json_ok,
               fail_json.stderr + fail_json.stdout)
+
+        # --- Task 7a: --dry-run previews without --yes and writes/installs NOTHING. (fake=False here:
+        # --dry-run must force the inert path on its own, not lean on OPS_SETUP_FAKE.) ---
+        dry_home = make_home(tmp / "dry")
+        dry_one = run_setup(["search", "--dry-run", "--json"], dry_home, fake=False)
+        try:
+            d1 = [json.loads(ln) for ln in dry_one.stdout.splitlines() if ln.strip()]
+            dry_one_ok = dry_one.returncode == 0 and d1 and d1[0]["data"].get("dry_run") is True
+        except Exception as e:
+            dry_one_ok = False
+            dry_one.stderr += str(e)
+        check("setup search --dry-run: ok envelope w/ dry_run, no --yes needed (confirm-class)",
+              dry_one_ok, dry_one.stderr + dry_one.stdout)
+        check("setup search --dry-run creates no .venv and no vault folders",
+              not (dry_home / ".venv").exists() and not (dry_home / "wiki").exists())
+
+        dry_all = run_setup(["--all", "--dry-run", "--json"], dry_home, fake=False)
+        try:
+            da = [json.loads(ln) for ln in dry_all.stdout.splitlines() if ln.strip()]
+            dry_all_ok = dry_all.returncode == 0 and da and da[0]["data"].get("dry_run") is True
+        except Exception as e:
+            dry_all_ok = False
+            dry_all.stderr += str(e)
+        check("setup --all --dry-run: ok envelope w/ dry_run, no --yes needed", dry_all_ok,
+              dry_all.stderr + dry_all.stdout)
+        check("setup --all --dry-run renders no plists, pulls no model, creates no .venv",
+              not (dry_home / ".venv").exists() and not (dry_home / "jobs" / "launchd").exists())
 
     print(f"\n{BOLD}Setup layer registry — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)

@@ -211,3 +211,36 @@ fallback instead of promising a stronger property it can't structurally deliver.
 `bin/share/run.py`). Requires a worker redeploy (`wrangler deploy` + `wrangler secret put
 PUBLISH_TOKEN`) before publish/fetch routes reflect this ADR in production; `ops share init` prints
 the exact steps.
+## ADR-009 — The interpreter + search-dependency contract: stdlib floor, optional `.venv`, dispatcher-preferred (2026-07-22)
+**Context.** The optional vector/rerank planes (lancedb + fastembed) are heavy pip deps, while the
+stage-1 keyword floor is stdlib-only (principle 6, zero-install). The install story had drifted into
+*two* incompatible tellings: `docs/agent-terminal-search.md` told the user to hand-make a `.venv` and
+carefully **prepend** `$OPS_HOME/.venv/bin` to `PATH` so the bare-`python3` dispatcher would pick it
+up — a silent-failure trap ("works in my shell, not for the agent") — while `ops setup search`
+installed the *entire* `requirements.txt` (dragging in the file-processing deps Pillow/trafilatura/
+mlx-vlm that belong to the `models` layer) into whatever interpreter happened to be running. A
+repo-local `.venv` was, by design, invisible to `ops` — the load-bearing gap.
+**Decision.** One contract, four rules:
+1. **Bare `python3` is the stdlib floor.** Every core verb works on it with no venv, no optional
+   deps (the zero-install path is never broken — a regression test asserts it).
+2. **The optional `.venv` holds the SEARCH deps only.** `ops setup search` creates `$OPS_HOME/.venv`
+   and installs a *search-only* set (`requirements-search.txt` = lancedb + fastembed, a strict subset
+   of `requirements.txt`), NOT the whole file. The model/file-processing deps stay on the `models`
+   layer. The venv lives inside `$OPS_HOME` (path-wall-allowed) and is `.gitignore`d + rebuildable
+   (`rm -rf .venv && ops setup search --yes`) — a disposable cache, never truth (principle 1).
+3. **The dispatcher prefers `.venv/bin/python3` when it exists**, else bare `python3` — for the
+   guardrail, resolver, and every verb. This is the fix that makes a repo-local venv actually
+   load-bearing: `ops index`/`ops search` import the vector plane with no `PATH` surgery, and any
+   agent terminal inherits it for free because it runs the same `ops` script.
+4. **Search readiness is OPERATIONAL, not "installed":** `deps-importable` (probed through the
+   dispatcher's interpreter) + `model-pulled` (ollama reachable vs present, distinguished) +
+   `index-built`; `OPS_VECTORS`/`OPS_RERANK` are advisory (surfaced as a handoff when unset).
+**Why.** The venv was the right mechanism and the wrong plumbing: isolating heavy deps from the
+stdlib floor is correct, but a venv the dispatcher can't see forces per-terminal PATH rituals that
+fail silently. Teaching the dispatcher to prefer it collapses two install stories into one, deletes
+the PATH-ordering footgun, and keeps the stdlib floor intact (no venv ⇒ bare `python3`, unchanged).
+Splitting search-only deps keeps the venv small and single-purpose, and lets the `models` layer own
+its own runtimes. **Status.** Done (this wave). `ops` prefers `.venv/bin/python3`; `ops setup search`
+provisions the venv + `requirements-search.txt` + model + index; docs collapsed to one story;
+`/.venv/` gitignored before any venv-creation code. Verified: full offline suite green in a
+`main==HEAD` clone.

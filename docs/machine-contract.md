@@ -129,3 +129,23 @@ Notes for authors:
 - `test/run_json.py` round-trips every read-class verb against its declared `output` block and fails
   the build on drift; `test/run_plugin.py` snapshots every SDK signature.
 - Consumers should key on `schema` / `ops_json` / `api_version`, not on `ops_version`.
+
+## 7. `ops setup` layer `status` enum
+
+Each row `ops setup` emits (`ops setup --json`, and the same rows `ops doctor` folds in) carries a
+`status` field from a **closed enum** — a program keys on this, never on the human `detail` string:
+
+| `status` | Meaning | `ops doctor` severity |
+|---|---|---|
+| `ready` | the layer is operational | `ok` |
+| `partial` | some prerequisites present, some missing | `warn` (optional) / `FAIL` (required) |
+| `absent` | no prerequisites present yet | `warn` (optional) / `FAIL` (required) |
+| `blocked` | a hard prerequisite is missing (an external binary, or a human handoff); `next` carries the **exact** remediation command | `warn` (advisory) |
+| `not_applicable` | the layer cannot apply on **this host** (e.g. launchd scheduling off macOS); advisory only | `ok` (never a FAIL, even for a required layer) |
+
+`blocked` and `not_applicable` are the two the machine must special-case: neither is a defect, and
+`ops setup --all` **skips** both (and `ready`) rather than attempting them — so they never contribute
+to its exit code. `--all` is otherwise best-effort: it advances every attemptable layer and exits `1`
+iff some *attempted* layer failed (a semantic at-risk exit per §2, not a crash; the envelope `ok`
+stays `true` and the per-layer `results` carry each failure). Reading `next` is how an agent learns
+the remediation for a `blocked` layer — it must never invent an install command from `detail`.

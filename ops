@@ -5,6 +5,16 @@
 set -euo pipefail
 OPS="${OPS_HOME:-$(cd "$(dirname "$0")" && pwd)}"
 export OPS_HOME="$OPS"
+
+# Interpreter selection (ADR-008): the stdlib floor runs on bare `python3` from PATH, but the OPTIONAL
+# search deps (lancedb/fastembed) live in a repo-local $OPS_HOME/.venv that `ops setup search` creates.
+# A bare-`python3` dispatcher can't see them, so prefer the venv interpreter WHEN it exists — this is
+# what lets `ops index`/`ops search` import the vector plane with no manual PATH surgery, and any agent
+# terminal inherits it for free. Falls back to bare `python3` otherwise (the zero-install path). The
+# guardrail/resolver are stdlib-only, so running them on the chosen interpreter is safe either way.
+PY=python3
+[ -x "$OPS/.venv/bin/python3" ] && PY="$OPS/.venv/bin/python3"
+
 VERB="${1:-help}"; shift || true
 case "$VERB" in -h|--help) VERB=help;; esac
 
@@ -12,13 +22,13 @@ case "$VERB" in -h|--help) VERB=help;; esac
 # runs. Exit codes propagate per the protocol (Part 0.3): 0 ok · 2 usage · 3 confirm · 4 not-found ·
 # 5 deny. The `|| exit 1` of old flattened 3/4/5 into 1, so agents couldn't tell them apart.
 set +e
-python3 "$OPS/bin/lib/guardrail.py" "$VERB" "$@"
+"$PY" "$OPS/bin/lib/guardrail.py" "$VERB" "$@"
 gr=$?
 set -e
 [ "$gr" -eq 0 ] || exit "$gr"
 
 # Multi-root resolution (Part 2.1): engine bin/ (reserved) → plugins/<pack>/ → $OPS_PATH. The resolver
 # is the single source of truth; the dispatcher just asks it for the run.py to exec.
-CMD="$(python3 "$OPS/bin/lib/resolver.py" "$VERB" 2>/dev/null || true)"
+CMD="$("$PY" "$OPS/bin/lib/resolver.py" "$VERB" 2>/dev/null || true)"
 [ -n "$CMD" ] && [ -f "$CMD" ] || { echo "ops: verb '$VERB' has no run.py" >&2; exit 4; }
-exec python3 "$CMD" "$@"
+exec "$PY" "$CMD" "$@"

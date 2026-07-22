@@ -129,7 +129,12 @@ def main(argv):
                                human=lambda _: f"would run '{name}': {job['command']}  (dry run — nothing executed)")
         toks = job["command"].split()
         if toks[0] == "ops":
-            cmd = [sys.executable, str(BIN / toks[1] / "run.py"), *toks[2:]]
+            # "One door" (Task 9): a manual `ops job run` re-enters the DISPATCHER, not the verb's
+            # run.py directly, so the scheduled verb passes the same guardrail + resolver + logs as
+            # any other caller (and the rendered launchd plists already invoke the dispatcher). The
+            # jobs are pre-validated read/safe_write, so the gate is a logged pass-through, never a
+            # block. Non-recursive: a job calls ONE non-job verb.
+            cmd = [str(paths.OPS_HOME / "ops"), *toks[1:]]
         else:
             cmd = toks  # allowlisted external
         logdir = paths.OPS_HOME / ".logs" / "jobs"; logdir.mkdir(parents=True, exist_ok=True)

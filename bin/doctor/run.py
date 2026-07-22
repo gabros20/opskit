@@ -185,6 +185,10 @@ def main(argv):
             msg += f" (next: {r['next']})"
         if r["status"] == "ready":
             ok(msg)
+        elif r["status"] == "not_applicable":
+            # This host can't run the layer (e.g. launchd off macOS) — informational, never a problem
+            # and never a FAIL, even were the layer required (Task 8).
+            ok(msg)
         elif r.get("required"):
             fail(msg)
         else:

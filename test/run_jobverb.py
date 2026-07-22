@@ -41,6 +41,11 @@ def main() -> int:
             "---\ntype: note\nupdated: 2026-06-20\n---\n# Alpha\nretrieval and ranking\n")
         (h / "jobs").mkdir()
         (h / "jobs" / "registry.json").write_text(json.dumps(REGISTRY), encoding="utf-8")
+        # `ops job run` now re-enters the DISPATCHER (Task 9, "one door") instead of calling the
+        # verb's run.py directly — so the temp OPS_HOME needs a real dispatcher tree. Symlink the
+        # engine `ops` + `bin` in; `job run index`/`consolidate` then pass the guardrail like any call.
+        os.symlink(REPO / "ops", h / "ops")
+        os.symlink(REPO / "bin", h / "bin")
 
         r = run(h, "list")
         check("job list shows the jobs", "index" in r.stdout and "consolidate" in r.stdout, r.stdout)

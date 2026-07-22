@@ -17,7 +17,21 @@ from lib import embed, enrichlib, imagelib, paths
 BIN = paths.BIN
 REQUIRED_DIRS = ["wiki", "tasks/inbox", "tasks/active", "tasks/waiting", "tasks/done",
                  "journal", "inbox", "templates", "jobs", "skills", "bin"]
-STATUSES = {"ready", "partial", "absent", "blocked"}
+# Layer status enum (documented in docs/machine-contract.md §7 and docs/setup.md). `not_applicable`
+# (Task 8) means the layer cannot apply on THIS host — e.g. launchd scheduling off macOS — and is
+# advisory-only: it never fails `ops doctor` and never causes a nonzero `--all` exit.
+STATUSES = {"ready", "partial", "absent", "blocked", "not_applicable"}
+
+# The SEARCH-ONLY dependency set (ADR-008): a strict subset of requirements.txt, isolated in
+# $OPS_HOME/.venv so the retrieval planes never drag in the file-processing packages (Pillow /
+# trafilatura / mlx-vlm) that belong to the `models` layer. requirements-search.txt is the source of
+# truth when present (the committed, human-followable install story); this inline mirror is the
+# fallback for a lean vault that dropped the file. Env markers ride through pip on the command line.
+SEARCH_DEPS = [
+    'lancedb>=0.25,<0.26 ; platform_system == "Darwin" and platform_machine == "x86_64"',
+    'lancedb>=0.33 ; platform_system != "Darwin" or platform_machine != "x86_64"',
+    "fastembed>=0.4",
+]
 
 
 @dataclass(frozen=True)
@@ -82,6 +96,49 @@ def _embed_model() -> str:
     return os.environ.get("OPS_EMBED_MODEL", embed.model_name())
 
 
+def _ollama_present() -> bool:
+    """Is the ollama binary on PATH? (The external prerequisite for pulling any local model.)"""
+    return shutil.which("ollama") is not None
+
+
+def _venv_python() -> "os.PathLike[str] | str":
+    """The search venv's interpreter path (may not exist yet)."""
+    return paths.OPS_HOME / ".venv" / "bin" / "python3"
+
+
+def _search_interpreter() -> str:
+    """The interpreter the dispatcher would pick for verbs: the repo-local .venv python when present
+    (ADR-008), else whichever python3 is running us. What `deps-importable` must probe."""
+    vp = _venv_python()
+    return str(vp) if os.path.exists(vp) else sys.executable
+
+
+def _deps_importable() -> bool:
+    """OPERATIONAL probe (Task 10): can the dispatcher-selected interpreter actually import BOTH
+    vector-plane deps? A file being pip-installed isn't enough — `ops index` imports through the
+    venv, so we import through the same interpreter. Never raises."""
+    interp = _search_interpreter()
+    try:
+        r = subprocess.run([interp, "-c", "import lancedb, fastembed"],
+                           capture_output=True, timeout=30)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def _index_built() -> bool:
+    return (paths.OPS_HOME / ".index" / "ops.sqlite").exists()
+
+
+def _search_pip_args() -> list[str]:
+    """`pip install` args for the search-only set: `-r requirements-search.txt` when the committed
+    file is present, else the inline SEARCH_DEPS mirror (lean vault)."""
+    req = paths.OPS_HOME / "requirements-search.txt"
+    if req.exists():
+        return ["-r", str(req)]
+    return list(SEARCH_DEPS)
+
+
 def _platform_system() -> str:
     return platform.system()
 
@@ -99,11 +156,22 @@ def _run(cmd: list[str], *, fake: bool = False) -> str:
 
 
 def _run_verb(verb: str, *args: str, fake: bool = False) -> str:
-    return _run([sys.executable, str(BIN / verb / "run.py"), *args], fake=fake)
+    """Invoke a sibling verb through the DISPATCHER (Task 9, "one door") — not `bin/<verb>/run.py`
+    directly — so doctor/models/job/index re-enter the guardrail + resolver + logs like any other
+    caller. Non-recursive (none of these verbs call setup). OPS_SETUP_FAKE keeps a dry-run inert
+    (the display string is recorded, nothing runs). The dispatcher itself prefers the .venv python
+    (ADR-008), so a re-entered `ops index` sees the vector deps with no PATH surgery here."""
+    return _run([str(paths.OPS_HOME / "ops"), verb, *args], fake=fake)
 
 
 def _pip(*pkgs_or_reqs: str, fake: bool = False) -> str:
     return _run([sys.executable, "-m", "pip", "install", *pkgs_or_reqs], fake=fake)
+
+
+def _venv_pip(*pkgs_or_reqs: str, fake: bool = False) -> str:
+    """`pip install` into the search venv specifically (Task 10) — the isolated interpreter, never the
+    caller's site-packages, so the vector plane stays quarantined from the stdlib floor."""
+    return _run([str(_venv_python()), "-m", "pip", "install", *pkgs_or_reqs], fake=fake)
 
 
 def _layer(layer_id: str) -> Layer:
@@ -146,27 +214,54 @@ def _status_skeleton(layer: Layer) -> dict:
 
 
 def _status_search(layer: Layer) -> dict:
+    """OPERATIONAL readiness (Task 10): "ready" means search actually works end to end, not merely
+    that a wheel is on disk. Core = deps import through the dispatcher's interpreter + the embed model
+    is pulled + the index is built; OPS_VECTORS/OPS_RERANK are advisory (surfaced as a handoff if
+    unset, never blocking). ollama is the hard external prerequisite — absent, the layer is `blocked`
+    with the exact install command (Task 8), because `advance` would otherwise crash pulling the
+    model."""
     model = _embed_model()
+    deps = _deps_importable()
+    model_pulled = _ollama_has(model)
+    index_built = _index_built()
+    vectors_env = _truthy(os.environ.get("OPS_VECTORS"))
+    rerank_env = _truthy(os.environ.get("OPS_RERANK"))
     items = [
-        {"id": "lancedb", "title": "lancedb", "ok": _has("lancedb")},
-        {"id": "fastembed", "title": "fastembed", "ok": _has("fastembed")},
-        {"id": "embed_model", "title": model, "ok": _ollama_has(model)},
+        {"id": "deps-importable", "title": "lancedb + fastembed importable", "ok": deps},
+        {"id": "model-pulled", "title": model, "ok": model_pulled},
+        {"id": "index-built", "title": ".index/ops.sqlite", "ok": index_built},
+        {"id": "OPS_VECTORS", "title": "OPS_VECTORS=1", "ok": vectors_env, "advisory": True},
+        {"id": "OPS_RERANK", "title": "OPS_RERANK=1", "ok": rerank_env, "advisory": True},
     ]
-    state = _items_status(items)
-    detail = "semantic search ready" if state == "ready" else "semantic search prerequisites are missing"
-    return _row(layer, state, detail, items, "ops setup search --yes" if state != "ready" else "")
+    if not _ollama_present():
+        return _row(layer, "blocked", "ollama is required to pull the embedding model", items,
+                    "install ollama: https://ollama.com")
+    core = [deps, model_pulled, index_built]
+    if all(core):
+        # Operational; nudge the advisory env flags so retrieval actually uses the vector/rerank arms.
+        nxt = "" if (vectors_env and rerank_env) else "export OPS_VECTORS=1 OPS_RERANK=1"
+        detail = "semantic search ready" if (vectors_env and rerank_env) else \
+            "semantic search operational (set OPS_VECTORS=1 / OPS_RERANK=1 to enable the arms)"
+        return _row(layer, "ready", detail, items, nxt)
+    state = "partial" if any(core) else "absent"
+    return _row(layer, state, "semantic search prerequisites are incomplete", items, "ops setup search --yes")
 
 
 def _status_backups(layer: Layer) -> dict:
+    config_ok = (paths.OPS_HOME / ".backup" / "config.json").exists()
+    restic_ok = shutil.which("restic") is not None
     items = [
-        {"id": "config", "title": ".backup/config.json", "ok": (paths.OPS_HOME / ".backup" / "config.json").exists()},
-        {"id": "restic", "title": "restic", "ok": shutil.which("restic") is not None},
+        {"id": "config", "title": ".backup/config.json", "ok": config_ok},
+        {"id": "restic", "title": "restic", "ok": restic_ok},
     ]
-    if all(i["ok"] for i in items):
+    if config_ok and restic_ok:
         return _row(layer, "ready", "backup configuration ready", items)
-    if any(i["ok"] for i in items):
-        return _row(layer, "blocked", "backup setup needs human initialization", items, layer.handoff)
-    return _row(layer, "absent", "backup setup has not been initialized", items, layer.handoff)
+    # The external binary is the hard prerequisite: name the exact install command (Task 8) rather
+    # than deferring to the generic init handoff, which can't proceed without restic anyway.
+    if not restic_ok:
+        return _row(layer, "blocked", "restic is required for encrypted off-machine backups", items,
+                    "install restic: brew install restic")
+    return _row(layer, "blocked", "backup setup needs human initialization", items, layer.handoff)
 
 
 def _status_models(layer: Layer) -> dict:
@@ -178,12 +273,23 @@ def _status_models(layer: Layer) -> dict:
         {"id": "vlm", "title": vlm_model, "ok": vlm_ok},
         {"id": "stt", "title": "speech-to-text runtime", "ok": any(_has(m) for m in ("parakeet_mlx", "mlx_whisper", "faster_whisper"))},
     ]
+    # ollama backs the enrich/embed model pulls; without it `advance` (→ `ops models pull`) can't run.
+    # Report `blocked` with the install command (Task 8) instead of letting it crash mid-pull.
+    if not _ollama_present():
+        return _row(layer, "blocked", "ollama is required for local model runtimes", items,
+                    "install ollama: https://ollama.com")
     state = _items_status(items)
     detail = "file-processing models ready" if state == "ready" else "file-processing model layer is incomplete"
     return _row(layer, state, detail, items, "ops setup models --yes" if state != "ready" else "")
 
 
 def _status_automation(layer: Layer) -> dict:
+    # launchd is macOS-only: off Darwin the layer cannot apply at all (Task 8) — report
+    # `not_applicable` with a one-line reason rather than a perpetually-"absent" nag the host can
+    # never satisfy. Advisory everywhere it surfaces (doctor never fails it; `--all` never attempts it).
+    if _platform_system() != "Darwin":
+        return _row(layer, "not_applicable", "launchd scheduling is macOS-only (no plists on this host)",
+                    [{"id": "launchd", "title": "jobs/launchd/*.plist", "ok": False, "advisory": True}], "")
     launchd = paths.OPS_HOME / "jobs" / "launchd"
     plists = sorted(launchd.glob("*.plist")) if launchd.exists() else []
     items = [{"id": "launchd", "title": "jobs/launchd/*.plist", "ok": bool(plists)}]
@@ -224,12 +330,21 @@ def _confirm(layer: Layer, yes: bool, res: dict) -> bool:
 def advance(layer_id, *, yes: bool, fake: bool) -> dict:
     layer = _layer(layer_id)
     res = _result()
-    if status(layer.id)[0]["status"] == "ready":
+    before = status(layer.id)[0]
+    if before["status"] == "ready":
         res["skipped"].append(layer.id)
         return res
-    if layer.gate == "blocked":
+    if layer.gate == "blocked":  # static human handoff (backups) — regardless of which piece is missing
         if layer.handoff:
             res["handoff"].append(layer.handoff)
+        res["skipped"].append(layer.id)
+        return res
+    # Dynamic block (Task 8): a missing external binary (ollama) or a host that can't run the layer
+    # (not_applicable). Never attempt it — surface the exact remediation from `next` and skip, so
+    # `advance` cannot crash mid-install on a prerequisite the status probe already flagged.
+    if before["status"] in ("blocked", "not_applicable"):
+        if before.get("next"):
+            res["handoff"].append(before["next"])
         res["skipped"].append(layer.id)
         return res
     if not _confirm(layer, yes, res):
@@ -238,8 +353,16 @@ def advance(layer_id, *, yes: bool, fake: bool) -> dict:
     if layer.id == "skeleton":
         res["ran"].append(_run_verb("doctor", "--init", fake=fake))
     elif layer.id == "search":
-        res["ran"].append(_pip("-r", str(paths.OPS_HOME / "requirements.txt"), fake=fake))
+        # Venv-correct, isolated search layer (Task 10 / ADR-008):
+        # (1) create $OPS_HOME/.venv if missing, (2) install ONLY the search deps into it (never the
+        # whole requirements.txt), (3) pull the embed model, (4) re-enter `ops index` — which the
+        # dispatcher runs on the now-present .venv python, so lancedb/fastembed import for the build.
+        venv = paths.OPS_HOME / ".venv"
+        if _fake(fake) or not venv.exists():  # fake previews the create; real skips an existing venv
+            res["ran"].append(_run([sys.executable, "-m", "venv", str(venv)], fake=fake))
+        res["ran"].append(_venv_pip(*_search_pip_args(), fake=fake))
         res["ran"].append(_run(["ollama", "pull", _embed_model()], fake=fake))
+        res["ran"].append(_run_verb("index", fake=fake))
     elif layer.id == "models":
         res["ran"].append(_run_verb("models", "pull", "--all", "--yes", fake=fake))
         pkgs = ["Pillow", "trafilatura"]

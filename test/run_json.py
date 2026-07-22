@@ -85,7 +85,7 @@ def mkrepo(path: Path):
 def main() -> int:
     # --- static contract: every non-hidden verb declares output + hints (+ dry_run where required) ---
     DRY = {"capture", "task", "wiki", "triage", "files", "archive", "sweep",
-           "invoice", "index", "consolidate", "job", "new", "bookmark"}
+           "invoice", "index", "consolidate", "job", "new", "bookmark", "setup"}
     verbs = []
     for cj in sorted(BIN.glob("*/cmd.json")):
         d = json.loads(cj.read_text(encoding="utf-8"))
@@ -178,6 +178,15 @@ def main() -> int:
         # human rendering unchanged when --json is absent (spot check)
         r = run(env, "task", "list")
         check("human mode still renders (no envelope)", "active/" in r.stdout and "ops_json" not in r.stdout, r.stdout[:160])
+
+        # setup layer status enum (machine-contract §7): every dashboard row's `status` is one of the
+        # documented values, now including `not_applicable` (Task 8).
+        SETUP_STATUS_ENUM = {"ready", "partial", "absent", "blocked", "not_applicable"}
+        r = run(env, "setup", "--json")
+        srows = parse_ndjson(r.stdout) if r.stdout.strip() else []
+        check("setup --json rows carry a documented status enum value",
+              len(srows) > 1 and all(row.get("status") in SETUP_STATUS_ENUM for row in srows[1:]),
+              f"rc={r.returncode} {r.stdout[:200]}")
 
     print(f"{BOLD}Machine contract: --json envelope + ops.json v2 + dry-run — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
