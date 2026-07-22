@@ -311,7 +311,157 @@ def main() -> int:
         finally:
             setup_run.setuplib.status, setup_run.setuplib.advance = _saved
 
+        # --- FIX 2: the models layer installs its deps into the .venv (the dispatcher-preferred
+        # interpreter), NOT bare sys.executable — closing the silent capability regression. ---
+        old = patch_probe(mod, _platform_system=lambda: "Darwin", _platform_machine=lambda: "arm64",
+                          _ollama_present=lambda: True, _ollama_has=lambda model: False)
+        try:
+            models_v = mod.advance("models", yes=True, fake=True)
+            joined_v = " | ".join(models_v["ran"])
+            venv_py = str(mod._venv_python())
+            check("FIX 2: models ensures the .venv (records a `-m venv` create)",
+                  any("-m venv" in c for c in models_v["ran"]), str(models_v["ran"]))
+            check("FIX 2: models deps pip-install into the .venv interpreter, not bare python",
+                  venv_py in joined_v and "Pillow" in joined_v and "trafilatura" in joined_v
+                  and "mlx-vlm" in joined_v, str(models_v["ran"]))
+            check("FIX 2: no models step targets the bare interpreter's pip",
+                  not any(c.startswith(sys.executable + " -m pip") for c in models_v["ran"]),
+                  str(models_v["ran"]))
+        finally:
+            restore(mod, old)
+
+        # --- FIX 4: the confirm gate must IGNORE skipped (blocked/not_applicable/ready) layers. When
+        # every confirm-class AUTO layer is blocked/not_applicable, `--all` attempts nothing and must
+        # NOT demand --yes (that was a spurious exit 3, e.g. on a host with no ollama). ---
+        _F4_STATUS = {"skeleton": "ready", "search": "blocked", "backups": "blocked",
+                      "models": "not_applicable", "automation": "ready"}
+
+        def f4_status(layer_id=None):
+            def row(i):
+                return {"id": i, "title": i, "status": _F4_STATUS[i], "required": i == "skeleton",
+                        "detail": "", "items": [], "next": f"next-{i}"}
+            order = ["skeleton", "search", "backups", "models", "automation"]
+            return [row(layer_id)] if layer_id else [row(i) for i in order]
+
+        def f4_advance(layer_id, *, yes, fake):
+            r = mod._result()
+            r["ran"].append(f"did {layer_id}")
+            return r
+
+        _saved4 = (setup_run.setuplib.status, setup_run.setuplib.advance)
+        setup_run.setuplib.status = f4_status
+        setup_run.setuplib.advance = f4_advance
+        try:
+            _buf = _io.StringIO()
+            f4_exit = None
+            try:
+                with _ctx.redirect_stdout(_buf):
+                    f4_exit = setup_run._advance_all(yes=False)  # NO --yes on purpose
+            except SystemExit as e:  # a spurious confirm gate would exit 3 here
+                f4_exit = e.code
+            check("FIX 4 (--all): no --yes demanded when only blocked/not_applicable confirm layers",
+                  f4_exit == 0, str(f4_exit) + _buf.getvalue())
+            # And the single-layer path: a BLOCKED confirm layer must not exit 3 for a missing --yes.
+            _buf2 = _io.StringIO()
+            one_exit = None
+            try:
+                with _ctx.redirect_stdout(_buf2):
+                    one_exit = setup_run._advance_one("search", yes=False)  # search is BLOCKED above
+            except SystemExit as e:
+                one_exit = e.code
+            check("FIX 4 (single-layer): a BLOCKED confirm layer does not exit 3 for missing --yes",
+                  one_exit != 3, str(one_exit) + _buf2.getvalue())
+        finally:
+            setup_run.setuplib.status, setup_run.setuplib.advance = _saved4
+
+        # --- FIX 5: best-effort `--all` preserves partial progress (steps that ran before a failure)
+        # AND aggregates every blocked/skipped layer's `next` remediation into the top-level handoff. ---
+        _F5_STATUS = {"skeleton": "absent", "search": "absent", "backups": "blocked",
+                      "models": "blocked", "automation": "absent"}
+
+        def f5_status(layer_id=None):
+            def row(i):
+                return {"id": i, "title": i, "status": _F5_STATUS[i], "required": i == "skeleton",
+                        "detail": "", "items": [], "next": f"next-{i}"}
+            order = ["skeleton", "search", "backups", "models", "automation"]
+            return [row(layer_id)] if layer_id else [row(i) for i in order]
+
+        def f5_advance(layer_id, *, yes, fake):
+            if layer_id == "search":  # ran 2 steps, then blew up on the 3rd
+                exc = subprocess.CalledProcessError(1, ["ops", "index"])
+                exc.ops_partial_ran = ["python -m venv .venv",
+                                       ".venv/bin/python3 -m pip install lancedb fastembed"]
+                raise exc
+            r = mod._result()
+            r["ran"].append(f"did {layer_id}")
+            return r
+
+        _saved5 = (setup_run.setuplib.status, setup_run.setuplib.advance)
+        setup_run.setuplib.status = f5_status
+        setup_run.setuplib.advance = f5_advance
+        try:
+            _buf5 = _io.StringIO()
+            with _ctx.redirect_stdout(_buf5):
+                rc5 = setup_run._advance_all(yes=True)
+            out5 = _buf5.getvalue()
+            check("FIX 5: an attempted-layer failure still exits 1", rc5 == 1, out5)
+            check("FIX 5: partial progress (steps run before the failure) is preserved/surfaced",
+                  "python -m venv .venv" in out5
+                  and ".venv/bin/python3 -m pip install lancedb fastembed" in out5
+                  and "FAILED" in out5, out5)
+            check("FIX 5: blocked AUTO layer's `next` remediation is aggregated into the handoff",
+                  "next-models" in out5, out5)
+        finally:
+            setup_run.setuplib.status, setup_run.setuplib.advance = _saved5
+
         os.environ.pop("OPS_SETUP_FAKE", None)
+
+        # --- FIX 3: ONE usable-venv probe (start-probe, not os.path.exists) shared by the dispatcher
+        # interpreter choice and the create-if-missing logic; a half-built/broken .venv is REPAIRED,
+        # not trusted as complete. (fake env is popped above so _ensure_venv really creates.) ---
+        probe_home = make_home(tmp / "venvprobe")
+        mod3 = reload_setuplib(probe_home)
+        check("FIX 3: usable-venv probe returns None when .venv is absent",
+              mod3._usable_venv_python() is None)
+        broken_bin = probe_home / ".venv" / "bin"
+        broken_bin.mkdir(parents=True)
+        (broken_bin / "python3").write_text("#!/nonexistent/interpreter\nnot a real python\n")
+        os.chmod(broken_bin / "python3", 0o755)
+        check("FIX 3: usable-venv probe returns None for a present-but-unstartable .venv python",
+              mod3._usable_venv_python() is None)
+        check("FIX 3: _search_interpreter falls back to sys.executable when the venv is broken",
+              mod3._search_interpreter() == sys.executable)
+        res_repair = mod3._result()
+        mod3._ensure_venv(res_repair, fake=False)
+        check("FIX 3: _ensure_venv repairs a half-built .venv into a startable interpreter",
+              any("venv" in c for c in res_repair["ran"]) and mod3._usable_venv_python() is not None,
+              str(res_repair["ran"]))
+        res_idem = mod3._result()
+        mod3._ensure_venv(res_idem, fake=False)
+        check("FIX 3: _ensure_venv is idempotent over an already-usable venv (no re-create)",
+              res_idem["ran"] == [], str(res_idem["ran"]))
+        mod = reload_setuplib(home)  # restore module state for any later in-process use
+
+        # --- FIX 1: the `ops` dispatcher must PROBE that .venv/bin/python3 actually starts, not just
+        # test `-x`. A broken (executable-but-unstartable) venv python must fall back to bare python3
+        # so ops keeps working, instead of returning 126/127 on every verb. Build an OPS_HOME that
+        # mirrors the repo (symlinks) but carries a deliberately-broken .venv, then run `ops help`. ---
+        broken_home = tmp / "brokenvenv"
+        broken_home.mkdir()
+        for entry in REPO.iterdir():
+            if entry.name in (".venv", ".git", ".orchestrate", "__pycache__"):
+                continue
+            os.symlink(entry, broken_home / entry.name)
+        vbin = broken_home / ".venv" / "bin"
+        vbin.mkdir(parents=True)
+        (vbin / "python3").write_text("#!/nonexistent/interp\nnot a real python\n")
+        os.chmod(vbin / "python3", 0o755)
+        f1_env = {**os.environ, "OPS_HOME": str(broken_home)}
+        f1_env.pop("OPS_SETUP_FAKE", None)
+        f1 = subprocess.run([str(REPO / "ops"), "help"], capture_output=True, text=True, env=f1_env)
+        check("FIX 1: broken/unstartable .venv python → dispatcher falls back to bare python3, ops runs",
+              f1.returncode == 0 and "126" not in (f1.stderr[-40:] or ""),
+              (f1.stderr + f1.stdout)[:400])
 
         # Verb surface: subprocess tests exercise the real command boundary.
         cli_home = make_home(tmp / "cli")

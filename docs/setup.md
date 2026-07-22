@@ -54,15 +54,27 @@ ops setup search --dry-run     # what the search layer would create/install/pull
 ops setup --all --dry-run      # the whole plan, nothing touched
 ```
 
-### The search layer provisions its own venv
+### The `.venv` is the single home for all optional deps
 
-`ops setup search --yes` creates an isolated `$OPS_HOME/.venv`, installs **only** the search deps
-(`lancedb` + `fastembed`, from `requirements-search.txt`) into it, pulls the embedding model, and
-builds the index. The `ops` dispatcher then prefers `$OPS_HOME/.venv/bin/python3` automatically, so
-`ops index` / `ops search` see the vector plane with no manual `PATH` surgery — including from an
-agent terminal. This is the single install story; see [ADR-008](DECISIONS.md) and
-[the agent-terminal guide](agent-terminal-search.md). (The file-processing deps — Pillow, trafilatura,
-mlx-vlm — belong to the `models` layer, not the search venv.)
+Bare `python3` is the stdlib floor — every core verb works on it with zero optional deps. The
+OPTIONAL `$OPS_HOME/.venv` holds **all** optional deps, and the `ops` dispatcher prefers it whenever
+it exists and actually starts (falling back to bare `python3` otherwise), so `ops index` / `ops
+search` / `ops files` / `ops doctor` all see those deps with no manual `PATH` surgery — including from
+an agent terminal.
+
+- `ops setup search --yes` creates `$OPS_HOME/.venv` (if missing), installs the search deps
+  (`lancedb` + `fastembed`, from `requirements-search.txt`) into it, pulls the embedding model, and
+  builds the index.
+- `ops setup models --yes` installs the file-processing deps (Pillow, trafilatura, and — on Apple
+  Silicon — mlx-vlm) into the **same** venv, and pulls the local models.
+
+Each layer owns its own dep subset; the venv is just the shared, dispatcher-visible environment they
+land in — so `ops doctor`'s optional probes (Pillow / mlx_vlm / lancedb) run under the same
+interpreter and report consistently. Re-running the relevant `ops setup <layer>` provisions or
+migrates that layer's deps into the venv. The venv is disposable and rebuildable
+(`rm -rf .venv && ops setup search --yes && ops setup models --yes`); a broken or half-built venv is
+repaired automatically on the next `ops setup search`/`models`. This is the single install story; see
+[ADR-008](DECISIONS.md) and [the agent-terminal guide](agent-terminal-search.md).
 
 Blocked layers stay blocked and print the exact remediation in `next`. Backups are blocked because
 encrypted off-machine backup setup needs human choices and secrets (and `restic` installed):

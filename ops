@@ -7,13 +7,20 @@ OPS="${OPS_HOME:-$(cd "$(dirname "$0")" && pwd)}"
 export OPS_HOME="$OPS"
 
 # Interpreter selection (ADR-008): the stdlib floor runs on bare `python3` from PATH, but the OPTIONAL
-# search deps (lancedb/fastembed) live in a repo-local $OPS_HOME/.venv that `ops setup search` creates.
-# A bare-`python3` dispatcher can't see them, so prefer the venv interpreter WHEN it exists — this is
-# what lets `ops index`/`ops search` import the vector plane with no manual PATH surgery, and any agent
-# terminal inherits it for free. Falls back to bare `python3` otherwise (the zero-install path). The
+# deps (search + models) live in a repo-local $OPS_HOME/.venv that `ops setup` creates. A bare-`python3`
+# dispatcher can't see them, so prefer the venv interpreter WHEN it exists — this is what lets `ops
+# index`/`ops search` import the vector plane with no manual PATH surgery, and any agent terminal
+# inherits it for free. Falls back to bare `python3` otherwise (the zero-install path). The
 # guardrail/resolver are stdlib-only, so running them on the chosen interpreter is safe either way.
+#
+# But `-x` alone is not enough: a `.venv/bin/python3` symlink can survive a system-python upgrade or an
+# ABI break and still be executable while failing to START — that would return 126/127 on EVERY verb.
+# So we also PROBE that it actually runs (`python3 -c ''`); a broken venv must never poison ops. One
+# cheap probe, and only when the venv python is present, so the no-venv path pays nothing.
 PY=python3
-[ -x "$OPS/.venv/bin/python3" ] && PY="$OPS/.venv/bin/python3"
+if [ -x "$OPS/.venv/bin/python3" ] && "$OPS/.venv/bin/python3" -c '' 2>/dev/null; then
+  PY="$OPS/.venv/bin/python3"
+fi
 
 VERB="${1:-help}"; shift || true
 case "$VERB" in -h|--help) VERB=help;; esac

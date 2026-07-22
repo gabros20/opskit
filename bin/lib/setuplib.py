@@ -102,15 +102,48 @@ def _ollama_present() -> bool:
 
 
 def _venv_python() -> "os.PathLike[str] | str":
-    """The search venv's interpreter path (may not exist yet)."""
+    """The optional venv's interpreter path (may not exist yet)."""
     return paths.OPS_HOME / ".venv" / "bin" / "python3"
 
 
-def _search_interpreter() -> str:
-    """The interpreter the dispatcher would pick for verbs: the repo-local .venv python when present
-    (ADR-008), else whichever python3 is running us. What `deps-importable` must probe."""
+def _usable_venv_python() -> str | None:
+    """The ONE "is the venv interpreter actually usable" probe, shared by the dispatcher's interpreter
+    choice, `_search_interpreter`, and the create-if-missing logic (FIX 3). Returns the path ONLY if
+    `$OPS_HOME/.venv/bin/python3` exists AND actually STARTS — mirroring the dispatcher's `-x`+start
+    probe. A half-built or ABI-broken venv (dir/symlink present but python won't run) returns None so
+    callers REPAIR it rather than trusting an existing `.venv` dir as complete. Never raises."""
     vp = _venv_python()
-    return str(vp) if os.path.exists(vp) else sys.executable
+    try:
+        r = subprocess.run([str(vp), "-c", ""], capture_output=True, timeout=10)
+        return str(vp) if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def _ensure_venv(res: dict, *, fake: bool) -> None:
+    """Provision `$OPS_HOME/.venv` as the single home for ALL optional deps (search + models, ADR-008 /
+    FIX 2). Idempotent: a usable venv is left untouched; a MISSING or half-built/broken one is
+    (re)created via the same start-probe as the dispatcher (FIX 3), so a partial `.venv` dir can't wedge
+    a later `_venv_pip`. Records the create command in `res['ran']`. In fake/dry mode it only previews
+    the create (records the string, runs nothing)."""
+    venv = paths.OPS_HOME / ".venv"
+    if _fake(fake):
+        res["ran"].append(_run([sys.executable, "-m", "venv", str(venv)], fake=fake))
+        return
+    if _usable_venv_python() is not None:
+        return
+    # Missing, or present-but-unstartable (stale symlink / ABI break): clear any partial tree so the
+    # create can't trip on it, then build fresh. .venv is a disposable, rebuildable cache (ADR-008).
+    if venv.exists():
+        shutil.rmtree(venv, ignore_errors=True)
+    res["ran"].append(_run([sys.executable, "-m", "venv", str(venv)], fake=fake))
+
+
+def _search_interpreter() -> str:
+    """The interpreter the dispatcher would pick for verbs: the repo-local .venv python when it exists
+    AND starts (ADR-008 / FIX 3), else whichever python3 is running us. What `deps-importable` must
+    probe."""
+    return _usable_venv_python() or sys.executable
 
 
 def _deps_importable() -> bool:
@@ -164,13 +197,10 @@ def _run_verb(verb: str, *args: str, fake: bool = False) -> str:
     return _run([str(paths.OPS_HOME / "ops"), verb, *args], fake=fake)
 
 
-def _pip(*pkgs_or_reqs: str, fake: bool = False) -> str:
-    return _run([sys.executable, "-m", "pip", "install", *pkgs_or_reqs], fake=fake)
-
-
 def _venv_pip(*pkgs_or_reqs: str, fake: bool = False) -> str:
-    """`pip install` into the search venv specifically (Task 10) — the isolated interpreter, never the
-    caller's site-packages, so the vector plane stays quarantined from the stdlib floor."""
+    """`pip install` into the optional venv specifically (Task 10 / FIX 2) — the isolated interpreter
+    the dispatcher prefers, never the caller's site-packages. ALL optional deps (search + models) land
+    here, so the stdlib floor stays clean and the dispatcher sees every optional dep consistently."""
     return _run([str(_venv_python()), "-m", "pip", "install", *pkgs_or_reqs], fake=fake)
 
 
@@ -350,25 +380,36 @@ def advance(layer_id, *, yes: bool, fake: bool) -> dict:
     if not _confirm(layer, yes, res):
         return res
 
-    if layer.id == "skeleton":
-        res["ran"].append(_run_verb("doctor", "--init", fake=fake))
-    elif layer.id == "search":
-        # Venv-correct, isolated search layer (Task 10 / ADR-008):
-        # (1) create $OPS_HOME/.venv if missing, (2) install ONLY the search deps into it (never the
-        # whole requirements.txt), (3) pull the embed model, (4) re-enter `ops index` — which the
-        # dispatcher runs on the now-present .venv python, so lancedb/fastembed import for the build.
-        venv = paths.OPS_HOME / ".venv"
-        if _fake(fake) or not venv.exists():  # fake previews the create; real skips an existing venv
-            res["ran"].append(_run([sys.executable, "-m", "venv", str(venv)], fake=fake))
-        res["ran"].append(_venv_pip(*_search_pip_args(), fake=fake))
-        res["ran"].append(_run(["ollama", "pull", _embed_model()], fake=fake))
-        res["ran"].append(_run_verb("index", fake=fake))
-    elif layer.id == "models":
-        res["ran"].append(_run_verb("models", "pull", "--all", "--yes", fake=fake))
-        pkgs = ["Pillow", "trafilatura"]
-        if _platform_system() == "Darwin" and _platform_machine().lower() in ("arm64", "aarch64"):
-            pkgs.append("mlx-vlm")
-        res["ran"].append(_pip(*pkgs, fake=fake))
-    elif layer.id == "automation":
-        res["ran"].append(_run_verb("job", "apply", fake=fake))
+    # FIX 5: if a multi-step install fails midway, `res["ran"]` holds the steps that DID succeed. A
+    # bare raise loses them (the caller only sees the exception), so attach the partial progress to the
+    # exception before re-raising — `_advance_all` reads `ops_partial_ran` to preserve step visibility.
+    try:
+        if layer.id == "skeleton":
+            res["ran"].append(_run_verb("doctor", "--init", fake=fake))
+        elif layer.id == "search":
+            # Venv-correct, isolated search layer (Task 10 / ADR-008 / FIX 2):
+            # (1) ensure $OPS_HOME/.venv (create/repair if missing or broken), (2) install ONLY the
+            # search deps into it (never the whole requirements.txt), (3) pull the embed model,
+            # (4) re-enter `ops index` — the dispatcher runs it on the .venv python, so lancedb/
+            # fastembed import for the build.
+            _ensure_venv(res, fake=fake)
+            res["ran"].append(_venv_pip(*_search_pip_args(), fake=fake))
+            res["ran"].append(_run(["ollama", "pull", _embed_model()], fake=fake))
+            res["ran"].append(_run_verb("index", fake=fake))
+        elif layer.id == "models":
+            # The .venv is the CANONICAL home for ALL optional deps (FIX 2): the file-processing
+            # packages install into the SAME venv the dispatcher prefers, so `ops files`/`enrich`/
+            # `doctor` see Pillow/trafilatura/mlx-vlm consistently instead of the old silent capability
+            # regression (installed into bare python, then invisible once .venv exists).
+            res["ran"].append(_run_verb("models", "pull", "--all", "--yes", fake=fake))
+            _ensure_venv(res, fake=fake)
+            pkgs = ["Pillow", "trafilatura"]
+            if _platform_system() == "Darwin" and _platform_machine().lower() in ("arm64", "aarch64"):
+                pkgs.append("mlx-vlm")
+            res["ran"].append(_venv_pip(*pkgs, fake=fake))
+        elif layer.id == "automation":
+            res["ran"].append(_run_verb("job", "apply", fake=fake))
+    except BaseException as exc:
+        exc.ops_partial_ran = list(res["ran"])
+        raise
     return res

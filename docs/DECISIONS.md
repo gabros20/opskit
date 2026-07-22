@@ -223,15 +223,22 @@ repo-local `.venv` was, by design, invisible to `ops` — the load-bearing gap.
 **Decision.** One contract, four rules:
 1. **Bare `python3` is the stdlib floor.** Every core verb works on it with no venv, no optional
    deps (the zero-install path is never broken — a regression test asserts it).
-2. **The optional `.venv` holds the SEARCH deps only.** `ops setup search` creates `$OPS_HOME/.venv`
-   and installs a *search-only* set (`requirements-search.txt` = lancedb + fastembed, a strict subset
-   of `requirements.txt`), NOT the whole file. The model/file-processing deps stay on the `models`
-   layer. The venv lives inside `$OPS_HOME` (path-wall-allowed) and is `.gitignore`d + rebuildable
-   (`rm -rf .venv && ops setup search --yes`) — a disposable cache, never truth (principle 1).
-3. **The dispatcher prefers `.venv/bin/python3` when it exists**, else bare `python3` — for the
-   guardrail, resolver, and every verb. This is the fix that makes a repo-local venv actually
-   load-bearing: `ops index`/`ops search` import the vector plane with no `PATH` surgery, and any
-   agent terminal inherits it for free because it runs the same `ops` script.
+2. **The optional `.venv` is the SINGLE home for ALL optional deps (search + models).** `ops setup
+   search` creates `$OPS_HOME/.venv` and installs the *search-only* set (`requirements-search.txt` =
+   lancedb + fastembed, a strict subset of `requirements.txt`) into it; `ops setup models` installs
+   the file-processing set (Pillow, trafilatura, +mlx-vlm on Apple Silicon) into the **same** venv.
+   Neither installs the whole `requirements.txt`. Each layer still owns its own dep subset — the venv
+   is just the shared, dispatcher-visible environment they land in. The venv lives inside `$OPS_HOME`
+   (path-wall-allowed) and is `.gitignore`d + rebuildable (`rm -rf .venv && ops setup search --yes
+   && ops setup models --yes`) — a disposable cache, never truth (principle 1).
+3. **The dispatcher prefers `.venv/bin/python3` when it exists AND starts**, else bare `python3` — for
+   the guardrail, resolver, and every verb. This is the fix that makes a repo-local venv actually
+   load-bearing: `ops index`/`ops search` import the vector plane, and `ops files`/`enrich`/`doctor`
+   see the file-processing deps, with no `PATH` surgery — and any agent terminal inherits it for free
+   because it runs the same `ops` script. The dispatcher (and setup's create-if-missing logic) probe
+   that the venv python actually *starts*, not merely that the symlink is executable: a `.venv` that
+   survived a system-python upgrade or ABI break falls back to bare `python3` instead of returning
+   126/127 on every verb, and a half-built `.venv` is repaired rather than trusted as complete.
 4. **Search readiness is OPERATIONAL, not "installed":** `deps-importable` (probed through the
    dispatcher's interpreter) + `model-pulled` (ollama reachable vs present, distinguished) +
    `index-built`; `OPS_VECTORS`/`OPS_RERANK` are advisory (surfaced as a handoff when unset).
@@ -239,8 +246,12 @@ repo-local `.venv` was, by design, invisible to `ops` — the load-bearing gap.
 stdlib floor is correct, but a venv the dispatcher can't see forces per-terminal PATH rituals that
 fail silently. Teaching the dispatcher to prefer it collapses two install stories into one, deletes
 the PATH-ordering footgun, and keeps the stdlib floor intact (no venv ⇒ bare `python3`, unchanged).
-Splitting search-only deps keeps the venv small and single-purpose, and lets the `models` layer own
-its own runtimes. **Status.** Done (this wave). `ops` prefers `.venv/bin/python3`; `ops setup search`
-provisions the venv + `requirements-search.txt` + model + index; docs collapsed to one story;
-`/.venv/` gitignored before any venv-creation code. Verified: full offline suite green in a
-`main==HEAD` clone.
+Making the venv the single home for BOTH dep sets closes a silent capability regression: installing
+the models deps into bare `sys.executable` while the dispatcher had already switched every verb to the
+venv left image/OCR/enrich/extract paths quietly downgraded (the deps were "installed" but invisible).
+One environment, dispatcher-preferred, keeps every optional dep consistently reachable. **Status.**
+Done. `ops` prefers `.venv/bin/python3` (with a start-probe, not just `-x`); `ops setup search`
+provisions the venv + `requirements-search.txt` + model + index, and `ops setup models` installs its
+file-processing deps into the SAME venv; a broken/half-built venv is repaired rather than trusted;
+docs collapsed to one story; `/.venv/` gitignored before any venv-creation code. Verified: full
+offline suite green in a `main==HEAD` clone.

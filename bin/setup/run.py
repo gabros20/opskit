@@ -98,8 +98,10 @@ def _advance_one(layer_id: str, *, yes: bool, dry: bool = False) -> int:
     before = setuplib.status(layer_id)[0]
     layer = next(layer for layer in setuplib.LAYERS if layer.id == layer_id)
     # A --dry-run is a READ (the guardrail already downgrades it): it previews the plan with fake=True
-    # and NEVER requires --yes, even for a confirm-class layer (Task 7a).
-    if not dry and before["status"] != "ready" and layer.gate == "confirm" and not yes:
+    # and NEVER requires --yes, even for a confirm-class layer (Task 7a). The confirm gate fires ONLY
+    # for a genuinely-attemptable layer (FIX 4): a blocked/not_applicable (or already-ready) layer is
+    # skipped, not installed, so demanding --yes for it would be a spurious exit 3.
+    if not dry and before["status"] not in SKIP_STATUSES and layer.gate == "confirm" and not yes:
         output.fail(output.EXIT_CONFIRM, _confirm_message(layer_id),
                     hint=f"re-run: ops setup {layer_id} --yes", verb="setup")
     try:
@@ -139,6 +141,9 @@ def _render_all(results: list[dict], handoffs: list[str], dry: bool = False) -> 
     for res in results:
         layer = res["layer"]
         if res.get("failed"):
+            # Surface the steps that DID run before the failure (FIX 5) so partial progress is visible.
+            for cmd in res.get("ran") or []:
+                lines.append(f"    {verb}: {cmd}")
             lines.append(f"  {layer}: FAILED — {res['failed']}")
         elif res["ran"]:
             lines.append(f"  {layer}: {'would advance' if dry else 'advanced'}")
@@ -165,12 +170,14 @@ def _advance_all(*, yes: bool, dry: bool = False) -> int:
     failed; 0 otherwise. `--dry-run` previews the plan (fake=True) and needs no --yes."""
     rows = {row["id"]: row for row in setuplib.status()}
     # Confirm gate (skipped for a dry-run, which is a read): name the confirm-class layers that would
-    # actually be attempted (not already-ready). Blocked/not_applicable layers can still appear here
-    # so the message stays honest about what --all covers; the attempt loop then skips them.
+    # actually be ATTEMPTED. Only genuinely-attemptable layers count (FIX 4) — a layer that is already
+    # ready, blocked on a missing prerequisite, or not_applicable is skipped by the attempt loop below,
+    # so it must not force a --yes it will never use (that was a spurious exit 3 on, e.g., a host with
+    # no ollama demanding --yes for a blocked search layer).
     if not dry:
         confirm = [layer.id for layer in setuplib.LAYERS
                    if layer.id in AUTO_LAYERS and layer.gate == "confirm"
-                   and rows[layer.id]["status"] != "ready"]
+                   and rows[layer.id]["status"] not in SKIP_STATUSES]
         if confirm and not yes:
             output.fail(output.EXIT_CONFIRM,
                         f"setup layers need --yes: {', '.join(confirm)}",
@@ -191,9 +198,16 @@ def _advance_all(*, yes: bool, dry: bool = False) -> int:
             results.append({**res, "layer": layer_id})
         except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
             attempted_failed = True
-            results.append({"layer": layer_id, "ran": [], "skipped": [], "handoff": [],
+            # FIX 5: keep the steps that DID run before the failure (advance attaches them to the
+            # exception), so a layer that ran N commands then failed on N+1 doesn't report `ran: []`.
+            partial = list(getattr(exc, "ops_partial_ran", []))
+            results.append({"layer": layer_id, "ran": partial, "skipped": [], "handoff": [],
                             "confirm_needed": False, "failed": _describe_failure(layer_id, exc)})
-    handoffs = _handoffs()
+    # FIX 5: aggregate every layer's remediation into the top-level handoff list ("refusals teach") —
+    # each blocked/not_applicable/skipped AUTO layer carried its `next` into its own res["handoff"]
+    # above; fold those in alongside the standing handoffs (backups, launchd load, git push), deduped.
+    handoffs = [h for res in results for h in res.get("handoff", [])]
+    handoffs = list(dict.fromkeys(h for h in [*handoffs, *_handoffs()] if h))
     payload = {"results": results, "handoff": handoffs}
     if dry:
         payload["dry_run"] = True

@@ -14,9 +14,17 @@ cron job) rather than your interactive shell. If keyword search works but vector
 **`ops setup search --yes` provisions everything, and the dispatcher finds it automatically.** That
 one command creates `$OPS_HOME/.venv`, installs *only* the search deps (`lancedb` + `fastembed`, from
 `requirements-search.txt`) into it, pulls the embedding model, and builds the index. The `ops`
-dispatcher then **prefers `$OPS_HOME/.venv/bin/python3` whenever it exists** — for the guardrail, the
-resolver, and every verb — so `ops index` / `ops search` import the vector plane with no manual `PATH`
-surgery. If there is no venv, the dispatcher falls back to bare `python3` (the stdlib keyword floor).
+dispatcher then **prefers `$OPS_HOME/.venv/bin/python3` whenever it exists and starts** — for the
+guardrail, the resolver, and every verb — so `ops index` / `ops search` import the vector plane with
+no manual `PATH` surgery. If there is no venv (or the venv python is broken — a stale symlink after a
+system-python upgrade), the dispatcher falls back to bare `python3` (the stdlib keyword floor) rather
+than failing every verb.
+
+> [!NOTE]
+> The `.venv` is the single home for **all** optional deps, not just search: `ops setup models --yes`
+> installs the file-processing deps (Pillow, trafilatura, mlx-vlm) into the same venv, so `ops files`
+> / `ops enrich` / `ops doctor` see them under the same dispatcher-preferred interpreter. This page
+> focuses on the search planes, but the interpreter contract below covers both.
 
 ```bash
 cd "$OPS_HOME"          # e.g. ~/ops
@@ -31,7 +39,8 @@ ops  ──►  $OPS_HOME/.venv/bin/python3   (if it exists — created by `ops 
 ```
 
 This is the whole contract (ADR-008): bare `python3` is the stdlib floor; the optional `.venv` holds
-the search deps; the dispatcher prefers it when present; **agent terminals inherit that for free** —
+all optional deps (search + models); the dispatcher prefers it when present and startable; **agent
+terminals inherit that for free** —
 they run the same `ops` script, so they get the same interpreter without any per-agent PATH ordering.
 Preview it first with `ops setup search --dry-run` (writes nothing, needs no `--yes`).
 
