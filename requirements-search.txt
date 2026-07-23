@@ -1,6 +1,6 @@
 # Personal OS — SEARCH-ONLY optional dependencies (the stage-2 vectors + stage-3 rerank planes).
 #
-# This is the isolated set `ops setup search` installs into $OPS_HOME/.venv (see ADR-008 and
+# This is the isolated set `ops setup search` installs into $OPS_HOME/.venv (see ADR-009 and
 # docs/agent-terminal-search.md). It is deliberately a STRICT SUBSET of requirements.txt: only the
 # packages the retrieval layer needs (lancedb + fastembed). The file-processing packages
 # (Pillow / trafilatura / mlx-vlm) belong to the `models` setup layer, NOT here — keeping the search

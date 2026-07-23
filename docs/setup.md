@@ -74,7 +74,7 @@ interpreter and report consistently. Re-running the relevant `ops setup <layer>`
 migrates that layer's deps into the venv. The venv is disposable and rebuildable
 (`rm -rf .venv && ops setup search --yes && ops setup models --yes`); a broken or half-built venv is
 repaired automatically on the next `ops setup search`/`models`. This is the single install story; see
-[ADR-008](DECISIONS.md) and [the agent-terminal guide](agent-terminal-search.md).
+[ADR-009](DECISIONS.md) and [the agent-terminal guide](agent-terminal-search.md).
 
 Blocked layers stay blocked and print the exact remediation in `next`. Backups are blocked because
 encrypted off-machine backup setup needs human choices and secrets (and `restic` installed):

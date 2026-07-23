@@ -256,7 +256,7 @@ file-processing deps into the SAME venv; a broken/half-built venv is repaired ra
 docs collapsed to one story; `/.venv/` gitignored before any venv-creation code. Verified: full
 offline suite green in a `main==HEAD` clone.
 
-## ADR-009 — First-run funnel: dashboard is the non-interactive form, `--wizard` the interactive one (2026-07-23)
+## ADR-010 — First-run funnel: dashboard is the non-interactive form, `--wizard` the interactive one (2026-07-23)
 **Context.** Roadmap Part 5.4 asks for a first-run experience that is a "wizard with ≤5 skippable
 prompts, vectors/jobs OFF" — a guided path that never surprises a new user with heavy installs. The
 layered `ops setup` engine (ADR added with the layered flow) already exposes every layer's state and a

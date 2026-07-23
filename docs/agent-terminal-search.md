@@ -38,7 +38,7 @@ ops  ──►  $OPS_HOME/.venv/bin/python3   (if it exists — created by `ops 
                                                └─ no  → keyword-only (a warning, never a crash)
 ```
 
-This is the whole contract (ADR-008): bare `python3` is the stdlib floor; the optional `.venv` holds
+This is the whole contract (ADR-009): bare `python3` is the stdlib floor; the optional `.venv` holds
 all optional deps (search + models); the dispatcher prefers it when present and startable; **agent
 terminals inherit that for free** —
 they run the same `ops` script, so they get the same interpreter without any per-agent PATH ordering.

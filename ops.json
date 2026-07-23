@@ -4,8 +4,8 @@
   "api_version": "1.0",
   "json_envelope": 1,
   "capabilities": {
-    "vectors": false,
-    "rerank": false,
+    "vectors": true,
+    "rerank": true,
     "agent": "none",
     "plugins": []
   },

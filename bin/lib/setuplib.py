@@ -22,7 +22,7 @@ REQUIRED_DIRS = ["wiki", "tasks/inbox", "tasks/active", "tasks/waiting", "tasks/
 # advisory-only: it never fails `ops doctor` and never causes a nonzero `--all` exit.
 STATUSES = {"ready", "partial", "absent", "blocked", "not_applicable"}
 
-# The SEARCH-ONLY dependency set (ADR-008): a strict subset of requirements.txt, isolated in
+# The SEARCH-ONLY dependency set (ADR-009): a strict subset of requirements.txt, isolated in
 # $OPS_HOME/.venv so the retrieval planes never drag in the file-processing packages (Pillow /
 # trafilatura / mlx-vlm) that belong to the `models` layer. requirements-search.txt is the source of
 # truth when present (the committed, human-followable install story); this inline mirror is the
@@ -121,7 +121,7 @@ def _usable_venv_python() -> str | None:
 
 
 def _ensure_venv(res: dict, *, fake: bool) -> None:
-    """Provision `$OPS_HOME/.venv` as the single home for ALL optional deps (search + models, ADR-008 /
+    """Provision `$OPS_HOME/.venv` as the single home for ALL optional deps (search + models, ADR-009 /
     FIX 2). Idempotent: a usable venv is left untouched; a MISSING or half-built/broken one is
     (re)created via the same start-probe as the dispatcher (FIX 3), so a partial `.venv` dir can't wedge
     a later `_venv_pip`. Records the create command in `res['ran']`. In fake/dry mode it only previews
@@ -133,7 +133,7 @@ def _ensure_venv(res: dict, *, fake: bool) -> None:
     if _usable_venv_python() is not None:
         return
     # Missing, or present-but-unstartable (stale symlink / ABI break): clear any partial tree so the
-    # create can't trip on it, then build fresh. .venv is a disposable, rebuildable cache (ADR-008).
+    # create can't trip on it, then build fresh. .venv is a disposable, rebuildable cache (ADR-009).
     if venv.exists():
         shutil.rmtree(venv, ignore_errors=True)
     res["ran"].append(_run([sys.executable, "-m", "venv", str(venv)], fake=fake))
@@ -141,7 +141,7 @@ def _ensure_venv(res: dict, *, fake: bool) -> None:
 
 def _search_interpreter() -> str:
     """The interpreter the dispatcher would pick for verbs: the repo-local .venv python when it exists
-    AND starts (ADR-008 / FIX 3), else whichever python3 is running us. What `deps-importable` must
+    AND starts (ADR-009 / FIX 3), else whichever python3 is running us. What `deps-importable` must
     probe."""
     return _usable_venv_python() or sys.executable
 
@@ -193,7 +193,7 @@ def _run_verb(verb: str, *args: str, fake: bool = False) -> str:
     directly — so doctor/models/job/index re-enter the guardrail + resolver + logs like any other
     caller. Non-recursive (none of these verbs call setup). OPS_SETUP_FAKE keeps a dry-run inert
     (the display string is recorded, nothing runs). The dispatcher itself prefers the .venv python
-    (ADR-008), so a re-entered `ops index` sees the vector deps with no PATH surgery here."""
+    (ADR-009), so a re-entered `ops index` sees the vector deps with no PATH surgery here."""
     return _run([str(paths.OPS_HOME / "ops"), verb, *args], fake=fake)
 
 
@@ -387,7 +387,7 @@ def advance(layer_id, *, yes: bool, fake: bool) -> dict:
         if layer.id == "skeleton":
             res["ran"].append(_run_verb("doctor", "--init", fake=fake))
         elif layer.id == "search":
-            # Venv-correct, isolated search layer (Task 10 / ADR-008 / FIX 2):
+            # Venv-correct, isolated search layer (Task 10 / ADR-009 / FIX 2):
             # (1) ensure $OPS_HOME/.venv (create/repair if missing or broken), (2) install ONLY the
             # search deps into it (never the whole requirements.txt), (3) pull the embed model,
             # (4) re-enter `ops index` — the dispatcher runs it on the .venv python, so lancedb/
