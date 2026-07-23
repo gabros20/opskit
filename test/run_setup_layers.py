@@ -53,7 +53,11 @@ def restore(mod, old):
         setattr(mod, name, value)
 
 
-def run_setup(args, home: Path, *, fake: bool = True):
+def run_setup(args, home: Path, *, fake: bool = True, assume_ollama: bool = True, extra_env=None):
+    # assume_ollama defaults True so these CLI subprocess tests are HOST-INDEPENDENT: the ollama-gated
+    # layers (search/models) stay attemptable+confirm on a runner with no ollama (Linux CI), instead
+    # of reporting `blocked` and skipping — which would make the confirm/failure-envelope assertions
+    # pass only on a Mac that happens to have ollama. Pass assume_ollama=False to test the blocked path.
     env = {
         **os.environ,
         "OPS_HOME": str(home),
@@ -64,6 +68,10 @@ def run_setup(args, home: Path, *, fake: bool = True):
         env["OPS_SETUP_FAKE"] = "1"
     else:
         env.pop("OPS_SETUP_FAKE", None)
+    if assume_ollama:
+        env["OPS_ASSUME_OLLAMA"] = "1"
+    if extra_env:
+        env.update(extra_env)
     return subprocess.run([sys.executable, str(REPO / "bin" / "setup" / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 
@@ -598,7 +606,12 @@ def main() -> int:
         check("setup fake search --yes records commands", fake_yes.returncode == 0 and "ollama pull" in fake_yes.stdout,
               fake_yes.stderr + fake_yes.stdout)
 
-        fail_json = run_setup(["automation", "--yes", "--json"], cli_home, fake=False)
+        # Deterministic action failure via the OPS_SETUP_FORCE_FAIL seam (host-independent): the layer
+        # raises inside advance() and the CLI must emit a clean exit-1 error envelope, no traceback.
+        # (Previously this leaned on automation actually failing, which only happened on macOS — off
+        # Darwin automation is not_applicable and would skip, so the failure path never ran on CI.)
+        fail_json = run_setup(["automation", "--yes", "--json"], cli_home, fake=False,
+                              extra_env={"OPS_SETUP_FORCE_FAIL": "automation"})
         try:
             fail_env = json.loads(fail_json.stdout)
             fail_json_ok = (fail_json.returncode == 1

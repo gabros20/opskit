@@ -97,7 +97,14 @@ def _embed_model() -> str:
 
 
 def _ollama_present() -> bool:
-    """Is the ollama binary on PATH? (The external prerequisite for pulling any local model.)"""
+    """Is the ollama binary on PATH? (The external prerequisite for pulling any local model.)
+
+    `OPS_ASSUME_OLLAMA` (truthy) forces this True — an install/test seam mirroring `OPS_SETUP_FAKE`:
+    it lets a host-independent test exercise the confirm/attemptable path for the ollama-gated layers
+    (search/models) on a machine or CI runner that has no ollama, and lets a user whose ollama lives
+    on a nonstandard PATH opt out of the `blocked` gate."""
+    if _truthy(os.environ.get("OPS_ASSUME_OLLAMA")):
+        return True
     return shutil.which("ollama") is not None
 
 
@@ -360,6 +367,13 @@ def _confirm(layer: Layer, yes: bool, res: dict) -> bool:
 def advance(layer_id, *, yes: bool, fake: bool) -> dict:
     layer = _layer(layer_id)
     res = _result()
+    # Test-only fault injection (`OPS_SETUP_FORCE_FAIL=<layer_id>`): raise a controlled action failure
+    # for the targeted layer BEFORE any skip/gate logic, so the CLI's error-envelope path
+    # (`_action_failed` → exit 1, no traceback) is exercised deterministically on any host — without
+    # depending on a real missing binary (which has side effects where the binary IS present). Never
+    # set in normal use.
+    if os.environ.get("OPS_SETUP_FORCE_FAIL", "") == layer_id:
+        raise subprocess.CalledProcessError(1, [f"ops setup {layer_id}", "(OPS_SETUP_FORCE_FAIL)"])
     before = status(layer.id)[0]
     if before["status"] == "ready":
         res["skipped"].append(layer.id)
