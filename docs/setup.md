@@ -10,6 +10,26 @@ first and reports `ready`, `partial`, `absent`, `blocked`, or `not_applicable` (
 can't run — e.g. launchd scheduling off macOS; advisory, never a failure). The full status contract
 is in [the machine contract §7](machine-contract.md#7-ops-setup-layer-status-enum).
 
+## Guided first-run (`ops setup --wizard`)
+
+The easiest way to finish setup interactively. `ops setup --wizard` walks the layers in order with
+**≤5 skippable prompts** and safe defaults pre-selected — skeleton **on** (required, safe), and
+search / models / automation **off** (no vectors, no model pulls, no scheduled jobs). Press Enter to
+accept each default; type `y`/`n` to override. Already-`ready` layers are noted and skipped;
+`blocked` / `not_applicable` layers show their reason and next step and are never prompted to install.
+Backups are never a yes/no here — the wizard prints the `ops backup init` handoff (it needs human
+secrets), never runs it. Each accepted layer advances through the *same* engine as everything below —
+there is no second code path.
+
+```sh
+ops setup --wizard
+```
+
+The wizard is **interactive-only**: with no tty (e.g. a piped `curl … | sh`), or combined with
+`--json` / `--dry-run`, it exits `2` and points you at the non-interactive forms
+(`ops setup --all --yes` to apply, `ops setup --json` to inspect). Those forms — and the granular
+per-layer controls — are below.
+
 ## Run the dashboard
 
 ```sh

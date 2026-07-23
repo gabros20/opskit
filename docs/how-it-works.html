@@ -377,7 +377,8 @@
       <ol class="steps">
         <li><div><b>Use this template → your own repo</b>, then clone it to <span class="mono">~/ops</span> (the path matters — the safety wall is rooted there).<code>git clone git@github.com:&lt;you&gt;/ops.git ~/ops &amp;&amp; cd ~/ops</code></div></li>
         <li><div><b>Run setup</b> — puts <span class="mono">ops</span> on your PATH, creates the sibling roots, tracks the template as fetch-only <span class="mono">upstream</span>, runs a health check, makes the first commit. It never pushes.<code>./script/setup --lean</code></div></li>
-        <li><div><b>Make it live</b> — push to your GitHub; optionally enable semantic search and schedule the nightly jobs.<code>git push -u origin main</code><div class="cap">Later: <span class="mono">./script/update</span> pulls only engine files from upstream — your notes are never touched.</div></div></li>
+        <li><div><b>Make it live</b> — push to your GitHub, then finish the optional layers with the guided first-run: <span class="mono">ops setup --wizard</span> (≤5 skippable prompts, safe defaults — search/models/jobs off). Or <span class="mono">ops setup --all --yes</span> non-interactively.<code>git push -u origin main
+ops setup --wizard</code><div class="cap">Later: <span class="mono">./script/update</span> pulls only engine files from upstream — your notes are never touched.</div></div></li>
       </ol>
     </div>
     <p class="tip" style="text-align:center;margin-top:22px">That's the whole system — <b>30 verbs</b>, one git repo, four roots, guardrailed, and yours. ✦</p>

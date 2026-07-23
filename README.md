@@ -75,8 +75,11 @@ to overwrite an existing install. Read it before you pipe it (that's the point o
 curl --proto '=https' --tlsv1.2 -fsSL \
   https://raw.githubusercontent.com/gabros20/personal-operating-system/main/script/get -o get.sh
 shasum -a 256 get.sh   # compare against get.sh.sha256 published beside it
-sh get.sh
+sh get.sh              # installs a LEAN vault, non-interactively (add --full to keep the dev test/ tree)
 ```
+Then finish setup with the guided first-run — **`ops setup --wizard`** (≤5 skippable prompts, safe
+defaults: skeleton on, search/models/automation off) — or **`ops setup --all --yes`** to advance
+every safe layer non-interactively.
 
 **Kick the tyres first (`--demo`).** Clone into a throwaway tmp dir seeded with example notes — the
 roots, the `ops` symlink, and completion all land *inside* that one dir, so `capture`/`search`/`week`
@@ -101,10 +104,12 @@ sh get.sh --demo        # prints the vault path and the one directory to delete
 3. **Make it live:**
    ```sh
    git push -u origin main                                        # your repo, your GitHub
-   ops setup                                                      # finish optional local layers
+   ops setup --wizard                                             # guided first-run (or: ops setup --all --yes)
    ```
-   Follow the layered checklist for semantic search, local models, backups, and scheduled jobs:
-   [`docs/setup.md`](docs/setup.md).
+   `ops setup --wizard` walks the optional layers interactively; `ops setup` (no args) is the
+   read-only dashboard, `ops setup --all --yes` advances every safe layer, and `ops setup <layer>
+   --dry-run` previews one without installing. Full reference — semantic search, local models,
+   backups, and scheduled jobs: [`docs/setup.md`](docs/setup.md).
 
 Now `ops` works from anywhere. Pull engine improvements later without touching your notes:
 ```sh
