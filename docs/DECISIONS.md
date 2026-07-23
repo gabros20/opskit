@@ -255,3 +255,33 @@ provisions the venv + `requirements-search.txt` + model + index, and `ops setup 
 file-processing deps into the SAME venv; a broken/half-built venv is repaired rather than trusted;
 docs collapsed to one story; `/.venv/` gitignored before any venv-creation code. Verified: full
 offline suite green in a `main==HEAD` clone.
+
+## ADR-009 — First-run funnel: dashboard is the non-interactive form, `--wizard` the interactive one (2026-07-23)
+**Context.** Roadmap Part 5.4 asks for a first-run experience that is a "wizard with ≤5 skippable
+prompts, vectors/jobs OFF" — a guided path that never surprises a new user with heavy installs. The
+layered `ops setup` engine (ADR added with the layered flow) already exposes every layer's state and a
+one-door `advance()`; what was missing was the *interactive* front for someone typing at a terminal.
+**Decision.** Two forms over ONE engine — no second advance path:
+1. **`ops setup` (dashboard) + `ops setup --all --yes` are the NON-INTERACTIVE form.** A read-only
+   status table plus a best-effort batch advance for agents, CI, and piped installs. This is what the
+   `curl … | sh` funnel and `--json` consumers use.
+2. **`ops setup --wizard` is the INTERACTIVE form.** A pure-stdlib `input()` loop, one skippable
+   prompt per layer in `LAYERS` order, with SAFE DEFAULTS pre-selected: skeleton ON (required,
+   safe-write), search/models/automation OFF (vectors OFF, no model pulls, jobs OFF), backups never a
+   yes/no (a printed `ops backup init` handoff, never auto-run — it is `gate="blocked"`, needs human
+   secrets). Already-ready layers are noted and skipped; blocked/not_applicable layers show their
+   reason + `next` and are not prompted. Each accepted layer advances through the SAME
+   `setuplib.advance(id, yes=True, fake=…)` the dashboard/`--all` use.
+   **tty-guard:** interactive-only. No tty, or `--json`/`--dry-run` paired with `--wizard`, exits `2`
+   (EXIT_USAGE) printing the exact non-interactive alternatives (`ops setup --all --yes`,
+   `ops setup --json`, `ops setup --all --dry-run`) — "refusals teach". `--dry-run` is refused rather
+   than previewed because the wizard's advance is real (fake only under `OPS_SETUP_FAKE`); a preview
+   would need a second code path, and the dashboard already owns the non-interactive preview.
+**Why.** One engine, two faces keeps the machine contract (`--json`, exit codes, `advance()`) intact
+while giving a human a guided, safe-by-default door. The prompt/answer loop is factored around an
+injected input-callable and output-callable (`_run_wizard(rows, ask, say)`), so the accepted-layers
+behaviour is unit-testable with scripted answers and no real tty. **Status.** Done. `--wizard`
+implemented in `bin/setup/run.py` (`_run_wizard`, `_ask_yes_no`, `_wizard` guard); `cmd.json`/`ops.json`
+mention it; `script/setup`'s closing banner points at it as the guided next step; the `curl … | sh`
+funnel (`script/get`) installs LEAN + non-interactive by default with a `--full` contributor escape
+hatch. Together the dashboard + wizard fulfil roadmap Part 5.4.

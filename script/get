@@ -16,13 +16,16 @@
 # We never auto-verify our own hash — that would be theatre; verification is the reader's, pre-run.)
 #
 # Usage:
-#   script/get [--demo] [--dry-run] [--dir PATH] [--repo URL] [--yes]
+#   script/get [--demo] [--full] [--dry-run] [--dir PATH] [--repo URL] [--yes]
 #     --demo      clone into a THROWAWAY tmp dir seeded with example notes; capture/search/week work
 #                 immediately. Prints the one directory to delete to walk away. Touches nothing else.
+#     --full      keep the dev-only test/ + ref/ tree (for contributors). Default is a LEAN vault
+#                 (engine + content; test/+ref/ dropped, restorable from upstream).
 #     --dry-run   print every step, change nothing (no clone, no setup).
 #     --dir PATH  install location (default: $HOME/ops; env OPS_GET_DIR).
 #     --repo URL  clone source        (default: the upstream template; env OPS_GET_REPO).
-#     --yes       pass through to setup (non-interactive).
+#     --yes       accepted for compatibility; the real install is ALWAYS non-interactive now
+#                 (so a piped `curl … | sh` never blocks), so this flag is a no-op.
 #
 # Homebrew stance: a formula would clone vault CONTENT into a brew-owned prefix — the exact opposite
 # of a user-owned repo. If we ever ship a tap it is ONLY a tiny bootstrapper that runs THIS script
@@ -32,11 +35,12 @@ set -euo pipefail
 
 REPO_URL="${OPS_GET_REPO:-https://github.com/gabros20/personal-operating-system.git}"
 TARGET="${OPS_GET_DIR:-$HOME/ops}"
-DEMO=0; DRY=0; YES=0
+DEMO=0; DRY=0; YES=0; FULL=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --demo) DEMO=1 ;;
+    --full) FULL=1 ;;
     --dry-run) DRY=1 ;;
     --dir) shift; TARGET="$1" ;;
     --repo) shift; REPO_URL="$1" ;;
@@ -135,8 +139,12 @@ ENGINE_REF=""
 [ "$DRY" = 1 ] || ENGINE_REF="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
 
 say "2. hand off to the one setup path (script/setup)"
-SETUP_ARGS=""
-[ "$YES" = 1 ] && SETUP_ARGS="--yes"
+# The funnel install is ALWAYS non-interactive (`--yes`) so a piped `curl … | sh` never blocks on
+# setup's lean/full prompt, and defaults to a LEAN vault — passing `--lean` explicitly so `--yes`
+# never silently falls through to FULL (setup's `--yes`-without-a-lean-choice default). `--full`
+# keeps the dev-only test/+ref/ tree for contributors.
+SETUP_ARGS="--yes"
+if [ "$FULL" = 1 ]; then SETUP_ARGS="$SETUP_ARGS --full"; else SETUP_ARGS="$SETUP_ARGS --lean"; fi
 [ "$DRY" = 1 ] && SETUP_ARGS="$SETUP_ARGS --dry-run"
 [ -n "$ENGINE_REF" ] && SETUP_ARGS="$SETUP_ARGS --engine-ref $ENGINE_REF"
 if [ "$DRY" = 1 ] && [ ! -x "$TARGET/script/setup" ]; then

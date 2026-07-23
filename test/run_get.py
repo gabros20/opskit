@@ -38,6 +38,24 @@ def main() -> int:
         check("dry-run shows the clone step", "git clone" in r.stdout)
         check("dry-run shows the setup hand-off", "script/setup" in r.stdout)
 
+        # Task 12: the real install is LEAN + non-interactive BY DEFAULT (a piped curl|sh must never
+        # block on setup's lean prompt and must never silently fall through to FULL). The dry-run of
+        # the real branch surfaces the exact setup args it would hand off.
+        check("default real install passes --yes (non-interactive)", "--yes" in r.stdout, r.stdout)
+        check("default real install passes --lean", "--lean" in r.stdout, r.stdout)
+        check("default real install does NOT pass --full", "--full" not in r.stdout, r.stdout)
+
+        # --full escape hatch: contributors keep the dev-only test/+ref/ tree.
+        rf = run(["--full", "--dry-run"], tmp / "dryfull")
+        check("--full real install passes --full, not --lean",
+              rf.returncode == 0 and "--full" in rf.stdout and "--lean" not in rf.stdout,
+              rf.stdout + rf.stderr)
+
+        # --demo branch is UNCHANGED: it still installs the full tree in the throwaway dir.
+        rd = run(["--demo", "--dry-run"], tmp / "drydemo")
+        check("--demo still hands off --full --yes --no-commit",
+              rd.returncode == 0 and "--full --yes --no-commit" in rd.stdout, rd.stdout + rd.stderr)
+
         # refuse to overwrite a non-empty existing install
         existing = tmp / "existing"
         existing.mkdir()

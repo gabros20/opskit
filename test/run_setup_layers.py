@@ -414,6 +414,63 @@ def main() -> int:
         finally:
             setup_run.setuplib.status, setup_run.setuplib.advance = _saved5
 
+        # --- Task 11: the interactive `--wizard`. The prompt/answer loop is factored around an
+        # injected input-callable (`ask`) and output-callable (`say`) so it is unit-testable WITHOUT a
+        # real tty: we drive `_run_wizard` in-process with scripted answers and capture every printed
+        # line. Safe defaults: skeleton ON (Enter accepts), search/models/automation OFF, backups a
+        # printed handoff (never prompted). ---
+        check("wizard default-Y accepted on Enter", setup_run._ask_yes_no("x", True, lambda p: "") is True)
+        check("wizard default-N skipped on Enter", setup_run._ask_yes_no("x", False, lambda p: "") is False)
+        check("wizard explicit 'y' overrides default-N", setup_run._ask_yes_no("x", False, lambda p: "y") is True)
+        check("wizard explicit 'n' overrides default-Y", setup_run._ask_yes_no("x", True, lambda p: "n") is False)
+        check("wizard closed stdin (EOF) takes the safe default",
+              setup_run._ask_yes_no("x", True, lambda p: (_ for _ in ()).throw(EOFError())) is True)
+
+        wiz_rows = [
+            {"id": "skeleton", "title": "Vault structure", "status": "absent", "required": True,
+             "detail": "", "items": [], "next": "ops setup skeleton"},
+            {"id": "search", "title": "Semantic search", "status": "absent", "required": False,
+             "detail": "", "items": [], "next": "ops setup search --yes"},
+            {"id": "backups", "title": "Durability", "status": "blocked", "required": False,
+             "detail": "backup setup needs human initialization", "items": [], "next": "ops backup init"},
+            {"id": "models", "title": "File-processing", "status": "ready", "required": False,
+             "detail": "file-processing models ready", "items": [], "next": ""},
+            {"id": "automation", "title": "Schedules", "status": "absent", "required": False,
+             "detail": "", "items": [], "next": "ops setup automation"},
+        ]
+        wiz_calls = []
+
+        def wiz_advance(layer_id, *, yes, fake):
+            wiz_calls.append((layer_id, yes))
+            r = mod._result()
+            r["ran"].append(f"did {layer_id}")
+            return r
+
+        # Prompts fire only for attemptable layers, in LAYERS order: skeleton, search, automation.
+        # Answers: Enter (accept default-Y skeleton), Enter (skip default-N search), 'y' (accept automation).
+        wiz_answers = iter(["", "", "y"])
+        wiz_lines = []
+        _saved_w = setup_run.setuplib.advance
+        setup_run.setuplib.advance = wiz_advance
+        try:
+            wiz_summary = setup_run._run_wizard(wiz_rows, lambda p: next(wiz_answers), wiz_lines.append)
+        finally:
+            setup_run.setuplib.advance = _saved_w
+        wiz_out = "\n".join(wiz_lines)
+        check("wizard advances accepted layers via the SAME advance(yes=True)",
+              wiz_calls == [("skeleton", True), ("automation", True)], str(wiz_calls))
+        check("wizard skips a default-N layer left at its default (search)",
+              "search" in wiz_summary["skipped"] and "search" not in [c[0] for c in wiz_calls],
+              str(wiz_summary))
+        check("wizard summary lists what advanced", wiz_summary["advanced"] == ["skeleton", "automation"],
+              str(wiz_summary))
+        check("wizard notes an already-ready layer and never advances it",
+              "already ready" in wiz_out and ("models", True) not in wiz_calls, wiz_out)
+        check("wizard surfaces the backups handoff (never prompts/auto-runs it)",
+              "ops backup init" in wiz_out and ("backups", True) not in wiz_calls, wiz_out)
+        check("wizard prints standing next-steps (push + backup init)",
+              "git push -u origin main" in wiz_out, wiz_out)
+
         os.environ.pop("OPS_SETUP_FAKE", None)
 
         # --- FIX 3: ONE usable-venv probe (start-probe, not os.path.exists) shared by the dispatcher
@@ -509,6 +566,22 @@ def main() -> int:
         check("setup --all without yes exits confirm", all_preview.returncode == 3, all_preview.stderr + all_preview.stdout)
         check("setup --all names confirm layers", "search" in all_preview.stderr and "models" in all_preview.stderr,
               all_preview.stderr + all_preview.stdout)
+
+        # Task 11 tty-guard: `--wizard` over a pipe (no tty, as here under capture) must NOT prompt —
+        # exit 2 and print the exact non-interactive alternatives. `--wizard --json` likewise exits 2.
+        wiz_notty = run_setup(["--wizard"], cli_home)
+        check("setup --wizard without a tty exits usage (2)", wiz_notty.returncode == 2,
+              wiz_notty.stderr + wiz_notty.stdout)
+        check("setup --wizard non-tty names the non-interactive alternatives",
+              "ops setup --all --yes" in (wiz_notty.stderr + wiz_notty.stdout)
+              and "ops setup --json" in (wiz_notty.stderr + wiz_notty.stdout),
+              wiz_notty.stderr + wiz_notty.stdout)
+        wiz_json = run_setup(["--wizard", "--json"], cli_home)
+        check("setup --wizard --json exits usage (2)", wiz_json.returncode == 2,
+              wiz_json.stderr + wiz_json.stdout)
+        wiz_dry = run_setup(["--wizard", "--dry-run"], cli_home)
+        check("setup --wizard --dry-run exits usage (2)", wiz_dry.returncode == 2,
+              wiz_dry.stderr + wiz_dry.stdout)
 
         backups_cli = run_setup(["backups", "--yes"], cli_home)
         check("setup backups --yes exits ok", backups_cli.returncode == 0, backups_cli.stderr + backups_cli.stdout)

@@ -137,7 +137,8 @@ fi
 echo
 say "done. next (these are yours to run — setup never pushes):"
 cat <<EOF
-  • advance local layers:      ops setup --all --yes   (or 'ops setup' for the read-only dashboard)
+  • finish setup (guided):     ops setup --wizard      (interactive first-run, safe defaults)
+                    or all-in:  ops setup --all --yes   (non-interactive; 'ops setup' = dashboard)
   • point at your GitHub:      git -C "$ROOT" remote set-url origin git@github.com:<you>/ops.git
                                git -C "$ROOT" push -u origin main
   • daily:                     ops start  ·  ops capture "…"  ·  ops triage  ·  ops close

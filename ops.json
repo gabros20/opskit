@@ -712,7 +712,7 @@
     {
       "verb": "setup",
       "summary": "layered installer dashboard and idempotent setup runner",
-      "usage": "ops setup [<layer> [--yes] | --all [--yes]]",
+      "usage": "ops setup [<layer> [--yes] | --all [--yes] | --wizard]",
       "risk": "safe_write",
       "args": [
         {
@@ -729,6 +729,10 @@
         },
         {
           "name": "--dry-run",
+          "required": false
+        },
+        {
+          "name": "--wizard",
           "required": false
         }
       ],
@@ -750,7 +754,7 @@
         "Python environment / site-packages (pip install, confirm-gated)",
         "~/.ollama/models (model pulls, confirm-gated)"
       ],
-      "hints": "Bare `ops setup` is a read-only layered dashboard. `ops setup <layer>` advances one layer idempotently. Search and model layers can install Python packages and pull Ollama models into external stores, so they require `--yes`; backups is a human handoff and is never included in `--all`. `--dry-run` previews any advance (single layer or `--all`) without installing/writing and needs no `--yes`.",
+      "hints": "Bare `ops setup` is a read-only layered dashboard. `ops setup <layer>` advances one layer idempotently. `ops setup --wizard` is a guided, interactive first-run: one skippable prompt per layer with safe defaults (skeleton on; search/models/automation off), interactive-only (needs a tty; not with --json/--dry-run \u2014 those exit 2 pointing at `ops setup --all --yes` / `ops setup --json`). Search and model layers can install Python packages and pull Ollama models into external stores, so they require `--yes`; backups is a human handoff and is never included in `--all`. `--dry-run` previews any advance (single layer or `--all`) without installing/writing and needs no `--yes`.",
       "dry_run": true,
       "output": {
         "mode": "rows",

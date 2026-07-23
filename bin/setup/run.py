@@ -217,15 +217,125 @@ def _advance_all(*, yes: bool, dry: bool = False) -> int:
     return output.EXIT_UNEXPECTED if attempted_failed else output.EXIT_OK
 
 
-USAGE = "usage: ops setup [<layer> [--yes] | --all [--yes]] [--dry-run]"
+# Safe defaults for the interactive wizard (Task 11 / roadmap 5.4 "≤5 skippable prompts, vectors/jobs
+# OFF"): the required, safe-write skeleton is pre-selected ON; the heavy/opt-in layers default OFF (no
+# vectors, no model pulls, no scheduled jobs). backups is never a yes/no here — it's a human handoff
+# (gate="blocked"), surfaced as a printed next-step, never auto-run.
+WIZARD_DEFAULTS = {"skeleton": True, "search": False, "models": False, "automation": False}
+
+
+def _ask_yes_no(prompt: str, default: bool, ask) -> bool:
+    """One stdlib yes/no prompt, factored so the wizard is unit-testable without a real tty:
+    `ask(text)->str` supplies the raw line (real path: builtin `input`). An empty line (just Enter)
+    takes the SAFE DEFAULT; a closed stdin (EOFError) also takes it. Only an explicit y/yes or n/no
+    overrides."""
+    suffix = "[Y/n]" if default else "[y/N]"
+    try:
+        raw = ask(f"  {prompt} {suffix} ").strip().lower()
+    except EOFError:
+        return default
+    if not raw:
+        return default
+    return raw in ("y", "yes")
+
+
+def _run_wizard(rows, ask, say) -> dict:
+    """The guided first-run loop (Task 11), factored so it is testable with injected I/O:
+    `ask(text)->str` supplies answers (real path: `input`), `say(text)` receives each printed line
+    (real path: `print`). Walks setuplib.LAYERS order, ONE skippable prompt per attemptable layer with
+    a safe default. Accepted layers advance through the SAME `setuplib.advance(id, yes=True, ...)` the
+    dashboard/`--all` use (no second advance path). Already-ready layers are noted and skipped;
+    blocked/not_applicable layers show their reason + handoff and are never prompted to install.
+    Returns {advanced, skipped, handoff}."""
+    advanced: list[str] = []
+    skipped: list[str] = []
+    handoffs: list[str] = []
+    say("ops setup — guided first run")
+    say("  safe defaults are pre-selected; press Enter to accept each.")
+    say("  search / models / automation default to OFF (no vectors, no model pulls, no jobs).")
+    for row in rows:
+        lid, status = row["id"], row["status"]
+        if status == "ready":
+            say(f"  {GLYPHS['ready']} {lid}: already ready — skipping")
+            continue
+        if status in ("blocked", "not_applicable"):
+            say(f"  {GLYPHS.get(status, '—')} {lid}: {row['detail']}")
+            nxt = row.get("next") or ""
+            if nxt:
+                say(f"      do this yourself: {nxt}")
+                handoffs.append(nxt)
+            skipped.append(lid)
+            continue
+        # Attemptable (partial/absent): the one skippable prompt, pre-set to the safe default.
+        if not _ask_yes_no(f"set up {lid} — {row['title']}?", WIZARD_DEFAULTS.get(lid, False), ask):
+            say(f"  skip {lid}")
+            skipped.append(lid)
+            continue
+        try:
+            res = setuplib.advance(lid, yes=True, fake=_fake())
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
+            say(f"  {lid}: FAILED — {_describe_failure(lid, exc)}")
+            skipped.append(lid)
+            continue
+        if res["ran"]:
+            advanced.append(lid)
+            say(f"  {lid}: advanced")
+            for cmd in res["ran"]:
+                say(f"    ran: {cmd}")
+        else:
+            skipped.append(lid)
+            say(f"  {lid}: no changes")
+        for item in res.get("handoff", []):
+            handoffs.append(item)
+    handoffs = list(dict.fromkeys(handoffs))
+    say("")
+    say("summary:")
+    say(f"  advanced: {', '.join(advanced) if advanced else '(none)'}")
+    say(f"  skipped:  {', '.join(skipped) if skipped else '(none)'}")
+    if handoffs:
+        say("  outstanding handoffs:")
+        for item in handoffs:
+            say(f"    [ ] {item}")
+    say("")
+    say("next steps (yours to run — setup never pushes):")
+    say("  • point origin at your GitHub and push:  git push -u origin main")
+    say("  • configure encrypted backups:           ops backup init")
+    say("  • re-check state anytime:                ops setup   (read-only dashboard)")
+    return {"advanced": advanced, "skipped": skipped, "handoff": handoffs}
+
+
+def _wizard(*, json_on: bool, dry: bool) -> int:
+    # tty-guard (Task 11): the wizard is interactive-only. No tty, or a machine/preview mode
+    # (--json / --dry-run) paired with it, means we must NOT prompt — fail with exit 2 and print the
+    # exact non-interactive alternatives ("refusals teach"). --dry-run is refused rather than silently
+    # advancing: the wizard's advance path is real (fake only under OPS_SETUP_FAKE), so a --dry-run
+    # here could not preview without a second code path; point at the dashboard's own preview instead.
+    if json_on or dry or not sys.stdin.isatty():
+        output.fail(output.EXIT_USAGE,
+                    "ops setup --wizard is interactive-only (needs a tty; not with --json or --dry-run)",
+                    hint="non-interactive instead: `ops setup --all --yes` to apply, "
+                         "`ops setup --json` to inspect, `ops setup --all --dry-run` to preview",
+                    verb="setup")
+    _run_wizard(setuplib.status(), input, print)
+    return output.EXIT_OK
+
+
+USAGE = "usage: ops setup [<layer> [--yes] | --all [--yes] | --wizard] [--dry-run]"
 
 
 def main(argv: list[str]) -> int:
-    _, argv = output.parse_argv(argv)
+    json_on, argv = output.parse_argv(argv)
     yes = "--yes" in argv or "-y" in argv
     all_ = "--all" in argv
     dry = "--dry-run" in argv  # a true preview: advance with fake=True, write nothing, never need --yes
-    argv = [a for a in argv if a not in ("--yes", "-y", "--all", "--dry-run")]
+    wizard = "--wizard" in argv
+    argv = [a for a in argv if a not in ("--yes", "-y", "--all", "--dry-run", "--wizard")]
+    if wizard:
+        if all_ or argv:
+            output.fail(output.EXIT_USAGE,
+                        "ops setup --wizard walks every layer — pass no <layer> and not --all",
+                        hint="run: ops setup --wizard", verb="setup")
+        return _wizard(json_on=json_on, dry=dry)
     if all_ and argv:
         output.fail(output.EXIT_USAGE, USAGE, verb="setup")
     if all_:
