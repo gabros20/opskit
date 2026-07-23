@@ -8,6 +8,34 @@ on:
   workflow_dispatch:
 
 jobs:
+  bootstrap-hash:
+    # The install funnel's integrity ritual (README + script/get) tells a user to compare their
+    # downloaded get.sh against the published script/get.sh.sha256. This job keeps that promise real:
+    # it recomputes the hash and FAILS if the committed file drifted from script/get — a detection
+    # gate that teaches the exact regeneration command. It NEVER commits or pushes (CI mutating the
+    # repo would be its own footgun); fixing a mismatch is the author's one-liner.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: verify script/get.sh.sha256 matches script/get
+        run: |
+          if [ ! -f script/get.sh.sha256 ]; then
+            echo "script/get.sh.sha256 is missing — regenerate it:"
+            echo "  shasum -a 256 script/get | awk '{print \$1\"  get.sh\"}' > script/get.sh.sha256"
+            exit 1
+          fi
+          actual="$(shasum -a 256 script/get | awk '{print $1}')"
+          published="$(awk '{print $1}' script/get.sh.sha256)"
+          if [ "$actual" != "$published" ]; then
+            echo "script/get.sh.sha256 is STALE (script/get changed but the hash wasn't updated)."
+            echo "  published: $published"
+            echo "  actual:    $actual"
+            echo "regenerate and commit:"
+            echo "  shasum -a 256 script/get | awk '{print \$1\"  get.sh\"}' > script/get.sh.sha256"
+            exit 1
+          fi
+          echo "ok: script/get.sh.sha256 matches script/get ($actual)"
+
   offline-suites:
     runs-on: ubuntu-latest
     steps:
