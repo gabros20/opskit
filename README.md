@@ -213,9 +213,12 @@ behind the *same* guardrail. Three layers make that reliable:
 envelope (`{"ops_json": 1, "ok": …, "data"|"error": …}`; NDJSON rows for list verbs). Exit codes are a
 protocol, not an accident: `0` ok · `2` usage · `3` needs `--yes` · `4` not found · `5` denied — and
 error messages carry the exact remediation, so a refusal teaches the caller the correct next call.
-[`ops.json`](ops.json) v2 is the complete I/O contract: every verb's args, output schema, risk class,
-source (engine or plugin), and a usage hint — plus a `capabilities` block (vectors? reranker? which
-agent?) re-detected on every regeneration. Details: [`docs/machine-contract.md`](docs/machine-contract.md).
+[`ops.json`](ops.json) (`ops.json/3`) is the complete I/O contract: every verb's args, output schema,
+risk class, display group, source (engine or plugin), a usage hint, and — for compound verbs — an
+`actions[]` array describing each subcommand's typed args + completion providers, plus a
+`capabilities` block (vectors? reranker? which agent?) re-detected on every regeneration. `ops complete
+--json` returns completion candidates from the same contract. Details:
+[`docs/machine-contract.md`](docs/machine-contract.md).
 
 **3. The transport (how a host connects).** For hosts that speak [MCP](https://modelcontextprotocol.io),
 `ops mcp` is a **stateless stdio server** — spawned per session, dies with it (no daemon, no HTTP, no

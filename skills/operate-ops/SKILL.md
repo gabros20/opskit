@@ -22,6 +22,16 @@ NEVER invent a verb. If a task needs something not in the manifest, say so and p
 adding a verb — do not script around the surface, do not reach for raw tools to do what a
 verb already does.
 
+`ops.json` is schema `ops.json/3`: besides each verb's top-level `args`/`risk`, a compound
+verb carries an `actions[]` array — the full subcommand grammar (per-action name, typed
+`args` with `enum`/`complete` provider/`required`, per-action `risk` and `dry_run`). Read it
+to know a subcommand's exact shape instead of guessing from prose. `ops complete --json
+<partial words…>` returns candidate `{value, description, kind}` rows for any argument (the
+same brain shell tab-completion uses). Per-action `risk` is descriptive (the verb self-gates
+`confirm` subactions on `--yes`, exit 3) — never pre-append `--yes`; let the verb refuse and
+read the exact re-run from its error. `ops ui` is the HUMAN terminal UI — not for you; you
+drive verbs by flags + `--json`, which is the better surface for an agent.
+
 ## 3. Orientation — run this at the start of every session
 1. Read today's and yesterday's `journal/YYYY/MM/*.md` to see what already happened.
 2. Run `ops status` (active/waiting tasks, last close/backup/index).
@@ -116,6 +126,9 @@ Discover the live, authoritative set with `ops help`; this is the working summar
 - Tasks:             `ops task list|add "<title>"|show <id>|move <id> <status>|done <id>`
 - Knowledge:         `ops wiki open <slug>|new <type> <name>|backlinks <slug>|stale|orphans`
 - Filing:            `ops triage` (text → tasks/wiki) · `ops files ingest` (binaries → ~/files + shadow note)
+  - `ops triage` walks the inbox interactively; to apply a decision programmatically (with `--json`),
+    use `ops triage decide <item> task|note|skip` and `ops triage drafts decide <slug> accept|reject|skip`
+    — the human still owns the call, but this is the non-interactive way to record it.
   - `ops files extract <slug>` turns an ingested source into a searchable derived note
     (`wiki/files/<slug>.extract.md`) — tier auto-detected by media type: PDF → markdown
     (pymupdf4llm, `--heavy` for docling), audio → transcript (`--lang`, `--diarize` for speaker
@@ -147,12 +160,14 @@ Discover the live, authoritative set with `ops help`; this is the working summar
 - Work scaffolding:  `ops new project|client "<name>"` (asks/uses the routing tree above)
 - Repo lifecycle:    `ops repo health|clone <p>|clone --all` · `ops archive <project>` (dead repo → bundle)
 - Business:          `ops invoice <client>` (DRAFT only; reads tax-formula.md; never sends)
-- System:            `ops status` · `ops doctor` · `ops setup [<layer>] [--all] [--yes]`
+- System:            `ops status` · `ops doctor` · `ops setup [<layer>] [--all] [--yes|--wizard]`
   (layered installer; paired with `ops doctor` as checker; see
   [`docs/setup.md`](../../docs/setup.md)) · `ops backup` · `ops index` · `ops job …` · `ops sweep`
+  · `ops complete --json` (completion candidates) · `ops ui` (human TUI — not for agents)
 
 `triage`, `files ingest`, and `invoice` PROPOSE; the human approves. `archive`, `sweep`,
-and anything mutating support `--dry-run` — use it when unsure what a verb will do.
+`start`/`close`/`week`, and anything mutating support `--dry-run` — use it when unsure what a
+verb will do (a dry-run is a read, so it needs no `--yes`).
 
 ## 7. Working inside a ~/work repo
 - FIRST read that repo's `AGENTS.md` and use its `script/*` commands; never invent build

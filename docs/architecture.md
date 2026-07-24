@@ -110,6 +110,15 @@ what Obsidian *renders* — no server, no plugin API dependency. The first **bui
 deliberately thin (Raycast script commands that shell to `ops`), proving the `--json` surface before
 anything heavier earns its keep. Mobile is documentation, not an app: git is the only sync transport.
 
+The next built tier is **`ops ui`** — a human terminal UI, kept in its own repo (a separate `ops-ui`
+binary the `bin/ui/` shim launches). It is the human *face* of the same one door: it reads `ops.json`
+(the `actions[]` grammar) to generate menus + forms so nothing has to be memorized, and every action
+it takes re-enters `ops <verb> --json` as a subprocess — the guardrail and `.logs/` see it exactly as
+they see an agent. Two faces, one door: humans drive `ops ui`, agents drive `ops <verb> --flags`; the
+enriched `ops.json/3` contract (grammar single-sourced, completion derived from it) is what makes the
+generated human UI possible without a second copy of the surface. Building it lives outside this repo,
+so the stdlib-only engine stays dependency-free.
+
 ## The knowledge pipeline: provenance as the safety mechanism
 
 Turning artifacts into knowledge involves models, and models hallucinate. The pipeline's design rule:
