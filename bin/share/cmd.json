@@ -30,5 +30,63 @@
       "agent_url": "string"
     }
   },
-  "dry_run": true
+  "dry_run": true,
+  "actions": [
+    {
+      "name": "publish",
+      "summary": "publish a note as one unguessable capability URL (invoked as `ops share <slug>`, no keyword)",
+      "risk": "confirm",
+      "dry_run": true,
+      "default": true,
+      "args": [
+        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the note slug to publish", "example": "the-ops-loop" },
+        { "name": "--expires", "type": "string", "required": false, "default": "7d", "help": "link TTL (e.g. 7d, 24h)" },
+        { "name": "--out", "type": "path", "required": false, "help": "also write the rendered HTML here (for inspection)" },
+        { "name": "--gist", "type": "flag", "required": false, "help": "secret-gist fallback instead of the Worker" }
+      ]
+    },
+    {
+      "name": "collection",
+      "summary": "publish every note carrying a tag as one bundle",
+      "risk": "confirm",
+      "dry_run": true,
+      "args": [
+        { "name": "tag", "type": "string", "required": true, "help": "the tag to collect (with or without leading #)" },
+        { "name": "--expires", "type": "string", "required": false, "default": "7d", "help": "link TTL" },
+        { "name": "--out", "type": "path", "required": false, "help": "also write the rendered HTML here" },
+        { "name": "--gist", "type": "flag", "required": false, "help": "secret-gist fallback" }
+      ]
+    },
+    {
+      "name": "list",
+      "summary": "the local share ledger",
+      "risk": "read",
+      "args": []
+    },
+    {
+      "name": "pull",
+      "summary": "fetch + unpack a published bundle's markdown locally",
+      "risk": "read",
+      "args": [
+        { "name": "url", "type": "string", "required": true, "help": "the share URL to pull", "example": "https://<worker>/<id>" },
+        { "name": "--out", "type": "path", "required": false, "help": "write the markdown here instead of stdout" }
+      ]
+    },
+    {
+      "name": "revoke",
+      "summary": "delete a published blob; needs --yes",
+      "risk": "confirm",
+      "args": [
+        { "name": "id", "type": "string", "required": true, "help": "the share id from `ops share list`" }
+      ]
+    },
+    {
+      "name": "init",
+      "summary": "deploy the share Worker + provision the publish token; needs --yes",
+      "risk": "confirm",
+      "args": [
+        { "name": "--endpoint", "type": "string", "required": false, "help": "the Worker endpoint URL" }
+      ]
+    }
+  ]
 }

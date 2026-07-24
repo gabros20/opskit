@@ -83,6 +83,64 @@ def main() -> int:
         unknown, _ = comp(h, "definitelynotaverb")
         check("__complete unknown verb → no candidates", unknown == [], str(unknown))
 
+        # ---- ops.json/3 (Wave 2): completion is DERIVED from actions[] — no table can drift ----
+        surface_doc = json.loads((REPO / "ops.json").read_text())
+        drift = []
+        for v in surface_doc["verbs"]:
+            acts = v.get("actions")
+            if not acts:
+                continue
+            expect = {a["name"] for a in acts if not a.get("default")}  # keyworded subactions
+            subs, _ = comp(h, v["verb"])
+            if not expect.issubset(set(subs)):
+                drift.append((v["verb"], sorted(expect - set(subs))))
+        check("__complete subactions == every compound verb's actions[] names (no drift)",
+              not drift, str(drift))
+        # wave-2 verbs specifically (they had no hardcoded table before)
+        ssub, _ = comp(h, "share")
+        check("__complete share → keyworded subactions + publish's note slugs (tokenless default)",
+              {"collection", "list", "pull", "revoke", "init"} <= set(ssub)
+              and "publish" not in ssub and "alpha" in ssub, str(ssub))
+        bsub, _ = comp(h, "backup")
+        check("__complete backup → subactions, no tokenless 'nag' keyword",
+              {"status", "run", "drill", "bundle", "init"} <= set(bsub) and "nag" not in bsub, str(bsub))
+        msub, _ = comp(h, "models")
+        check("__complete models → subactions", {"list", "status", "stop", "pull", "test"} <= set(msub), str(msub))
+        kv, _ = comp(h, "repo", "clone", "--kind")
+        check("__complete repo clone --kind → enum values", {"products", "labs", "tools"} <= set(kv), str(kv))
+        # files asset args use the narrow asset-slug provider (wiki/files/*), NOT every note
+        note(h, "files/q3-report.md", "file", "Q3 Report")
+        fopen, _ = comp(h, "files", "open")
+        check("__complete files open → asset slugs only (not arbitrary notes)",
+              "q3-report" in fopen and "alpha" not in fopen, str(fopen))
+
+        # ---- ops complete --json: the structured completion contract (Wave 2) ----
+        def cjson(*prior):
+            r = run(h, "complete", *prior, "--json")
+            objs = [json.loads(ln) for ln in r.stdout.splitlines() if ln.strip()]
+            return objs, r
+
+        objs, r = cjson("task", "move", "T-20260101-01")
+        head, rows = (objs[0] if objs else {}), objs[1:]
+        check("ops complete --json: rows header (verb=complete, count matches)",
+              head.get("ops_json") == 1 and head.get("ok") is True and head.get("verb") == "complete"
+              and head.get("count") == len(rows), r.stdout[:160])
+        check("ops complete --json: rows carry value/description/kind",
+              bool(rows) and all({"value", "description", "kind"} <= set(row) for row in rows), str(rows[:2]))
+        # move's status arg is declared `type: enum` (a closed set) → kind "enum" (inline enum wins
+        # over the redundant `complete: status` hint, which yields the same values)
+        check("ops complete --json task move <id> → enum-kind status rows",
+              {row["value"] for row in rows} >= {"active", "waiting", "done"}
+              and all(row["kind"] == "enum" for row in rows), str(rows))
+        vobjs, _ = cjson()
+        check("ops complete --json (no words) → verb-kind rows incl. task",
+              len(vobjs) > 1 and all(row["kind"] == "verb" for row in vobjs[1:])
+              and any(row["value"] == "task" for row in vobjs[1:]), str(vobjs[:2]))
+        # human (non-json) mode still prints candidates, no envelope
+        rh = run(h, "complete", "task")
+        check("ops complete (human) prints candidates, no envelope",
+              "add" in rh.stdout and "ops_json" not in rh.stdout, rh.stdout[:120])
+
     # ---- guardrail lets __complete through the real dispatcher (risk: read) ----
     d = subprocess.run([str(REPO / "ops"), "__complete", "wiki"], capture_output=True, text=True)
     check("dispatcher runs __complete (guardrail: read)", d.returncode == 0 and "open" in d.stdout, d.stdout + d.stderr)

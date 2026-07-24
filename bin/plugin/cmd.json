@@ -20,5 +20,45 @@
       "source": "string",
       "commit": "string"
     }
-  }
+  },
+  "actions": [
+    {
+      "name": "list",
+      "summary": "installed packs + trust state (the default action)",
+      "risk": "read",
+      "args": []
+    },
+    {
+      "name": "add",
+      "summary": "install a pack (capped at confirm until trusted); needs --yes",
+      "risk": "confirm",
+      "args": [
+        { "name": "target", "type": "string", "required": true, "help": "owner/repo, a local path, optionally @tag", "example": "acme/ops-pack@v1" }
+      ]
+    },
+    {
+      "name": "trust",
+      "summary": "let a pack's verbs run at their declared risk; needs --yes",
+      "risk": "confirm",
+      "args": [
+        { "name": "name", "type": "string", "required": true, "help": "the installed pack name" }
+      ]
+    },
+    {
+      "name": "update",
+      "summary": "update an installed pack; needs --yes",
+      "risk": "confirm",
+      "args": [
+        { "name": "name", "type": "string", "required": true, "help": "the installed pack name" }
+      ]
+    },
+    {
+      "name": "remove",
+      "summary": "remove an installed pack; needs --yes",
+      "risk": "confirm",
+      "args": [
+        { "name": "name", "type": "string", "required": true, "help": "the installed pack name" }
+      ]
+    }
+  ]
 }

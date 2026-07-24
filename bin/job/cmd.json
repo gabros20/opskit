@@ -29,5 +29,29 @@
       "warns": "list"
     }
   },
-  "dry_run": true
+  "dry_run": true,
+  "actions": [
+    {
+      "name": "list",
+      "summary": "the job registry with validation flags (the default action)",
+      "risk": "read",
+      "args": []
+    },
+    {
+      "name": "run",
+      "summary": "run one job now, through the dispatcher",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": [
+        { "name": "name", "type": "string", "required": true, "help": "the job name from `ops job list`" }
+      ]
+    },
+    {
+      "name": "apply",
+      "summary": "render launchd plists for the schedulable jobs",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": []
+    }
+  ]
 }

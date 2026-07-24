@@ -53,7 +53,7 @@
       "risk": "safe_write",
       "dry_run": true,
       "args": [
-        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the shadow-note slug to extract", "example": "acme-contract" },
+        { "name": "slug", "type": "slug", "required": true, "complete": "asset-slug", "help": "the shadow-note slug to extract", "example": "acme-contract" },
         { "name": "--reextract", "type": "flag", "required": false, "help": "force re-extraction even if bytes + tool are unchanged" },
         { "name": "--heavy", "type": "flag", "required": false, "help": "allow a heavier extractor tier (e.g. docling for PDF)" },
         { "name": "--lang", "type": "string", "required": false, "help": "language hint for ASR (audio/video)" },
@@ -67,7 +67,7 @@
       "risk": "safe_write",
       "dry_run": true,
       "args": [
-        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the shadow-note slug whose extract to distill", "example": "acme-contract" }
+        { "name": "slug", "type": "slug", "required": true, "complete": "asset-slug", "help": "the shadow-note slug whose extract to distill", "example": "acme-contract" }
       ]
     },
     {
@@ -75,7 +75,7 @@
       "summary": "attach an already-ingested asset to a hub note",
       "risk": "safe_write",
       "args": [
-        { "name": "file", "type": "slug", "required": true, "complete": "note-slug", "help": "the asset (shadow-note) slug", "example": "acme-contract" },
+        { "name": "file", "type": "slug", "required": true, "complete": "asset-slug", "help": "the asset (shadow-note) slug", "example": "acme-contract" },
         { "name": "hub", "type": "slug", "required": true, "complete": "hub", "help": "the hub note to file it under", "example": "acme" }
       ]
     },
@@ -92,7 +92,7 @@
       "summary": "reveal an asset in Finder via its shadow note",
       "risk": "read",
       "args": [
-        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the shadow-note slug to reveal", "example": "acme-contract" }
+        { "name": "slug", "type": "slug", "required": true, "complete": "asset-slug", "help": "the shadow-note slug to reveal", "example": "acme-contract" }
       ]
     }
   ]

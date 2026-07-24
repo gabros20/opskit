@@ -151,6 +151,9 @@ top-level `args`/`risk`/`output`/`dry_run`, which continue to describe the **def
                                        //   Omitted ⇒ the verb's top-level risk applies (inherited).
     "dry_run": true,                   // this action honours --dry-run (optional bool).
                                        //   Omitted ⇒ it does NOT — no inheritance from top-level.
+    "default": false,                  // optional bool; true marks the TOKENLESS default action —
+                                       //   the one that runs when no subcommand keyword is given
+                                       //   (`ops share <slug>`, bare `ops backup`). ≤1 per verb.
     "args": [                          // positional args + flags, IN ORDER (required; may be empty)
       { "name": "title", "type": "string", "required": true,
         "help": "the task title", "example": "Fix the Acme webhook" },
@@ -168,14 +171,21 @@ a positional. The rest are optional.
 | `name` | the positional name, or `--flag` for an option (required) |
 | `type` | `string` \| `int` \| `enum` \| `slug` \| `path` \| `flag` (required). `flag` = a valueless boolean switch |
 | `enum` | the allowed values, a list — **required when `type` is `enum`** |
-| `complete` | which live completion provider feeds this arg: `note-slug` \| `task-id` \| `hub` \| `note-type` \| `status` \| `layer` (optional) |
-| `required` | `true` for a mandatory positional (optional; default `false`) |
+| `complete` | which live completion provider feeds this arg: `note-slug` \| `asset-slug` \| `task-id` \| `hub` \| `note-type` \| `status` \| `layer` (optional). `asset-slug` is the binary-asset subset of `note-slug` (`wiki/files/*`); `layer` is reserved for a future setup-layer completion |
+| `required` | `true` for a mandatory arg — a positional, **or** a value-flag that must be supplied (e.g. `repo adopt --kind`), which a form generator renders as a mandatory field (optional; default `false`) |
 | `default` | the value used when the arg is omitted (optional) |
 | `help` | one-line description (optional) |
 | `example` | a sample value for a generated form's placeholder (optional) |
 
 Rules a consumer can rely on:
-- The `name` values, in order, are the exact set of subcommand tokens the verb accepts.
+- The `name` values are the subcommand tokens the verb accepts — **except** an action marked
+  `"default": true`, whose `name` is a descriptive label, not a typed token. A default action is the
+  one selected when the first argument is not another action's name: for most compound verbs that is
+  also a real keyword (`task list`, `files ingest` — discoverable from the top-level `args[0].default`),
+  but two verbs have a **tokenless** default — `share` (`ops share <slug>` publishes; there is no
+  `publish` keyword) and `backup` (bare `ops backup` nags). For a tokenless default a consumer must not
+  offer the `name` as a literal completion; it offers the action's first positional's values instead
+  (this is exactly what `ops complete` does — see §8). There is at most one `default` action per verb.
 - Each action's `args` are listed in invocation order.
 - **`risk` inherits, `dry_run` does not.** A per-action `risk` omitted ⇒ the verb's top-level `risk`
   applies to that subcommand. A per-action `dry_run` omitted ⇒ that subcommand does **not** honour
@@ -222,3 +232,35 @@ to its exit code. `--all` is otherwise best-effort: it advances every attemptabl
 iff some *attempted* layer failed (a semantic at-risk exit per §2, not a crash; the envelope `ok`
 stays `true` and the per-layer `results` carry each failure). Reading `next` is how an agent learns
 the remediation for a `blocked` layer — it must never invent an install command from `detail`.
+
+## 8. The completion contract (`ops complete --json`)
+
+`ops complete [<typed word>...] [--json]` returns the candidates for the **next** word, given the words
+already typed after `ops` (everything *before* the word being completed). It is the structured sibling
+of the zsh helper `ops __complete` (which prints the same candidates as lossy `value:description` text);
+both share one brain (`bin/lib/completion.py`) that derives everything from the verb surface + each
+compound verb's `actions[]`/args (§5.1) and the live content providers. There are **no** hardcoded
+subaction tables anywhere — the grammar in `cmd.json` is the single source, so completion, `ops help`,
+the MCP layer, and a future TUI can never drift apart.
+
+Rows (NDJSON, the standard §1 rows envelope — a header then one object per candidate):
+
+```json
+{"ops_json": 1, "ok": true, "verb": "complete", "count": 4}
+{"value": "inbox",  "description": "",             "kind": "status"}
+{"value": "active", "description": "",             "kind": "status"}
+```
+
+| Row field | Meaning |
+|---|---|
+| `value` | the completion candidate (the literal next word) |
+| `description` | a short human hint (an action's summary, a note's type, a task's status+title; may be empty) |
+| `kind` | `verb` \| `action` \| `enum` \| a provider name (`note-slug`/`asset-slug`/`task-id`/`hub`/`note-type`/`status`/`layer`) — what the candidate *is*, so a UI can group/icon them |
+
+Resolution mirrors §5.1: with no words, `kind: "verb"` rows; after a compound verb, its keyworded
+action names (`kind: "action"`) plus, for a tokenless-default verb, its default action's first
+positional's values; within an action, the values for the next positional (or a value-flag's value) —
+from that arg's `enum` (`kind: "enum"`) or its `complete` provider. Pass only the words **before** the
+one being completed (`ops complete task move` lists statuses; `ops complete wiki open` lists note slugs).
+`test/run_completion.py` asserts this shape and that the offered subactions equal each verb's `actions[]`
+names (the anti-drift gate).

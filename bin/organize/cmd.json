@@ -31,5 +31,38 @@
       "status": "string"
     }
   },
-  "dry_run": true
+  "dry_run": true,
+  "actions": [
+    {
+      "name": "scan",
+      "summary": "zero-LLM candidate generation into the typed proposal queue (the default action)",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": []
+    },
+    {
+      "name": "review",
+      "summary": "accept/reject/defer queued ops (audit ledger; shows each op's diff)",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": [
+        { "name": "--accept", "type": "string", "required": false, "help": "op ids to accept (comma/space-separated), or 'all'" },
+        { "name": "--reject", "type": "string", "required": false, "help": "op ids to reject, or 'all'" },
+        { "name": "--defer", "type": "string", "required": false, "help": "op ids to defer, or 'all'" },
+        { "name": "--file", "type": "path", "required": false, "help": "the queue file to operate on (default: the newest inbox/organize/*.jsonl)" }
+      ]
+    },
+    {
+      "name": "apply",
+      "summary": "deterministically replay APPROVED ops (one commit per op); needs --yes",
+      "risk": "confirm",
+      "dry_run": true,
+      "args": [
+        { "name": "--safe-only", "type": "flag", "required": false, "help": "apply only the four additive primitives above 0.8 confidence" },
+        { "name": "--max-ops", "type": "int", "required": false, "default": 20, "help": "edit-budget ceiling on op count (flags may only lower it)" },
+        { "name": "--max-lines", "type": "int", "required": false, "default": 300, "help": "edit-budget ceiling on changed lines" },
+        { "name": "--file", "type": "path", "required": false, "help": "the queue file to operate on (default: the newest inbox/organize/*.jsonl)" }
+      ]
+    }
+  ]
 }

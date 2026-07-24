@@ -32,5 +32,54 @@
       "at_risk": "bool"
     }
   },
-  "dry_run": true
+  "dry_run": true,
+  "actions": [
+    {
+      "name": "nag",
+      "summary": "read-only commit/push nag (bare `ops backup`; exit 1 = at risk)",
+      "risk": "read",
+      "default": true,
+      "args": []
+    },
+    {
+      "name": "status",
+      "summary": "restic snapshot age per target (exit 1 if stale/unconfigured)",
+      "risk": "read",
+      "args": []
+    },
+    {
+      "name": "run",
+      "summary": "restic backup of the working set; cloud always needs --yes",
+      "risk": "confirm",
+      "dry_run": true,
+      "args": [
+        { "name": "--target", "type": "enum", "required": false, "default": "local", "enum": ["local", "cloud"], "help": "which restic target to back up to" }
+      ]
+    },
+    {
+      "name": "drill",
+      "summary": "restore the latest snapshot to a temp dir and diff; needs --yes",
+      "risk": "confirm",
+      "args": []
+    },
+    {
+      "name": "bundle",
+      "summary": "rotated `git bundle --all` of ~/ops + every ~/work repo",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": []
+    },
+    {
+      "name": "init",
+      "summary": "write .backup/config.json + render the launchd plist (human-run once); needs --yes",
+      "risk": "confirm",
+      "args": [
+        { "name": "--local-repo", "type": "string", "required": false, "help": "local restic repo path" },
+        { "name": "--cloud-repo", "type": "string", "required": false, "help": "cloud restic repo (e.g. b2:bucket:ops)" },
+        { "name": "--password-ref", "type": "string", "required": false, "help": "1Password op:// reference for the restic password" },
+        { "name": "--b2-account-ref", "type": "string", "required": false, "help": "op:// reference for the B2 account id" },
+        { "name": "--b2-key-ref", "type": "string", "required": false, "help": "op:// reference for the B2 append-only key" }
+      ]
+    }
+  ]
 }

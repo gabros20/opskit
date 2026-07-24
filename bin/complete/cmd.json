@@ -1,0 +1,27 @@
+{
+  "verb": "complete",
+  "summary": "structured completion candidates for the next word (the TUI/agent completion contract)",
+  "usage": "ops complete [<typed word>...] [--json]",
+  "risk": "read",
+  "args": [
+    {
+      "name": "words",
+      "required": false
+    }
+  ],
+  "reads": [
+    "bin/*/cmd.json",
+    "wiki/",
+    "tasks/"
+  ],
+  "writes": [],
+  "hints": "The completion contract: given the words already typed after `ops`, emit the candidates for the NEXT word as structured rows {value, description, kind} — kind is verb|action|enum|<provider> (note-slug|task-id|hub|note-type|status|layer). Same brain as zsh tab-completion (`ops __complete`), derived live from each verb's cmd.json actions[]/args (no hardcoded tables). Use --json for the machine rows; without it, one `value  description` per line. Common mistake: passing the word being completed — pass only the words BEFORE it (e.g. `ops complete task move` lists statuses).",
+  "output": {
+    "mode": "rows",
+    "fields": {
+      "value": "string",
+      "description": "string",
+      "kind": "string"
+    }
+  }
+}

@@ -116,7 +116,7 @@ def main() -> int:
     # --- ops.json/3: every verb carries a display `group`; declared `actions[]` are well-formed ---
     ARG_TYPES = {"string", "int", "enum", "slug", "path", "flag"}
     RISK_ENUM = {"read", "safe_write", "draft_only", "confirm", "deny"}
-    COMPLETE_PROVIDERS = {"note-slug", "task-id", "hub", "note-type", "status", "layer"}
+    COMPLETE_PROVIDERS = {"note-slug", "asset-slug", "task-id", "hub", "note-type", "status", "layer"}
     dverbs = doc.get("verbs", [])
     check("every verb carries a non-empty group",
           all(isinstance(v.get("group"), str) and v.get("group") for v in dverbs),
@@ -135,6 +135,8 @@ def main() -> int:
                 return False, f"action {a['name']} bad risk {a['risk']}"
             if "dry_run" in a and not isinstance(a["dry_run"], bool):
                 return False, f"action {a['name']} dry_run not bool"
+            if "default" in a and not isinstance(a["default"], bool):
+                return False, f"action {a['name']} default not bool"
             for arg in a["args"]:
                 if not isinstance(arg.get("name"), str) or not arg["name"]:
                     return False, f"{a['name']}: arg missing name: {arg}"
@@ -150,12 +152,30 @@ def main() -> int:
         if "actions" in v:
             ok, why = _actions_wellformed(v)
             check(f"{v['verb']}: actions[] well-formed (ops.json/3)", ok, why)
-    # the three compound verbs enriched in wave 1 specifically carry actions[]
+            ndefault = sum(1 for a in v["actions"] if a.get("default"))
+            check(f"{v['verb']}: at most one default action", ndefault <= 1, f"{ndefault} defaults")
+    # every compound verb (wave 1 + wave 2) carries a non-empty actions[]
     by_verb = {v["verb"]: v for v in dverbs}
-    for v in ("task", "wiki", "files"):
+    for v in ("task", "wiki", "files", "organize", "share", "repo", "job", "backup",
+              "models", "plugin", "new"):
         acts = by_verb.get(v, {}).get("actions")
         check(f"{v}: declares a non-empty actions[]", isinstance(acts, list) and len(acts) > 0,
               str(acts)[:120])
+    # the two tokenless-default verbs mark their default action
+    for v in ("share", "backup"):
+        acts = by_verb.get(v, {}).get("actions", [])
+        check(f"{v}: has a default:true action (tokenless default)",
+              any(a.get("default") for a in acts), str([a["name"] for a in acts]))
+
+    # --- the completion contract verb (ops complete): visible, read-class, right output shape ---
+    comp = by_verb.get("complete")
+    check("complete: verb present in ops.json/3", isinstance(comp, dict), "missing")
+    if comp:
+        check("complete: risk read", comp.get("risk") == "read", str(comp.get("risk")))
+        cfields = comp.get("output", {}).get("fields", {})
+        check("complete: output rows {value,description,kind}",
+              comp.get("output", {}).get("mode") == "rows"
+              and all(f in cfields for f in ("value", "description", "kind")), str(cfields))
 
     # --- live --json round-trip against a seeded fixture world ---
     with tempfile.TemporaryDirectory() as td:

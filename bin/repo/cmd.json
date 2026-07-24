@@ -31,5 +31,40 @@
       "flags": "list",
       "clean": "bool"
     }
-  }
+  },
+  "actions": [
+    {
+      "name": "health",
+      "summary": "fleet health table (the default action; exit 1 = repos need attention)",
+      "risk": "read",
+      "args": []
+    },
+    {
+      "name": "clone",
+      "summary": "clone one project repo by slug, or --all missing ones",
+      "risk": "safe_write",
+      "args": [
+        { "name": "slug", "type": "string", "required": false, "help": "the project slug to clone (omit with --all)" },
+        { "name": "--all", "type": "flag", "required": false, "help": "clone every project missing from ~/work" },
+        { "name": "--kind", "type": "enum", "required": false, "default": "labs", "enum": ["products", "labs", "tools"], "help": "the ~/work subtree to clone into" }
+      ]
+    },
+    {
+      "name": "adopt",
+      "summary": "adopt an existing repo path into the ~/work fleet",
+      "risk": "safe_write",
+      "args": [
+        { "name": "path", "type": "path", "required": true, "help": "the repo path to adopt" },
+        { "name": "--kind", "type": "enum", "required": true, "enum": ["products", "labs", "tools"], "help": "the ~/work subtree to file it under" }
+      ]
+    },
+    {
+      "name": "nuke-modules",
+      "summary": "delete stale node_modules across the fleet",
+      "risk": "safe_write",
+      "args": [
+        { "name": "--stale", "type": "int", "required": false, "default": 30, "help": "only dirs untouched for this many days" }
+      ]
+    }
+  ]
 }

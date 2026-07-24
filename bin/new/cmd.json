@@ -35,5 +35,37 @@
       "hub": "string"
     }
   },
-  "dry_run": true
+  "dry_run": true,
+  "actions": [
+    {
+      "name": "project",
+      "summary": "scaffold a project: wiki hub + ~/work repo",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": [
+        { "name": "name", "type": "string", "required": true, "help": "the project name (slugified)", "example": "Acme Redesign" },
+        { "name": "--kind", "type": "enum", "required": false, "default": "labs", "enum": ["products", "labs", "tools"], "help": "the ~/work subtree for the repo" }
+      ]
+    },
+    {
+      "name": "client",
+      "summary": "scaffold a client: wiki hub + ~/files tree",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": [
+        { "name": "name", "type": "string", "required": true, "help": "the client name (slugified)", "example": "Acme Inc" }
+      ]
+    },
+    {
+      "name": "verb",
+      "summary": "scaffold a new bin/<name>/ command stub",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": [
+        { "name": "name", "type": "slug", "required": true, "help": "the verb name (the bin/<name>/ dir)", "example": "digest" },
+        { "name": "--risk", "type": "enum", "required": false, "enum": ["read", "safe_write", "draft_only", "confirm", "deny"], "help": "the guardrail class for the new verb" },
+        { "name": "--summary", "type": "string", "required": false, "help": "the one-line summary for the stub's cmd.json" }
+      ]
+    }
+  ]
 }

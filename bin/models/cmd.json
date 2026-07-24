@@ -25,5 +25,47 @@
       "runtime": "string",
       "available": "bool"
     }
-  }
+  },
+  "actions": [
+    {
+      "name": "list",
+      "summary": "each stage's configured model, runtime, and availability (pure probes)",
+      "risk": "read",
+      "args": []
+    },
+    {
+      "name": "status",
+      "summary": "resident models (`ollama ps`)",
+      "risk": "read",
+      "args": []
+    },
+    {
+      "name": "stop",
+      "summary": "unload a resident model (reloads on next use; no --yes)",
+      "risk": "safe_write",
+      "args": [
+        { "name": "model", "type": "string", "required": false, "help": "the model to stop (omit with --all)" },
+        { "name": "--all", "type": "flag", "required": false, "help": "unload every resident model" }
+      ]
+    },
+    {
+      "name": "pull",
+      "summary": "download a stage's model (can be gigabytes); needs --yes",
+      "risk": "confirm",
+      "args": [
+        { "name": "--stage", "type": "enum", "required": false, "enum": ["stt", "ocr", "vlm", "enrich", "embed", "rerank"], "help": "which stage's model to pull (omit with --all)" },
+        { "name": "--all", "type": "flag", "required": false, "help": "pull every ollama-managed stage's model" }
+      ]
+    },
+    {
+      "name": "test",
+      "summary": "run a stage's model on a sample/--input and print output + timing; needs --yes",
+      "risk": "confirm",
+      "args": [
+        { "name": "stage", "type": "enum", "required": true, "enum": ["stt", "ocr", "vlm", "enrich", "embed", "rerank"], "help": "which stage to test" },
+        { "name": "--model", "type": "string", "required": false, "help": "override the stage's configured model (A/B a candidate)" },
+        { "name": "--input", "type": "path", "required": false, "help": "input file (required for stt/ocr/vlm)" }
+      ]
+    }
+  ]
 }

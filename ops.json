@@ -78,6 +78,90 @@
         }
       },
       "dry_run": true,
+      "actions": [
+        {
+          "name": "nag",
+          "summary": "read-only commit/push nag (bare `ops backup`; exit 1 = at risk)",
+          "risk": "read",
+          "default": true,
+          "args": []
+        },
+        {
+          "name": "status",
+          "summary": "restic snapshot age per target (exit 1 if stale/unconfigured)",
+          "risk": "read",
+          "args": []
+        },
+        {
+          "name": "run",
+          "summary": "restic backup of the working set; cloud always needs --yes",
+          "risk": "confirm",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "--target",
+              "type": "enum",
+              "required": false,
+              "default": "local",
+              "enum": [
+                "local",
+                "cloud"
+              ],
+              "help": "which restic target to back up to"
+            }
+          ]
+        },
+        {
+          "name": "drill",
+          "summary": "restore the latest snapshot to a temp dir and diff; needs --yes",
+          "risk": "confirm",
+          "args": []
+        },
+        {
+          "name": "bundle",
+          "summary": "rotated `git bundle --all` of ~/ops + every ~/work repo",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": []
+        },
+        {
+          "name": "init",
+          "summary": "write .backup/config.json + render the launchd plist (human-run once); needs --yes",
+          "risk": "confirm",
+          "args": [
+            {
+              "name": "--local-repo",
+              "type": "string",
+              "required": false,
+              "help": "local restic repo path"
+            },
+            {
+              "name": "--cloud-repo",
+              "type": "string",
+              "required": false,
+              "help": "cloud restic repo (e.g. b2:bucket:ops)"
+            },
+            {
+              "name": "--password-ref",
+              "type": "string",
+              "required": false,
+              "help": "1Password op:// reference for the restic password"
+            },
+            {
+              "name": "--b2-account-ref",
+              "type": "string",
+              "required": false,
+              "help": "op:// reference for the B2 account id"
+            },
+            {
+              "name": "--b2-key-ref",
+              "type": "string",
+              "required": false,
+              "help": "op:// reference for the B2 append-only key"
+            }
+          ]
+        }
+      ],
       "source": "engine",
       "group": "SYSTEM"
     },
@@ -182,6 +266,35 @@
       },
       "source": "engine",
       "group": "FLOW"
+    },
+    {
+      "verb": "complete",
+      "summary": "structured completion candidates for the next word (the TUI/agent completion contract)",
+      "usage": "ops complete [<typed word>...] [--json]",
+      "risk": "read",
+      "args": [
+        {
+          "name": "words",
+          "required": false
+        }
+      ],
+      "reads": [
+        "bin/*/cmd.json",
+        "wiki/",
+        "tasks/"
+      ],
+      "writes": [],
+      "hints": "The completion contract: given the words already typed after `ops`, emit the candidates for the NEXT word as structured rows {value, description, kind} \u2014 kind is verb|action|enum|<provider> (note-slug|task-id|hub|note-type|status|layer). Same brain as zsh tab-completion (`ops __complete`), derived live from each verb's cmd.json actions[]/args (no hardcoded tables). Use --json for the machine rows; without it, one `value  description` per line. Common mistake: passing the word being completed \u2014 pass only the words BEFORE it (e.g. `ops complete task move` lists statuses).",
+      "output": {
+        "mode": "rows",
+        "fields": {
+          "value": "string",
+          "description": "string",
+          "kind": "string"
+        }
+      },
+      "source": "engine",
+      "group": "SYSTEM"
     },
     {
       "verb": "consolidate",
@@ -375,7 +488,7 @@
               "name": "slug",
               "type": "slug",
               "required": true,
-              "complete": "note-slug",
+              "complete": "asset-slug",
               "help": "the shadow-note slug to extract",
               "example": "acme-contract"
             },
@@ -421,7 +534,7 @@
               "name": "slug",
               "type": "slug",
               "required": true,
-              "complete": "note-slug",
+              "complete": "asset-slug",
               "help": "the shadow-note slug whose extract to distill",
               "example": "acme-contract"
             }
@@ -436,7 +549,7 @@
               "name": "file",
               "type": "slug",
               "required": true,
-              "complete": "note-slug",
+              "complete": "asset-slug",
               "help": "the asset (shadow-note) slug",
               "example": "acme-contract"
             },
@@ -473,7 +586,7 @@
               "name": "slug",
               "type": "slug",
               "required": true,
-              "complete": "note-slug",
+              "complete": "asset-slug",
               "help": "the shadow-note slug to reveal",
               "example": "acme-contract"
             }
@@ -605,6 +718,35 @@
         }
       },
       "dry_run": true,
+      "actions": [
+        {
+          "name": "list",
+          "summary": "the job registry with validation flags (the default action)",
+          "risk": "read",
+          "args": []
+        },
+        {
+          "name": "run",
+          "summary": "run one job now, through the dispatcher",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "help": "the job name from `ops job list`"
+            }
+          ]
+        },
+        {
+          "name": "apply",
+          "summary": "render launchd plists for the schedulable jobs",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": []
+        }
+      ],
       "source": "engine",
       "group": "JOBS"
     },
@@ -636,6 +778,99 @@
           "available": "bool"
         }
       },
+      "actions": [
+        {
+          "name": "list",
+          "summary": "each stage's configured model, runtime, and availability (pure probes)",
+          "risk": "read",
+          "args": []
+        },
+        {
+          "name": "status",
+          "summary": "resident models (`ollama ps`)",
+          "risk": "read",
+          "args": []
+        },
+        {
+          "name": "stop",
+          "summary": "unload a resident model (reloads on next use; no --yes)",
+          "risk": "safe_write",
+          "args": [
+            {
+              "name": "model",
+              "type": "string",
+              "required": false,
+              "help": "the model to stop (omit with --all)"
+            },
+            {
+              "name": "--all",
+              "type": "flag",
+              "required": false,
+              "help": "unload every resident model"
+            }
+          ]
+        },
+        {
+          "name": "pull",
+          "summary": "download a stage's model (can be gigabytes); needs --yes",
+          "risk": "confirm",
+          "args": [
+            {
+              "name": "--stage",
+              "type": "enum",
+              "required": false,
+              "enum": [
+                "stt",
+                "ocr",
+                "vlm",
+                "enrich",
+                "embed",
+                "rerank"
+              ],
+              "help": "which stage's model to pull (omit with --all)"
+            },
+            {
+              "name": "--all",
+              "type": "flag",
+              "required": false,
+              "help": "pull every ollama-managed stage's model"
+            }
+          ]
+        },
+        {
+          "name": "test",
+          "summary": "run a stage's model on a sample/--input and print output + timing; needs --yes",
+          "risk": "confirm",
+          "args": [
+            {
+              "name": "stage",
+              "type": "enum",
+              "required": true,
+              "enum": [
+                "stt",
+                "ocr",
+                "vlm",
+                "enrich",
+                "embed",
+                "rerank"
+              ],
+              "help": "which stage to test"
+            },
+            {
+              "name": "--model",
+              "type": "string",
+              "required": false,
+              "help": "override the stage's configured model (A/B a candidate)"
+            },
+            {
+              "name": "--input",
+              "type": "path",
+              "required": false,
+              "help": "input file (required for stt/ocr/vlm)"
+            }
+          ]
+        }
+      ],
       "source": "engine",
       "group": "OTHER"
     },
@@ -677,6 +912,84 @@
         }
       },
       "dry_run": true,
+      "actions": [
+        {
+          "name": "project",
+          "summary": "scaffold a project: wiki hub + ~/work repo",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "help": "the project name (slugified)",
+              "example": "Acme Redesign"
+            },
+            {
+              "name": "--kind",
+              "type": "enum",
+              "required": false,
+              "default": "labs",
+              "enum": [
+                "products",
+                "labs",
+                "tools"
+              ],
+              "help": "the ~/work subtree for the repo"
+            }
+          ]
+        },
+        {
+          "name": "client",
+          "summary": "scaffold a client: wiki hub + ~/files tree",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "help": "the client name (slugified)",
+              "example": "Acme Inc"
+            }
+          ]
+        },
+        {
+          "name": "verb",
+          "summary": "scaffold a new bin/<name>/ command stub",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "name",
+              "type": "slug",
+              "required": true,
+              "help": "the verb name (the bin/<name>/ dir)",
+              "example": "digest"
+            },
+            {
+              "name": "--risk",
+              "type": "enum",
+              "required": false,
+              "enum": [
+                "read",
+                "safe_write",
+                "draft_only",
+                "confirm",
+                "deny"
+              ],
+              "help": "the guardrail class for the new verb"
+            },
+            {
+              "name": "--summary",
+              "type": "string",
+              "required": false,
+              "help": "the one-line summary for the stub's cmd.json"
+            }
+          ]
+        }
+      ],
       "source": "engine",
       "group": "WORK"
     },
@@ -744,6 +1057,81 @@
         }
       },
       "dry_run": true,
+      "actions": [
+        {
+          "name": "scan",
+          "summary": "zero-LLM candidate generation into the typed proposal queue (the default action)",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": []
+        },
+        {
+          "name": "review",
+          "summary": "accept/reject/defer queued ops (audit ledger; shows each op's diff)",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "--accept",
+              "type": "string",
+              "required": false,
+              "help": "op ids to accept (comma/space-separated), or 'all'"
+            },
+            {
+              "name": "--reject",
+              "type": "string",
+              "required": false,
+              "help": "op ids to reject, or 'all'"
+            },
+            {
+              "name": "--defer",
+              "type": "string",
+              "required": false,
+              "help": "op ids to defer, or 'all'"
+            },
+            {
+              "name": "--file",
+              "type": "path",
+              "required": false,
+              "help": "the queue file to operate on (default: the newest inbox/organize/*.jsonl)"
+            }
+          ]
+        },
+        {
+          "name": "apply",
+          "summary": "deterministically replay APPROVED ops (one commit per op); needs --yes",
+          "risk": "confirm",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "--safe-only",
+              "type": "flag",
+              "required": false,
+              "help": "apply only the four additive primitives above 0.8 confidence"
+            },
+            {
+              "name": "--max-ops",
+              "type": "int",
+              "required": false,
+              "default": 20,
+              "help": "edit-budget ceiling on op count (flags may only lower it)"
+            },
+            {
+              "name": "--max-lines",
+              "type": "int",
+              "required": false,
+              "default": 300,
+              "help": "edit-budget ceiling on changed lines"
+            },
+            {
+              "name": "--file",
+              "type": "path",
+              "required": false,
+              "help": "the queue file to operate on (default: the newest inbox/organize/*.jsonl)"
+            }
+          ]
+        }
+      ],
       "source": "engine",
       "group": "KNOWLEDGE"
     },
@@ -819,6 +1207,67 @@
           "commit": "string"
         }
       },
+      "actions": [
+        {
+          "name": "list",
+          "summary": "installed packs + trust state (the default action)",
+          "risk": "read",
+          "args": []
+        },
+        {
+          "name": "add",
+          "summary": "install a pack (capped at confirm until trusted); needs --yes",
+          "risk": "confirm",
+          "args": [
+            {
+              "name": "target",
+              "type": "string",
+              "required": true,
+              "help": "owner/repo, a local path, optionally @tag",
+              "example": "acme/ops-pack@v1"
+            }
+          ]
+        },
+        {
+          "name": "trust",
+          "summary": "let a pack's verbs run at their declared risk; needs --yes",
+          "risk": "confirm",
+          "args": [
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "help": "the installed pack name"
+            }
+          ]
+        },
+        {
+          "name": "update",
+          "summary": "update an installed pack; needs --yes",
+          "risk": "confirm",
+          "args": [
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "help": "the installed pack name"
+            }
+          ]
+        },
+        {
+          "name": "remove",
+          "summary": "remove an installed pack; needs --yes",
+          "risk": "confirm",
+          "args": [
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "help": "the installed pack name"
+            }
+          ]
+        }
+      ],
       "source": "engine",
       "group": "SYSTEM"
     },
@@ -856,6 +1305,83 @@
           "clean": "bool"
         }
       },
+      "actions": [
+        {
+          "name": "health",
+          "summary": "fleet health table (the default action; exit 1 = repos need attention)",
+          "risk": "read",
+          "args": []
+        },
+        {
+          "name": "clone",
+          "summary": "clone one project repo by slug, or --all missing ones",
+          "risk": "safe_write",
+          "args": [
+            {
+              "name": "slug",
+              "type": "string",
+              "required": false,
+              "help": "the project slug to clone (omit with --all)"
+            },
+            {
+              "name": "--all",
+              "type": "flag",
+              "required": false,
+              "help": "clone every project missing from ~/work"
+            },
+            {
+              "name": "--kind",
+              "type": "enum",
+              "required": false,
+              "default": "labs",
+              "enum": [
+                "products",
+                "labs",
+                "tools"
+              ],
+              "help": "the ~/work subtree to clone into"
+            }
+          ]
+        },
+        {
+          "name": "adopt",
+          "summary": "adopt an existing repo path into the ~/work fleet",
+          "risk": "safe_write",
+          "args": [
+            {
+              "name": "path",
+              "type": "path",
+              "required": true,
+              "help": "the repo path to adopt"
+            },
+            {
+              "name": "--kind",
+              "type": "enum",
+              "required": true,
+              "enum": [
+                "products",
+                "labs",
+                "tools"
+              ],
+              "help": "the ~/work subtree to file it under"
+            }
+          ]
+        },
+        {
+          "name": "nuke-modules",
+          "summary": "delete stale node_modules across the fleet",
+          "risk": "safe_write",
+          "args": [
+            {
+              "name": "--stale",
+              "type": "int",
+              "required": false,
+              "default": 30,
+              "help": "only dirs untouched for this many days"
+            }
+          ]
+        }
+      ],
       "source": "engine",
       "group": "WORK"
     },
@@ -989,6 +1515,129 @@
         }
       },
       "dry_run": true,
+      "actions": [
+        {
+          "name": "publish",
+          "summary": "publish a note as one unguessable capability URL (invoked as `ops share <slug>`, no keyword)",
+          "risk": "confirm",
+          "dry_run": true,
+          "default": true,
+          "args": [
+            {
+              "name": "slug",
+              "type": "slug",
+              "required": true,
+              "complete": "note-slug",
+              "help": "the note slug to publish",
+              "example": "the-ops-loop"
+            },
+            {
+              "name": "--expires",
+              "type": "string",
+              "required": false,
+              "default": "7d",
+              "help": "link TTL (e.g. 7d, 24h)"
+            },
+            {
+              "name": "--out",
+              "type": "path",
+              "required": false,
+              "help": "also write the rendered HTML here (for inspection)"
+            },
+            {
+              "name": "--gist",
+              "type": "flag",
+              "required": false,
+              "help": "secret-gist fallback instead of the Worker"
+            }
+          ]
+        },
+        {
+          "name": "collection",
+          "summary": "publish every note carrying a tag as one bundle",
+          "risk": "confirm",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "tag",
+              "type": "string",
+              "required": true,
+              "help": "the tag to collect (with or without leading #)"
+            },
+            {
+              "name": "--expires",
+              "type": "string",
+              "required": false,
+              "default": "7d",
+              "help": "link TTL"
+            },
+            {
+              "name": "--out",
+              "type": "path",
+              "required": false,
+              "help": "also write the rendered HTML here"
+            },
+            {
+              "name": "--gist",
+              "type": "flag",
+              "required": false,
+              "help": "secret-gist fallback"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "summary": "the local share ledger",
+          "risk": "read",
+          "args": []
+        },
+        {
+          "name": "pull",
+          "summary": "fetch + unpack a published bundle's markdown locally",
+          "risk": "read",
+          "args": [
+            {
+              "name": "url",
+              "type": "string",
+              "required": true,
+              "help": "the share URL to pull",
+              "example": "https://<worker>/<id>"
+            },
+            {
+              "name": "--out",
+              "type": "path",
+              "required": false,
+              "help": "write the markdown here instead of stdout"
+            }
+          ]
+        },
+        {
+          "name": "revoke",
+          "summary": "delete a published blob; needs --yes",
+          "risk": "confirm",
+          "args": [
+            {
+              "name": "id",
+              "type": "string",
+              "required": true,
+              "help": "the share id from `ops share list`"
+            }
+          ]
+        },
+        {
+          "name": "init",
+          "summary": "deploy the share Worker + provision the publish token; needs --yes",
+          "risk": "confirm",
+          "args": [
+            {
+              "name": "--endpoint",
+              "type": "string",
+              "required": false,
+              "help": "the Worker endpoint URL"
+            }
+          ]
+        }
+      ],
       "source": "engine",
       "group": "BUSINESS"
     },
