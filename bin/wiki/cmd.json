@@ -25,5 +25,73 @@
       "count": "int"
     }
   },
-  "dry_run": true
+  "dry_run": true,
+  "actions": [
+    {
+      "name": "open",
+      "summary": "render a note in the terminal (or Obsidian)",
+      "risk": "read",
+      "args": [
+        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the note slug ([[wikilink]] basename)", "example": "the-ops-loop" },
+        { "name": "--obsidian", "type": "flag", "required": false, "help": "open in Obsidian via an obsidian:// URI instead of the terminal" }
+      ]
+    },
+    {
+      "name": "edit",
+      "summary": "open a note in $EDITOR",
+      "risk": "safe_write",
+      "args": [
+        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the note slug to edit", "example": "the-ops-loop" }
+      ]
+    },
+    {
+      "name": "new",
+      "summary": "create a structured note of a given type",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": [
+        { "name": "type", "type": "slug", "required": true, "complete": "note-type", "help": "the note type (its template + folder); the `note-type` provider lists the live registry (built-ins + templates/wiki/types.json)" },
+        { "name": "name", "type": "string", "required": true, "help": "the note title (slugified for the filename)", "example": "Risk classes" }
+      ]
+    },
+    {
+      "name": "backlinks",
+      "summary": "notes that link to this one",
+      "risk": "read",
+      "args": [
+        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the target note slug", "example": "the-ops-loop" }
+      ]
+    },
+    {
+      "name": "stale",
+      "summary": "notes not updated in N+ days",
+      "risk": "read",
+      "args": [
+        { "name": "days", "type": "int", "required": false, "default": 180, "help": "the staleness threshold in days" }
+      ]
+    },
+    {
+      "name": "orphans",
+      "summary": "type-note notes with no inbound links",
+      "risk": "read",
+      "args": []
+    },
+    {
+      "name": "canvas",
+      "summary": "write a JSON Canvas over the wikilink graph around a hub or tag",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": [
+        { "name": "target", "type": "string", "required": true, "complete": "note-slug", "help": "a hub note slug, or a #tag (all tagged notes)", "example": "the-ops-loop" },
+        { "name": "--depth", "type": "int", "required": false, "default": 1, "help": "hops out from the hub (hub mode only)" },
+        { "name": "--stdout", "type": "flag", "required": false, "help": "print the canvas JSON instead of writing wiki/canvas/<slug>.canvas" }
+      ]
+    },
+    {
+      "name": "list",
+      "summary": "note counts by type (the default action)",
+      "risk": "read",
+      "args": []
+    }
+  ]
 }

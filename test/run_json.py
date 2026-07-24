@@ -4,7 +4,8 @@ run_json.py — the machine-contract suite (proposal Part 1.1/1.2/0.5), offline 
   1. every non-hidden verb's cmd.json declares an `output` block and `hints` (the I/O contract lives
      in ops.json, so a third party never imports lib);
   2. the declared `dry_run` verbs actually declare it;
-  3. ops.json v2 top-level shape (schema/ops_version/api_version/json_envelope/capabilities);
+  3. ops.json/3 top-level shape (schema/ops_version/api_version/json_envelope/capabilities) + the
+     ops.json/3 additions: every verb's `group`, and well-formed `actions[]` on compound verbs;
   4. `--json` round-trips: each read-class verb, run against a fixture world, emits the frozen
      envelope and every field its cmd.json `output` block declares;
   5. `--dry-run` on a mutating verb emits a valid envelope and writes NOTHING.
@@ -100,17 +101,61 @@ def main() -> int:
     for v in sorted(DRY):
         check(f"{v}: declares dry_run", _cmd(v).get("dry_run") is True)
 
-    # --- ops.json v2 top-level shape ---
+    # --- ops.json/3 top-level shape ---
     with tempfile.TemporaryDirectory() as td:
         env0 = {**os.environ, "OPS_HOME": td, "OPS_ROOTS_HOME": td}
         run(env0, "help")  # regenerates ops.json into the temp OPS_HOME
         doc = json.loads((Path(td) / "ops.json").read_text(encoding="utf-8"))
     for key in ("schema", "ops_version", "api_version", "json_envelope", "capabilities", "verbs"):
-        check(f"ops.json v2 top-level: {key}", key in doc)
-    check("ops.json schema is ops.json/2", doc.get("schema") == "ops.json/2")
+        check(f"ops.json top-level: {key}", key in doc)
+    check("ops.json schema is ops.json/3", doc.get("schema") == "ops.json/3")
     caps = doc.get("capabilities", {})
     check("capabilities keys present", all(k in caps for k in ("vectors", "rerank", "agent", "plugins")))
     check("every verb tagged source=engine", all(v.get("source") == "engine" for v in doc.get("verbs", [])))
+
+    # --- ops.json/3: every verb carries a display `group`; declared `actions[]` are well-formed ---
+    ARG_TYPES = {"string", "int", "enum", "slug", "path", "flag"}
+    RISK_ENUM = {"read", "safe_write", "draft_only", "confirm", "deny"}
+    COMPLETE_PROVIDERS = {"note-slug", "task-id", "hub", "note-type", "status", "layer"}
+    dverbs = doc.get("verbs", [])
+    check("every verb carries a non-empty group",
+          all(isinstance(v.get("group"), str) and v.get("group") for v in dverbs),
+          str([v.get("verb") for v in dverbs if not v.get("group")]))
+
+    def _actions_wellformed(v) -> tuple[bool, str]:
+        acts = v.get("actions")
+        if not isinstance(acts, list) or not acts:
+            return False, "actions is not a non-empty list"
+        for a in acts:
+            if not isinstance(a.get("name"), str) or not a["name"]:
+                return False, f"action missing name: {a}"
+            if not isinstance(a.get("args"), list):
+                return False, f"action {a.get('name')} missing args list"
+            if "risk" in a and a["risk"] not in RISK_ENUM:
+                return False, f"action {a['name']} bad risk {a['risk']}"
+            if "dry_run" in a and not isinstance(a["dry_run"], bool):
+                return False, f"action {a['name']} dry_run not bool"
+            for arg in a["args"]:
+                if not isinstance(arg.get("name"), str) or not arg["name"]:
+                    return False, f"{a['name']}: arg missing name: {arg}"
+                if arg.get("type") not in ARG_TYPES:
+                    return False, f"{a['name']}/{arg.get('name')}: bad type {arg.get('type')}"
+                if "complete" in arg and arg["complete"] not in COMPLETE_PROVIDERS:
+                    return False, f"{a['name']}/{arg['name']}: bad complete {arg['complete']}"
+                if arg["type"] == "enum" and not (isinstance(arg.get("enum"), list) and arg["enum"]):
+                    return False, f"{a['name']}/{arg['name']}: enum type without enum list"
+        return True, ""
+
+    for v in dverbs:
+        if "actions" in v:
+            ok, why = _actions_wellformed(v)
+            check(f"{v['verb']}: actions[] well-formed (ops.json/3)", ok, why)
+    # the three compound verbs enriched in wave 1 specifically carry actions[]
+    by_verb = {v["verb"]: v for v in dverbs}
+    for v in ("task", "wiki", "files"):
+        acts = by_verb.get(v, {}).get("actions")
+        check(f"{v}: declares a non-empty actions[]", isinstance(acts, list) and len(acts) > 0,
+              str(acts)[:120])
 
     # --- live --json round-trip against a seeded fixture world ---
     with tempfile.TemporaryDirectory() as td:
@@ -188,7 +233,7 @@ def main() -> int:
               len(srows) > 1 and all(row.get("status") in SETUP_STATUS_ENUM for row in srows[1:]),
               f"rc={r.returncode} {r.stdout[:200]}")
 
-    print(f"{BOLD}Machine contract: --json envelope + ops.json v2 + dry-run — {len(results)} checks{RESET}\n")
+    print(f"{BOLD}Machine contract: --json envelope + ops.json/3 + dry-run — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
     for name, ok, detail in results:
         mark = f"{GREEN}PASS{RESET}" if ok else f"{RED}FAIL{RESET}"

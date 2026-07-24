@@ -40,7 +40,7 @@ SUITES = [
     ("backup family + share (5.1/5.2)", "run_backup_share.py"),
     ("setup/update flow (§2/§17)", "run_setup.py"),
     ("trust wave: exit codes + update merge + doctor (0.1/0.3/0.4)", "run_trust.py"),
-    ("machine contract: --json + ops.json v2 + dry-run (1.1/1.2/0.5)", "run_json.py"),
+    ("machine contract: --json + ops.json/3 + dry-run (1.1/1.2/0.5)", "run_json.py"),
     ("multi-root verb resolution: plugins + OPS_PATH (2.1/0.2)", "run_resolver.py"),
     ("frozen SDK + ops plugin: api.py + trust ceiling (2.2/2.3)", "run_plugin.py"),
     ("agent transport: ops mcp stdio server (2.4)", "run_mcp.py"),

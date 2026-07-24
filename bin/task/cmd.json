@@ -26,5 +26,49 @@
       "status": "string"
     }
   },
-  "dry_run": true
+  "dry_run": true,
+  "actions": [
+    {
+      "name": "list",
+      "summary": "active + waiting tasks (the default action)",
+      "risk": "read",
+      "args": []
+    },
+    {
+      "name": "add",
+      "summary": "create a task in active/",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": [
+        { "name": "title", "type": "string", "required": true, "help": "the task title (free text)", "example": "Fix the Acme webhook" }
+      ]
+    },
+    {
+      "name": "show",
+      "summary": "print one task's full note",
+      "risk": "read",
+      "args": [
+        { "name": "id", "type": "slug", "required": true, "complete": "task-id", "help": "the task id", "example": "T-0042" }
+      ]
+    },
+    {
+      "name": "move",
+      "summary": "change a task's status",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": [
+        { "name": "id", "type": "slug", "required": true, "complete": "task-id", "help": "the task id", "example": "T-0042" },
+        { "name": "status", "type": "enum", "required": true, "enum": ["inbox", "active", "waiting", "done"], "complete": "status", "help": "the destination status" }
+      ]
+    },
+    {
+      "name": "done",
+      "summary": "mark a task done (shorthand for move <id> done)",
+      "risk": "safe_write",
+      "dry_run": true,
+      "args": [
+        { "name": "id", "type": "slug", "required": true, "complete": "task-id", "help": "the task id", "example": "T-0042" }
+      ]
+    }
+  ]
 }

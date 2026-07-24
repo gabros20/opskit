@@ -7,7 +7,7 @@ verdict — a resident process accumulates state plaintext can't rebuild).
 STDLIB ONLY: the JSON-RPC 2.0 / MCP handshake (initialize · notifications/initialized · tools/list ·
 tools/call) is implemented by hand over newline-delimited JSON on stdin/stdout — no mcp/fastmcp dep.
 
-  • The tool list is GENERATED from the ops surface (manifest.load_cmds → the same data as ops.json v2:
+  • The tool list is GENERATED from the ops surface (manifest.load_cmds → the same data as ops.json/3:
     summaries + hints become descriptions, args become inputSchema). Plugins appear automatically.
   • A tools/call SHELLS OUT: subprocess [<abs>/ops, verb, ...args, --json]. Execution RE-ENTERS through
     the dispatcher, so the guardrail + .logs stay the single enforcement path (anti-roadmap #2 — never
@@ -35,7 +35,7 @@ def _ops_bin() -> str:
     return str(paths.OPS_HOME / "ops")
 
 
-# ── tool generation (from the ops surface = ops.json v2) ────────────────────────────────────────
+# ── tool generation (from the ops surface = ops.json/3) ─────────────────────────────────────────
 def _tool(cmd: dict) -> dict:
     """One MCP tool from a cmd.json dict: description = summary (+hints), inputSchema from args."""
     desc = cmd.get("summary", "")

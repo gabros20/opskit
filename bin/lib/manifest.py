@@ -18,7 +18,7 @@ from . import resolver  # type: ignore  # multi-root verb resolution (Part 2.1)
 BIN = Path(__file__).resolve().parents[1]   # the verbs live with the CODE (bin/), not under OPS_HOME
 MANIFEST = paths.OPS_HOME / "ops.json"       # ...but ops.json is written to the data root (OPS_HOME)
 VERSION_FILE = BIN.parent / "VERSION"        # engine version lives with the CODE (repo root)
-SCHEMA = "ops.json/2"
+SCHEMA = "ops.json/3"
 API_VERSION = "1.0"
 
 # display grouping (design §4.1); verbs not listed fall under "OTHER"
@@ -31,6 +31,17 @@ GROUPS = [
     ("BUSINESS", ["invoice", "share"]),
     ("JOBS", ["job"]),
 ]
+
+# reverse index of GROUPS (verb -> display group); anything unlisted is "OTHER"
+_GROUP_OF = {v: name for name, verbs in GROUPS for v in verbs}
+
+
+def group_of(verb: str) -> str:
+    """The display group a verb renders under (ops.json/3 field `group`). The GROUPS table above is
+    the single source; verbs not listed there (incl. plugin verbs) fall under "OTHER" — matching how
+    `render()` places them. Every ops.json verb entry carries this so a UI groups without re-encoding
+    the table."""
+    return _GROUP_OF.get(verb, "OTHER")
 
 
 def load_cmds() -> list[dict]:
@@ -76,14 +87,16 @@ def _capabilities() -> dict:
 
 
 def write_manifest() -> Path:
-    """(Re)generate ops.json v2 from the cmd.json sidecars (committed; rebuilt by `ops index`).
-    Top level carries schema/version/capabilities; each verb gains `source` (engine) — the output
-    block and hints ride through from cmd.json as-is."""
+    """(Re)generate ops.json/3 from the cmd.json sidecars (committed; rebuilt by `ops index`).
+    Top level carries schema/version/capabilities; each verb gains `source` (engine) and `group` (its
+    display group) — the output block, hints, and optional `actions[]` grammar ride through from
+    cmd.json as-is."""
     cmds = []
     for c in load_cmds():
         src = c.get("_source", "engine")
         d = {k: v for k, v in c.items() if not k.startswith("_")}
         d["source"] = src
+        d["group"] = group_of(d["verb"])
         cmds.append(d)
     doc = {
         "schema": SCHEMA,

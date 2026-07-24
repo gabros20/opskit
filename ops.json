@@ -1,5 +1,5 @@
 {
-  "schema": "ops.json/2",
+  "schema": "ops.json/3",
   "ops_version": "4.0.0-dev",
   "api_version": "1.0",
   "json_envelope": 1,
@@ -40,7 +40,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "WORK"
     },
     {
       "verb": "backup",
@@ -77,7 +78,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "SYSTEM"
     },
     {
       "verb": "bookmark",
@@ -122,7 +124,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "KNOWLEDGE"
     },
     {
       "verb": "capture",
@@ -150,7 +153,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "FLOW"
     },
     {
       "verb": "close",
@@ -176,7 +180,8 @@
           "uncommitted": "int"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "FLOW"
     },
     {
       "verb": "consolidate",
@@ -206,7 +211,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "SYSTEM"
     },
     {
       "verb": "doctor",
@@ -232,7 +238,8 @@
           "message": "string"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "SYSTEM"
     },
     {
       "verb": "enrich",
@@ -272,7 +279,8 @@
           "enrich_key": "string"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "OTHER"
     },
     {
       "verb": "files",
@@ -308,7 +316,172 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "actions": [
+        {
+          "name": "ingest",
+          "summary": "route a binary into ~/files + write a wiki shadow note (the default action)",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "path",
+              "type": "path",
+              "required": false,
+              "help": "the file to ingest; omit to drain inbox/",
+              "example": "~/Downloads/contract.pdf"
+            },
+            {
+              "name": "--client",
+              "type": "slug",
+              "required": false,
+              "complete": "hub",
+              "help": "file under a client hub and link it"
+            },
+            {
+              "name": "--project",
+              "type": "slug",
+              "required": false,
+              "complete": "hub",
+              "help": "file under a project hub and link it"
+            },
+            {
+              "name": "--area",
+              "type": "slug",
+              "required": false,
+              "complete": "hub",
+              "help": "file under an area hub and link it"
+            },
+            {
+              "name": "--research",
+              "type": "flag",
+              "required": false,
+              "help": "file under ~/files/research (no hub)"
+            },
+            {
+              "name": "--extract",
+              "type": "flag",
+              "required": false,
+              "help": "chain an extract on each freshly filed asset"
+            }
+          ]
+        },
+        {
+          "name": "extract",
+          "summary": "derive wiki/files/<slug>.extract.md from the source bytes",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "slug",
+              "type": "slug",
+              "required": true,
+              "complete": "note-slug",
+              "help": "the shadow-note slug to extract",
+              "example": "acme-contract"
+            },
+            {
+              "name": "--reextract",
+              "type": "flag",
+              "required": false,
+              "help": "force re-extraction even if bytes + tool are unchanged"
+            },
+            {
+              "name": "--heavy",
+              "type": "flag",
+              "required": false,
+              "help": "allow a heavier extractor tier (e.g. docling for PDF)"
+            },
+            {
+              "name": "--lang",
+              "type": "string",
+              "required": false,
+              "help": "language hint for ASR (audio/video)"
+            },
+            {
+              "name": "--diarize",
+              "type": "flag",
+              "required": false,
+              "help": "request speaker labels (needs pyannote.audio)"
+            },
+            {
+              "name": "--describe",
+              "type": "flag",
+              "required": false,
+              "help": "add a VLM scene caption for images"
+            }
+          ]
+        },
+        {
+          "name": "distill",
+          "summary": "compile an extract into draft concept notes in wiki/notes/",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "slug",
+              "type": "slug",
+              "required": true,
+              "complete": "note-slug",
+              "help": "the shadow-note slug whose extract to distill",
+              "example": "acme-contract"
+            }
+          ]
+        },
+        {
+          "name": "link",
+          "summary": "attach an already-ingested asset to a hub note",
+          "risk": "safe_write",
+          "args": [
+            {
+              "name": "file",
+              "type": "slug",
+              "required": true,
+              "complete": "note-slug",
+              "help": "the asset (shadow-note) slug",
+              "example": "acme-contract"
+            },
+            {
+              "name": "hub",
+              "type": "slug",
+              "required": true,
+              "complete": "hub",
+              "help": "the hub note to file it under",
+              "example": "acme"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "summary": "the asset catalogue (optionally one hub's)",
+          "risk": "read",
+          "args": [
+            {
+              "name": "--hub",
+              "type": "slug",
+              "required": false,
+              "complete": "hub",
+              "help": "only assets filed under this hub"
+            }
+          ]
+        },
+        {
+          "name": "open",
+          "summary": "reveal an asset in Finder via its shadow note",
+          "risk": "read",
+          "args": [
+            {
+              "name": "slug",
+              "type": "slug",
+              "required": true,
+              "complete": "note-slug",
+              "help": "the shadow-note slug to reveal",
+              "example": "acme-contract"
+            }
+          ]
+        }
+      ],
+      "source": "engine",
+      "group": "WORK"
     },
     {
       "verb": "help",
@@ -332,7 +505,8 @@
           "verbs": "list"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "SYSTEM"
     },
     {
       "verb": "index",
@@ -355,7 +529,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "SYSTEM"
     },
     {
       "verb": "invoice",
@@ -395,7 +570,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "BUSINESS"
     },
     {
       "verb": "job",
@@ -429,7 +605,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "JOBS"
     },
     {
       "verb": "models",
@@ -459,7 +636,8 @@
           "available": "bool"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "OTHER"
     },
     {
       "verb": "new",
@@ -499,7 +677,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "WORK"
     },
     {
       "verb": "open",
@@ -528,7 +707,8 @@
           "path": "string"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "KNOWLEDGE"
     },
     {
       "verb": "organize",
@@ -564,7 +744,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "KNOWLEDGE"
     },
     {
       "verb": "orient",
@@ -598,7 +779,8 @@
           "line": "string"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "SYSTEM"
     },
     {
       "verb": "plugin",
@@ -637,7 +819,8 @@
           "commit": "string"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "SYSTEM"
     },
     {
       "verb": "repo",
@@ -673,7 +856,8 @@
           "clean": "bool"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "WORK"
     },
     {
       "verb": "search",
@@ -707,7 +891,8 @@
           "snippet": "string"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "KNOWLEDGE"
     },
     {
       "verb": "setup",
@@ -768,7 +953,8 @@
           "next": "string"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "OTHER"
     },
     {
       "verb": "share",
@@ -803,7 +989,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "BUSINESS"
     },
     {
       "verb": "start",
@@ -829,7 +1016,8 @@
           "inbox": "int"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "FLOW"
     },
     {
       "verb": "status",
@@ -856,7 +1044,8 @@
           "git_dirty": "int"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "SYSTEM"
     },
     {
       "verb": "sweep",
@@ -884,7 +1073,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "WORK"
     },
     {
       "verb": "task",
@@ -915,7 +1105,91 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "actions": [
+        {
+          "name": "list",
+          "summary": "active + waiting tasks (the default action)",
+          "risk": "read",
+          "args": []
+        },
+        {
+          "name": "add",
+          "summary": "create a task in active/",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": true,
+              "help": "the task title (free text)",
+              "example": "Fix the Acme webhook"
+            }
+          ]
+        },
+        {
+          "name": "show",
+          "summary": "print one task's full note",
+          "risk": "read",
+          "args": [
+            {
+              "name": "id",
+              "type": "slug",
+              "required": true,
+              "complete": "task-id",
+              "help": "the task id",
+              "example": "T-0042"
+            }
+          ]
+        },
+        {
+          "name": "move",
+          "summary": "change a task's status",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "id",
+              "type": "slug",
+              "required": true,
+              "complete": "task-id",
+              "help": "the task id",
+              "example": "T-0042"
+            },
+            {
+              "name": "status",
+              "type": "enum",
+              "required": true,
+              "enum": [
+                "inbox",
+                "active",
+                "waiting",
+                "done"
+              ],
+              "complete": "status",
+              "help": "the destination status"
+            }
+          ]
+        },
+        {
+          "name": "done",
+          "summary": "mark a task done (shorthand for move <id> done)",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "id",
+              "type": "slug",
+              "required": true,
+              "complete": "task-id",
+              "help": "the task id",
+              "example": "T-0042"
+            }
+          ]
+        }
+      ],
+      "source": "engine",
+      "group": "TASKS"
     },
     {
       "verb": "triage",
@@ -950,7 +1224,8 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "source": "engine",
+      "group": "FLOW"
     },
     {
       "verb": "week",
@@ -976,7 +1251,8 @@
           "swept": "int"
         }
       },
-      "source": "engine"
+      "source": "engine",
+      "group": "FLOW"
     },
     {
       "verb": "wiki",
@@ -1006,7 +1282,138 @@
         }
       },
       "dry_run": true,
-      "source": "engine"
+      "actions": [
+        {
+          "name": "open",
+          "summary": "render a note in the terminal (or Obsidian)",
+          "risk": "read",
+          "args": [
+            {
+              "name": "slug",
+              "type": "slug",
+              "required": true,
+              "complete": "note-slug",
+              "help": "the note slug ([[wikilink]] basename)",
+              "example": "the-ops-loop"
+            },
+            {
+              "name": "--obsidian",
+              "type": "flag",
+              "required": false,
+              "help": "open in Obsidian via an obsidian:// URI instead of the terminal"
+            }
+          ]
+        },
+        {
+          "name": "edit",
+          "summary": "open a note in $EDITOR",
+          "risk": "safe_write",
+          "args": [
+            {
+              "name": "slug",
+              "type": "slug",
+              "required": true,
+              "complete": "note-slug",
+              "help": "the note slug to edit",
+              "example": "the-ops-loop"
+            }
+          ]
+        },
+        {
+          "name": "new",
+          "summary": "create a structured note of a given type",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "type",
+              "type": "slug",
+              "required": true,
+              "complete": "note-type",
+              "help": "the note type (its template + folder); the `note-type` provider lists the live registry (built-ins + templates/wiki/types.json)"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "help": "the note title (slugified for the filename)",
+              "example": "Risk classes"
+            }
+          ]
+        },
+        {
+          "name": "backlinks",
+          "summary": "notes that link to this one",
+          "risk": "read",
+          "args": [
+            {
+              "name": "slug",
+              "type": "slug",
+              "required": true,
+              "complete": "note-slug",
+              "help": "the target note slug",
+              "example": "the-ops-loop"
+            }
+          ]
+        },
+        {
+          "name": "stale",
+          "summary": "notes not updated in N+ days",
+          "risk": "read",
+          "args": [
+            {
+              "name": "days",
+              "type": "int",
+              "required": false,
+              "default": 180,
+              "help": "the staleness threshold in days"
+            }
+          ]
+        },
+        {
+          "name": "orphans",
+          "summary": "type-note notes with no inbound links",
+          "risk": "read",
+          "args": []
+        },
+        {
+          "name": "canvas",
+          "summary": "write a JSON Canvas over the wikilink graph around a hub or tag",
+          "risk": "safe_write",
+          "dry_run": true,
+          "args": [
+            {
+              "name": "target",
+              "type": "string",
+              "required": true,
+              "complete": "note-slug",
+              "help": "a hub note slug, or a #tag (all tagged notes)",
+              "example": "the-ops-loop"
+            },
+            {
+              "name": "--depth",
+              "type": "int",
+              "required": false,
+              "default": 1,
+              "help": "hops out from the hub (hub mode only)"
+            },
+            {
+              "name": "--stdout",
+              "type": "flag",
+              "required": false,
+              "help": "print the canvas JSON instead of writing wiki/canvas/<slug>.canvas"
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "summary": "note counts by type (the default action)",
+          "risk": "read",
+          "args": []
+        }
+      ],
+      "source": "engine",
+      "group": "KNOWLEDGE"
     }
   ]
 }

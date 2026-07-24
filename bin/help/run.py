@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """ops help [verb] [--json] — render the command surface from the cmd.json manifest (§4.3).
---json returns the ops.json v2 document (list) or one verb's contract (single verb)."""
+--json returns the ops.json/3 document (list) or one verb's contract (single verb)."""
 import json
 import sys
 from pathlib import Path
