@@ -20,6 +20,7 @@ def _d(s: str):
 
 def main(argv):
     _, argv = output.parse_argv(argv)
+    dry = "--dry-run" in argv
     today = date.today()
     week_ago = today.toordinal() - 7
     donedir = paths.TASKS / "done"
@@ -31,9 +32,12 @@ def main(argv):
     stalled = [f for f in active if (_d(paths.fm_field(f, "updated")) or date.min).toordinal() < week_ago]
     dirty = len([ln for ln in paths.git("status", "--porcelain").splitlines() if ln.strip()])
 
-    # sweep done/*.md -> done/<year>/
+    # sweep done/*.md -> done/<year>/  (--dry-run: count what WOULD be swept, move nothing)
     swept = 0
     for f in done_all:
+        if dry:
+            swept += 1
+            continue
         yr = (paths.fm_field(f, "created")[:4]) or str(today.year)
         dest = donedir / yr
         dest.mkdir(parents=True, exist_ok=True)
@@ -49,20 +53,22 @@ def main(argv):
     block.append(f"- repo: {'clean' if dirty == 0 else str(dirty) + ' uncommitted'}")
     block.append(f"- swept {swept} done task(s) into done/<year>/")
     block.append("- ? what did you do by hand twice this week → a skill/verb candidate (§11)")
-    note, _ = paths.ensure_journal()
-    with open(note, "a", encoding="utf-8") as fh:
-        fh.write("\n".join(block) + "\n")
-    paths.append_journal("weekly review")
+    note = paths.journal_path(today)
+    if not dry:
+        note, _ = paths.ensure_journal()
+        with open(note, "a", encoding="utf-8") as fh:
+            fh.write("\n".join(block) + "\n")
+        paths.append_journal("weekly review")
 
     data = {
         "journal": str(note.relative_to(paths.OPS_HOME)),
         "shipped": len(shipped), "shipped_ids": [f.stem for f in shipped],
         "stalled": len(stalled), "stalled_ids": [f.stem for f in stalled],
-        "repo_dirty": dirty, "swept": swept,
+        "repo_dirty": dirty, "swept": swept, "dry_run": dry,
     }
 
     def render(_):
-        print(f"weekly review -> {note.relative_to(paths.OPS_HOME)}")
+        print(f"weekly review{' (dry run — nothing written)' if dry else ''} -> {note.relative_to(paths.OPS_HOME)}")
         print(f"  shipped: {len(shipped)} | stalled: {len(stalled)} | repo: "
               f"{'clean' if dirty == 0 else str(dirty)+' dirty'} | swept: {swept}")
         print("  ask: what did you do by hand twice this week? → skill/verb candidate")

@@ -86,7 +86,8 @@ def mkrepo(path: Path):
 def main() -> int:
     # --- static contract: every non-hidden verb declares output + hints (+ dry_run where required) ---
     DRY = {"capture", "task", "wiki", "triage", "files", "archive", "sweep",
-           "invoice", "index", "consolidate", "job", "new", "bookmark", "setup"}
+           "invoice", "index", "consolidate", "job", "new", "bookmark", "setup",
+           "start", "close", "week"}
     verbs = []
     for cj in sorted(BIN.glob("*/cmd.json")):
         d = json.loads(cj.read_text(encoding="utf-8"))
@@ -137,6 +138,8 @@ def main() -> int:
                 return False, f"action {a['name']} dry_run not bool"
             if "default" in a and not isinstance(a["default"], bool):
                 return False, f"action {a['name']} default not bool"
+            if "tty" in a and not isinstance(a["tty"], bool):
+                return False, f"action {a['name']} tty not bool"
             for arg in a["args"]:
                 if not isinstance(arg.get("name"), str) or not arg["name"]:
                     return False, f"{a['name']}: arg missing name: {arg}"
@@ -233,6 +236,19 @@ def main() -> int:
         check("capture --dry-run writes nothing",
               len(list((ops / "inbox").glob("cap-*.md"))) == inbox_before, r.stdout[:160])
 
+        # the daily/weekly verbs (start/close/week) now honour --dry-run: valid envelope, no journal write
+        def _journal_md():
+            jd = ops / "journal"
+            return len(list(jd.rglob("*.md"))) if jd.exists() else 0
+        for verb in ("start", "close", "week"):
+            before = _journal_md()
+            r = run(env, verb, "--dry-run", "--json")
+            objs = parse_ndjson(r.stdout) if r.stdout.strip() else []
+            check(f"{verb} --dry-run: ok envelope + dry_run flag",
+                  len(objs) == 1 and objs[0].get("ok") is True and objs[0]["data"].get("dry_run") is True,
+                  r.stdout[:200])
+            check(f"{verb} --dry-run writes no journal", _journal_md() == before, f"{before} -> {_journal_md()}")
+
         # error path: fail() emits the error envelope + protocol exit code under --json
         r = run(env, "search", "--json")  # empty query -> usage (2)
         errs = parse_ndjson(r.stdout) if r.stdout.strip() else []
@@ -252,6 +268,18 @@ def main() -> int:
         check("setup --json rows carry a documented status enum value",
               len(srows) > 1 and all(row.get("status") in SETUP_STATUS_ENUM for row in srows[1:]),
               f"rc={r.returncode} {r.stdout[:200]}")
+
+        # ui shim (Wave 3): with ops-ui absent, a blocked-style envelope (installed:false, next hint),
+        # exits cleanly — never a crash. Point OPS_UI_BIN at a nonexistent path so `_resolve` short-
+        # circuits on the override and never consults the host PATH — deterministic even the day
+        # ops-ui is installed globally (the host-sensitive-path CI lesson).
+        r = run({**env, "OPS_UI_BIN": "/nonexistent/ops-ui"}, "ui", "--json")
+        uobjs = parse_ndjson(r.stdout) if r.stdout.strip() else []
+        check("ui --json (ops-ui absent): blocked envelope, clean exit",
+              r.returncode == 0 and len(uobjs) == 1 and uobjs[0].get("ok") is True
+              and uobjs[0]["data"].get("installed") is False
+              and uobjs[0]["data"].get("status") == "blocked"
+              and bool(uobjs[0]["data"].get("next")), r.stdout[:200])
 
     print(f"{BOLD}Machine contract: --json envelope + ops.json/3 + dry-run — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)

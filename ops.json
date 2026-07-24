@@ -128,6 +128,7 @@
           "name": "init",
           "summary": "write .backup/config.json + render the launchd plist (human-run once); needs --yes",
           "risk": "confirm",
+          "tty": true,
           "args": [
             {
               "name": "--local-repo",
@@ -243,8 +244,9 @@
     {
       "verb": "close",
       "summary": "daily close: summarize the day into the journal, flag loose ends",
-      "usage": "ops close [--automated]",
+      "usage": "ops close [--automated] [--dry-run]",
       "risk": "safe_write",
+      "dry_run": true,
       "reads": [
         "tasks/",
         "journal/",
@@ -1644,8 +1646,9 @@
     {
       "verb": "start",
       "summary": "daily start: today's journal, carry-forward open tasks, dashboard",
-      "usage": "ops start",
+      "usage": "ops start [--dry-run]",
       "risk": "safe_write",
+      "dry_run": true,
       "reads": [
         "tasks/",
         "inbox/",
@@ -1873,14 +1876,81 @@
         }
       },
       "dry_run": true,
+      "actions": [
+        {
+          "name": "propose",
+          "summary": "page inbox/ items and file each (interactive; `ops triage`, no keyword). --json lists proposals without acting; use `decide` to apply headless",
+          "risk": "safe_write",
+          "dry_run": true,
+          "tty": true,
+          "default": true,
+          "args": []
+        },
+        {
+          "name": "decide",
+          "summary": "non-interactively file ONE inbox item (the headless apply path)",
+          "risk": "safe_write",
+          "args": [
+            {
+              "name": "item",
+              "type": "string",
+              "required": true,
+              "help": "the inbox item filename (from `ops triage --json`)",
+              "example": "cap-2026-07-24-note.md"
+            },
+            {
+              "name": "decision",
+              "type": "enum",
+              "required": true,
+              "enum": [
+                "task",
+                "note",
+                "skip"
+              ],
+              "help": "file as a task, a note, or skip it"
+            }
+          ]
+        },
+        {
+          "name": "drafts",
+          "summary": "promote agent-drafted notes (interactive). --json lists them; nested `drafts decide <slug> accept|reject|skip` applies one headless",
+          "risk": "safe_write",
+          "dry_run": true,
+          "tty": true,
+          "args": []
+        }
+      ],
       "source": "engine",
       "group": "FLOW"
     },
     {
+      "verb": "ui",
+      "summary": "launch the ops terminal UI (ops-ui) \u2014 the ops.json/3 contract-driven frontend",
+      "usage": "ops ui [args passed through to ops-ui]",
+      "risk": "read",
+      "tty": true,
+      "reads": [
+        "PATH (locates the ops-ui binary)"
+      ],
+      "writes": [],
+      "hints": "Entry shim for the terminal UI: execs the installed `ops-ui` binary (found on PATH, or via OPS_UI_BIN), handing it the terminal \u2014 the TUI itself composes verbs over `ops <verb> --json` + `ops complete`. When ops-ui isn't installed it prints a blocked-style install hint and exits cleanly (never a crash). Common mistake: expecting `ops ui --json` to stream data \u2014 it launches an interactive UI (tty:true); drive ops programmatically with `ops <verb> --json` instead.",
+      "output": {
+        "mode": "scalar",
+        "fields": {
+          "installed": "bool",
+          "status": "string",
+          "next": "string"
+        }
+      },
+      "source": "engine",
+      "group": "SYSTEM"
+    },
+    {
       "verb": "week",
       "summary": "weekly review: shipped/stalled, repo health, sweep done/ -> done/<year>/",
-      "usage": "ops week",
+      "usage": "ops week [--dry-run]",
       "risk": "safe_write",
+      "dry_run": true,
       "reads": [
         "tasks/",
         ".git"
@@ -1936,6 +2006,7 @@
           "name": "open",
           "summary": "render a note in the terminal (or Obsidian)",
           "risk": "read",
+          "tty": true,
           "args": [
             {
               "name": "slug",
@@ -1957,6 +2028,7 @@
           "name": "edit",
           "summary": "open a note in $EDITOR",
           "risk": "safe_write",
+          "tty": true,
           "args": [
             {
               "name": "slug",

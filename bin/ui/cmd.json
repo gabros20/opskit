@@ -1,0 +1,20 @@
+{
+  "verb": "ui",
+  "summary": "launch the ops terminal UI (ops-ui) — the ops.json/3 contract-driven frontend",
+  "usage": "ops ui [args passed through to ops-ui]",
+  "risk": "read",
+  "tty": true,
+  "reads": [
+    "PATH (locates the ops-ui binary)"
+  ],
+  "writes": [],
+  "hints": "Entry shim for the terminal UI: execs the installed `ops-ui` binary (found on PATH, or via OPS_UI_BIN), handing it the terminal — the TUI itself composes verbs over `ops <verb> --json` + `ops complete`. When ops-ui isn't installed it prints a blocked-style install hint and exits cleanly (never a crash). Common mistake: expecting `ops ui --json` to stream data — it launches an interactive UI (tty:true); drive ops programmatically with `ops <verb> --json` instead.",
+  "output": {
+    "mode": "scalar",
+    "fields": {
+      "installed": "bool",
+      "status": "string",
+      "next": "string"
+    }
+  }
+}

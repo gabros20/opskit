@@ -15,8 +15,9 @@ from lib import output, paths  # noqa: E402
 def main(argv):
     _, argv = output.parse_argv(argv)
     automated = "--automated" in argv  # used by the nightly nudge job (§15)
+    dry = "--dry-run" in argv
     td = date.today().isoformat()
-    note, _ = paths.ensure_journal()
+    note = paths.journal_path(date.today()) if dry else paths.ensure_journal()[0]
 
     commits = [ln for ln in paths.git("log", "--since=00:00:00", "--oneline").splitlines() if ln.strip()]
     done_today = [f for f in (paths.TASKS / "done").glob("T-*.md")
@@ -35,19 +36,21 @@ def main(argv):
                      + ", ".join(f.stem for f in no_progress))
     if dirty:
         block.append(f"- ⚠ {len(dirty)} uncommitted change(s) in ~/ops (commit before backup)")
-    with open(note, "a", encoding="utf-8") as fh:
-        fh.write("\n".join(block) + "\n")
-    paths.append_journal("closed the day" + (" (automated)" if automated else ""))
+    if not dry:
+        with open(note, "a", encoding="utf-8") as fh:
+            fh.write("\n".join(block) + "\n")
+        paths.append_journal("closed the day" + (" (automated)" if automated else ""))
 
     data = {
         "journal": str(note.relative_to(paths.OPS_HOME)),
         "commits": len(commits), "completed": len(done_today),
         "no_progress": len(no_progress), "no_progress_ids": [f.stem for f in no_progress],
-        "uncommitted": len(dirty),
+        "uncommitted": len(dirty), "dry_run": dry,
     }
 
     def render(_):
-        print(f"day closed -> {note.relative_to(paths.OPS_HOME)}")
+        print(f"day {'would close' if dry else 'closed'} -> {note.relative_to(paths.OPS_HOME)}"
+              + ("  (dry run — nothing written)" if dry else ""))
         print(f"  commits today: {len(commits)} | completed: {len(done_today)} | "
               f"active without progress: {len(no_progress)} | uncommitted: {len(dirty)}")
         if no_progress:

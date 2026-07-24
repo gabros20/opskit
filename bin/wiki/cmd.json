@@ -31,6 +31,7 @@
       "name": "open",
       "summary": "render a note in the terminal (or Obsidian)",
       "risk": "read",
+      "tty": true,
       "args": [
         { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the note slug ([[wikilink]] basename)", "example": "the-ops-loop" },
         { "name": "--obsidian", "type": "flag", "required": false, "help": "open in Obsidian via an obsidian:// URI instead of the terminal" }
@@ -40,6 +41,7 @@
       "name": "edit",
       "summary": "open a note in $EDITOR",
       "risk": "safe_write",
+      "tty": true,
       "args": [
         { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the note slug to edit", "example": "the-ops-loop" }
       ]

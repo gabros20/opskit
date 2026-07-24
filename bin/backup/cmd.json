@@ -73,6 +73,7 @@
       "name": "init",
       "summary": "write .backup/config.json + render the launchd plist (human-run once); needs --yes",
       "risk": "confirm",
+      "tty": true,
       "args": [
         { "name": "--local-repo", "type": "string", "required": false, "help": "local restic repo path" },
         { "name": "--cloud-repo", "type": "string", "required": false, "help": "cloud restic repo (e.g. b2:bucket:ops)" },

@@ -1,8 +1,9 @@
 {
   "verb": "week",
   "summary": "weekly review: shipped/stalled, repo health, sweep done/ -> done/<year>/",
-  "usage": "ops week",
+  "usage": "ops week [--dry-run]",
   "risk": "safe_write",
+  "dry_run": true,
   "reads": [
     "tasks/",
     ".git"

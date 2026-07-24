@@ -30,5 +30,33 @@
       "dest": "string"
     }
   },
-  "dry_run": true
+  "dry_run": true,
+  "actions": [
+    {
+      "name": "propose",
+      "summary": "page inbox/ items and file each (interactive; `ops triage`, no keyword). --json lists proposals without acting; use `decide` to apply headless",
+      "risk": "safe_write",
+      "dry_run": true,
+      "tty": true,
+      "default": true,
+      "args": []
+    },
+    {
+      "name": "decide",
+      "summary": "non-interactively file ONE inbox item (the headless apply path)",
+      "risk": "safe_write",
+      "args": [
+        { "name": "item", "type": "string", "required": true, "help": "the inbox item filename (from `ops triage --json`)", "example": "cap-2026-07-24-note.md" },
+        { "name": "decision", "type": "enum", "required": true, "enum": ["task", "note", "skip"], "help": "file as a task, a note, or skip it" }
+      ]
+    },
+    {
+      "name": "drafts",
+      "summary": "promote agent-drafted notes (interactive). --json lists them; nested `drafts decide <slug> accept|reject|skip` applies one headless",
+      "risk": "safe_write",
+      "dry_run": true,
+      "tty": true,
+      "args": []
+    }
+  ]
 }

@@ -15,19 +15,24 @@ def _tasks(status):
 
 def main(argv):
     _, argv = output.parse_argv(argv)
-    note, created = paths.ensure_journal()
+    dry = "--dry-run" in argv
     active, waiting = _tasks("active"), _tasks("waiting")
     inbox = len([p for p in paths.INBOX.glob("*.md")]) if paths.INBOX.exists() else 0
 
-    if created:  # seed the new day's note with what's carried forward
-        lines = ["\n## Carried forward\n"]
-        for f in active:
-            lines.append(f"- [ ] {f.stem} {paths.title_of(f)}")
-        for f in waiting:
-            lines.append(f"- ⏸ {f.stem} {paths.title_of(f)} (waiting: {paths.fm_field(f, 'why') or '—'})")
-        lines.append("\n## Log\n")
-        with open(note, "a", encoding="utf-8") as fh:
-            fh.write("\n".join(lines) + "\n")
+    # --dry-run: preview today's journal path + carry-forward without creating/seeding/logging.
+    note = paths.journal_path(date.today())
+    created = not note.exists()
+    if not dry:
+        note, created = paths.ensure_journal()
+        if created:  # seed the new day's note with what's carried forward
+            lines = ["\n## Carried forward\n"]
+            for f in active:
+                lines.append(f"- [ ] {f.stem} {paths.title_of(f)}")
+            for f in waiting:
+                lines.append(f"- ⏸ {f.stem} {paths.title_of(f)} (waiting: {paths.fm_field(f, 'why') or '—'})")
+            lines.append("\n## Log\n")
+            with open(note, "a", encoding="utf-8") as fh:
+                fh.write("\n".join(lines) + "\n")
 
     y = paths.journal_path(date.today() - timedelta(days=1))
     data = {
@@ -38,11 +43,13 @@ def main(argv):
         "waiting_tasks": [{"id": f.stem, "title": paths.title_of(f),
                            "why": paths.fm_field(f, "why") or None} for f in waiting],
         "yesterday": str(y.relative_to(paths.OPS_HOME)) if y.exists() else None,
+        "dry_run": dry,
     }
 
     def render(_):
-        print(f"good morning — {date.today().isoformat()}")
-        print(f"  journal: {note.relative_to(paths.OPS_HOME)}{' (created)' if created else ''}")
+        print(f"good morning — {date.today().isoformat()}" + ("  (dry run — nothing written)" if dry else ""))
+        print(f"  journal: {note.relative_to(paths.OPS_HOME)}"
+              + (" (would create)" if (dry and created) else " (created)" if created else ""))
         print(f"  active:  {len(active)} task(s)")
         for f in active[:10]:
             print(f"    • {f.stem} {paths.title_of(f)}")
@@ -56,7 +63,8 @@ def main(argv):
             print(f"  yesterday: {y.relative_to(paths.OPS_HOME)}")
 
     output.emit(data, "start", human=render)
-    paths.append_journal("started the day")
+    if not dry:
+        paths.append_journal("started the day")
     return output.EXIT_OK
 
 

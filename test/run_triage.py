@@ -2,6 +2,7 @@
 """run_triage.py — exercises `ops triage`: dry-run, --yes auto-file, and the interactive
 override -> filing-rule learning loop (§10). Temp OPS_HOME; stdlib only."""
 from __future__ import annotations
+import json
 import os
 import subprocess
 import sys
@@ -62,6 +63,44 @@ def main() -> int:
         conv = (h / "wiki" / "conventions.md").read_text()
         check("override files as TASK", len(tasks) == 1, r.stdout + r.stderr)
         check("override records a filing rule", "-> task" in conv, conv)
+
+    # D) headless `triage decide` — the --json apply path (Wave 3): a frontend files ONE item
+    with tempfile.TemporaryDirectory() as td:
+        h = Path(td); seed(h, {"cap-a.md": TASK_CAP, "cap-b.md": NOTE_CAP})
+        r = triage(h, "decide", "cap-b.md", "note", "--json")
+        env = json.loads(r.stdout.splitlines()[0]) if r.stdout.strip() else {}
+        notes = list((h / "wiki" / "notes").glob("*.md")) if (h / "wiki" / "notes").exists() else []
+        check("triage decide <item> note --json: ok envelope + filed",
+              r.returncode == 0 and env.get("ok") is True and env.get("data", {}).get("filed"), r.stdout[:160])
+        check("triage decide files the note + removes the item", len(notes) == 1
+              and not (h / "inbox" / "cap-b.md").exists(), r.stdout + r.stderr)
+        r = triage(h, "decide", "cap-a.md", "skip", "--json")
+        env = json.loads(r.stdout.splitlines()[0]) if r.stdout.strip() else {}
+        check("triage decide <item> skip --json: no-op, item stays",
+              env.get("data", {}).get("filed") is None and (h / "inbox" / "cap-a.md").exists(), r.stdout[:160])
+        r = triage(h, "decide", "cap-a.md", "bogus", "--json")
+        check("triage decide bad decision -> usage error (2)", r.returncode == 2, f"rc={r.returncode}")
+        r = triage(h, "decide", "nope.md", "note", "--json")
+        check("triage decide missing item -> not-found (4)", r.returncode == 4, f"rc={r.returncode}")
+
+    # E) headless `triage drafts decide` — promote/reject an agent-drafted note (Wave 3)
+    with tempfile.TemporaryDirectory() as td:
+        h = Path(td); (h / "wiki" / "notes").mkdir(parents=True)
+        draft = h / "wiki" / "notes" / "concept-x.md"
+        draft.write_text("---\ntype: note\nauthor: agent\nstatus: draft\ntitle: Concept X\n---\n# Concept X\n",
+                         encoding="utf-8")
+        r = triage(h, "drafts", "decide", "concept-x", "accept", "--json")
+        env = json.loads(r.stdout.splitlines()[0]) if r.stdout.strip() else {}
+        check("triage drafts decide <slug> accept --json: promotes to active",
+              r.returncode == 0 and env.get("data", {}).get("status") == "active"
+              and "status: active" in draft.read_text(), r.stdout[:160])
+        # reject deletes
+        draft2 = h / "wiki" / "notes" / "concept-y.md"
+        draft2.write_text("---\ntype: note\nauthor: agent\nstatus: draft\ntitle: Concept Y\n---\n# Concept Y\n",
+                          encoding="utf-8")
+        r = triage(h, "drafts", "decide", "concept-y", "reject", "--json")
+        check("triage drafts decide <slug> reject --json: deletes the draft",
+              r.returncode == 0 and not draft2.exists(), r.stdout + r.stderr)
 
     print(f"{BOLD}triage (inbox -> tasks/wiki, with learning loop) — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)

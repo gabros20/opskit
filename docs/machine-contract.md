@@ -99,6 +99,7 @@ Per verb (copied from its `cmd.json` sidecar, plus injected fields):
 | `output` | `{mode: "scalar"|"rows", fields: {name: type}}` — the `--json` shape of the verb's default action |
 | `hints` | when-to-use + the common mistake (also shown by `ops help <verb>`; becomes the MCP tool description) |
 | `dry_run` | `true` if the verb supports the dry-run contract |
+| `tty` | **(ops.json/3, optional)** `true` if the verb (or, per-action in `actions[]`, a subaction) prompts or takes over the terminal — a frontend must hand off stdio rather than capture `--json` (see §5.1) |
 | `actions` | **(ops.json/3, optional)** the real subcommand grammar of a compound verb — see §5.1. Absent on scalar verbs |
 
 Both new fields are additive: every `ops.json/2` field is retained, so a `schema`-unaware consumer that
@@ -154,6 +155,9 @@ top-level `args`/`risk`/`output`/`dry_run`, which continue to describe the **def
     "default": false,                  // optional bool; true marks the TOKENLESS default action —
                                        //   the one that runs when no subcommand keyword is given
                                        //   (`ops share <slug>`, bare `ops backup`). ≤1 per verb.
+    "tty": true,                       // optional bool; true = this action prompts or takes over the
+                                       //   terminal ($EDITOR, an fzf picker, a password prompt), so a
+                                       //   TUI must SUSPEND and hand off stdio, not capture --json.
     "args": [                          // positional args + flags, IN ORDER (required; may be empty)
       { "name": "title", "type": "string", "required": true,
         "help": "the task title", "example": "Fix the Acme webhook" },
@@ -192,11 +196,21 @@ Rules a consumer can rely on:
   `--dry-run` (the top-level `dry_run` describes only the **default** action, per the note above — it is
   never inherited by the other subactions). So a UI offers `--dry-run` on exactly the actions that
   declare `dry_run: true`, and nowhere else.
-- **`risk` is declarative today.** The engine guardrail currently gates on the verb's **top-level**
-  `risk`; the per-action `risk` is published for consumers (a UI can confirm-gate just the subactions
-  that need it) but the dispatcher does not yet enforce it per-action — that is Wave 3's contract-honesty
-  pass. Until then a consumer should treat per-action `risk` as the intended class, not as what the
-  guardrail will already refuse.
+- **`tty` means hand off the terminal.** An action (or a non-compound verb, top-level) with
+  `"tty": true` prompts or takes over the terminal — `$EDITOR` (`wiki edit`), an fzf picker (`wiki
+  open` with no slug), or a password prompt (`backup init`), and the interactive `triage` flows. A
+  frontend must **suspend and hand off stdio** for these rather than capture `--json`; for the
+  headless path it uses the action's non-interactive sibling instead (e.g. `triage decide` /
+  `triage drafts decide` rather than the interactive pager). Omitted ⇒ `false`.
+- **Per-action `risk` is declarative; the guardrail gates on the verb's top-level `risk`.** The
+  dispatcher's guardrail reads the verb's top-level `risk` (a confirm-class *verb* needs `--yes`); a
+  subaction that is stricter than its verb — e.g. a `confirm` subaction under a `safe_write` verb
+  (`share revoke`, `backup run --target cloud`, `models pull`) — enforces that stricter class **inside
+  the verb**, self-gating on `--yes` and returning `EXIT_CONFIRM` (3). So the per-action `risk` is an
+  honest description a UI can pre-gate on (confirm just the subactions that need it), and it is
+  enforced — by the verb, not double-gated by the dispatcher (which cannot know a subaction's
+  *conditional* gates, e.g. `backup run` is free for `--target local` but confirm for `cloud`). A
+  consumer treats per-action `risk` as the class that subaction will require.
 
 `test/run_json.py` validates every declared `actions[]` (typed args, enum lists present, `risk`/`complete`
 in their enums) and fails the build on drift.

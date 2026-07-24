@@ -23,7 +23,7 @@ API_VERSION = "1.0"
 
 # display grouping (design §4.1); verbs not listed fall under "OTHER"
 GROUPS = [
-    ("SYSTEM", ["help", "status", "orient", "doctor", "backup", "index", "consolidate", "plugin", "complete"]),
+    ("SYSTEM", ["help", "status", "orient", "doctor", "backup", "index", "consolidate", "plugin", "complete", "ui"]),
     ("FLOW", ["capture", "triage", "start", "close", "week"]),
     ("KNOWLEDGE", ["search", "open", "wiki", "bookmark", "organize"]),
     ("TASKS", ["task"]),

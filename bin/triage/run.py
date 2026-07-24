@@ -139,11 +139,66 @@ def cmd_drafts(argv, dry, yes, js):
     return 0
 
 
+def cmd_decide(argv):
+    """Non-interactive: apply ONE decision to ONE inbox item (the JSON/agent apply path). The
+    interactive/list flows can't be driven headless, so a frontend calls this per item."""
+    if len(argv) < 2:
+        output.fail(output.EXIT_USAGE, "usage: ops triage decide <item> task|note|skip", verb="triage")
+    item, decision = argv[0], argv[1].lower()
+    if decision not in ("task", "note", "skip"):
+        output.fail(output.EXIT_USAGE, "decision must be one of task|note|skip", verb="triage")
+    cands = [q for q in items() if q.name == item or q.stem == item]
+    p = cands[0] if cands else None
+    if not p or not p.exists():
+        output.fail(output.EXIT_NOT_FOUND, f"no inbox item '{item}' (see `ops triage --json`)", verb="triage")
+    if decision == "skip":
+        return output.emit({"item": p.name, "decision": "skip", "filed": None}, "triage",
+                           human=lambda _: f"skipped {p.name}")
+    text = parse_item(p)
+    new = make_task(text) if decision == "task" else make_note(text)
+    p.unlink()
+    filed = str(new.relative_to(paths.OPS_HOME))
+    paths.append_journal(f"triaged {p.name} -> {filed} (decide {decision})")
+    return output.emit({"item": p.name, "decision": decision, "filed": filed}, "triage",
+                       human=lambda _: f"filed {p.name} -> {filed}")
+
+
+def cmd_drafts_decide(argv):
+    """Non-interactive: apply ONE decision to ONE agent-drafted note (the JSON/agent promote path)."""
+    if len(argv) < 2:
+        output.fail(output.EXIT_USAGE, "usage: ops triage drafts decide <slug> accept|reject|skip", verb="triage")
+    slug, decision = argv[0], argv[1].lower()
+    if decision not in ("accept", "reject", "skip"):
+        output.fail(output.EXIT_USAGE, "decision must be one of accept|reject|skip", verb="triage")
+    p = next((q for q in _draft_notes() if q.stem == slug), None)
+    if not p:
+        output.fail(output.EXIT_NOT_FOUND, f"no agent-draft '{slug}' (see `ops triage drafts --json`)", verb="triage")
+    rel = str(p.relative_to(paths.OPS_HOME))
+    if decision == "skip":
+        return output.emit({"slug": slug, "decision": "skip"}, "triage", human=lambda _: f"skipped {slug}")
+    if decision == "reject":
+        p.unlink()
+        _commit(rel, f"organize: reject agent draft {slug}")
+        paths.append_journal(f"triage drafts: rejected {slug} (deleted)")
+        return output.emit({"slug": slug, "decision": "reject", "deleted": True}, "triage",
+                           human=lambda _: f"rejected {slug} (deleted)")
+    text = p.read_text(encoding="utf-8")
+    p.write_text(re.sub(r"(?m)^status:\s*draft\s*$", "status: active", text, count=1), encoding="utf-8")
+    _commit(rel, f"organize: promote agent draft {slug} -> active")
+    paths.append_journal(f"triage drafts: promoted {slug} -> active")
+    return output.emit({"slug": slug, "decision": "accept", "status": "active"}, "triage",
+                       human=lambda _: f"promoted {slug} -> active")
+
+
 def main(argv):
     js, argv = output.parse_argv(argv)
     dry = "--dry-run" in argv
     yes = "--yes" in argv or "-y" in argv
+    if argv and argv[0] == "decide":
+        return cmd_decide(argv[1:])
     if argv and argv[0] == "drafts":
+        if len(argv) > 1 and argv[1] == "decide":
+            return cmd_drafts_decide(argv[2:])
         return cmd_drafts(argv[1:], dry, yes, js)
     its = items()
 

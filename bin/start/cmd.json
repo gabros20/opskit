@@ -1,8 +1,9 @@
 {
   "verb": "start",
   "summary": "daily start: today's journal, carry-forward open tasks, dashboard",
-  "usage": "ops start",
+  "usage": "ops start [--dry-run]",
   "risk": "safe_write",
+  "dry_run": true,
   "reads": [
     "tasks/",
     "inbox/",
