@@ -5,9 +5,11 @@ import their `run.py` modules, so setup status can be reused without cross-verb 
 """
 from __future__ import annotations
 from dataclasses import dataclass
+import hashlib
 import importlib.util
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -50,6 +52,7 @@ LAYERS: list[Layer] = [
     Layer("backups", "Durability", "Encrypted off-machine backup configuration", False, "blocked", "ops backup init"),
     Layer("models", "File-processing / LLM", "Local models and optional file-processing runtimes", False, "confirm"),
     Layer("automation", "Schedules", "Rendered launchd job plists", False, "safe_write"),
+    Layer("ui", "Terminal UI", "The guided ops-ui binary for humans (`ops ui`)", False, "confirm"),
 ]
 
 
@@ -335,6 +338,148 @@ def _status_automation(layer: Layer) -> dict:
     return _row(layer, state, detail, items, "ops setup automation" if state != "ready" else "")
 
 
+# --- the `ui` layer (ADR-011): the ops-ui terminal binary for humans. The TS source lives in the
+# template's ui/ (NOT in engine.txt, so it never propagates to vaults); what a vault installs is a
+# self-contained compiled binary from the template repo's GitHub release, placed where the
+# `bin/ui/run.py` shim looks first ($OPS_HOME/.local/bin/ops-ui). The template may be PRIVATE, so
+# the download uses the authenticated GitHub CLI, never anonymous curl.
+
+UI_ASSETS = {
+    ("Darwin", "arm64"): "ops-ui-darwin-arm64",
+    ("Darwin", "x86_64"): "ops-ui-darwin-x64",
+    ("Linux", "x86_64"): "ops-ui-linux-x64",
+    ("Linux", "aarch64"): "ops-ui-linux-arm64",
+    ("Linux", "arm64"): "ops-ui-linux-arm64",
+}
+
+
+def _ui_target():
+    return paths.OPS_HOME / ".local" / "bin" / "ops-ui"
+
+
+def _ui_installed() -> str | None:
+    """Mirror of the bin/ui shim's resolution: explicit $OPS_UI_BIN wins, then the vault-local
+    install this layer provisions, then PATH. Same isfile+X_OK bar everywhere."""
+    override = os.environ.get("OPS_UI_BIN")
+    if override:
+        p = override if os.path.isabs(override) else shutil.which(override)
+        return p if (p and os.path.isfile(p) and os.access(p, os.X_OK)) else None
+    target = _ui_target()
+    if target.is_file() and os.access(target, os.X_OK):
+        return str(target)
+    return shutil.which("ops-ui")
+
+
+def _ui_asset() -> str | None:
+    return UI_ASSETS.get((_platform_system(), _platform_machine()))
+
+
+def _gh_present() -> bool:
+    """Is the GitHub CLI on PATH? A seam (like _ollama_present) so tests exercise the
+    downloadable/blocked branches host-independently."""
+    return shutil.which("gh") is not None
+
+
+def _ui_repo() -> str | None:
+    """The template repo (owner/repo) hosting the ops-ui releases: a derived vault's fetch-only
+    `upstream` remote when present, else `origin` (the template checkout itself). Never hardcoded —
+    the same remote script/update trusts for engine files is the one trusted for binaries."""
+    for remote in ("upstream", "origin"):
+        try:
+            r = subprocess.run(["git", "-C", str(paths.OPS_HOME), "remote", "get-url", remote],
+                               capture_output=True, text=True, timeout=10)
+        except Exception:
+            return None
+        if r.returncode != 0:
+            continue
+        m = re.search(r"github\.com[:/]+([^/:]+/[^/\s]+?)(?:\.git)?/?$", r.stdout.strip())
+        if m:
+            return m.group(1)
+    return None
+
+
+def _ui_source_buildable() -> bool:
+    """Contributor fallback: a full template checkout carries ui/ source, compilable with bun."""
+    return (paths.OPS_HOME / "ui" / "package.json").is_file() and shutil.which("bun") is not None
+
+
+def _status_ui(layer: Layer) -> dict:
+    exe = _ui_installed()
+    items = [{"id": "binary", "title": ".local/bin/ops-ui (or $OPS_UI_BIN / PATH)", "ok": bool(exe)}]
+    if exe:
+        return _row(layer, "ready", f"ops ui launches {exe}", items)
+    asset = _ui_asset()
+    can_download = _gh_present() and asset is not None and _ui_repo() is not None
+    if can_download or _ui_source_buildable():
+        return _row(layer, "absent", "the terminal UI binary is not installed", items,
+                    "ops setup ui --yes")
+    if asset is None:
+        return _row(layer, "not_applicable",
+                    f"no prebuilt ops-ui for this platform ({_platform_system()}/{_platform_machine()}), "
+                    "and no ui/ source + bun to build from", items, "")
+    return _row(layer, "blocked",
+                "the GitHub CLI is required to download the ops-ui release binary", items,
+                "install the GitHub CLI: brew install gh (then `ops setup ui --yes`)")
+
+
+def _ui_verify_and_install(asset_path, checksums_path, target) -> None:
+    """sha256-gate the downloaded asset against the release's checksums.txt, then move it into place
+    executable. Raises OSError on any mismatch (the caller surfaces it as a layer failure) and
+    removes the unverified download so a bad binary never lingers executable."""
+    digest = hashlib.sha256(asset_path.read_bytes()).hexdigest()
+    want = None
+    for ln in checksums_path.read_text().splitlines():
+        parts = ln.split()
+        if len(parts) >= 2 and parts[-1].lstrip("*") == asset_path.name:
+            want = parts[0]
+            break
+    if want is None:
+        asset_path.unlink(missing_ok=True)
+        raise OSError(f"checksums.txt has no entry for {asset_path.name}")
+    if digest != want:
+        asset_path.unlink(missing_ok=True)
+        raise OSError(f"sha256 mismatch for {asset_path.name}: got {digest}, want {want}")
+    checksums_path.unlink(missing_ok=True)
+    if str(asset_path) != str(target):
+        asset_path.replace(target)
+    target.chmod(0o755)
+
+
+def _install_ui(res: dict, *, fake: bool) -> None:
+    """Provision the ops-ui binary into $OPS_HOME/.local/bin (where the bin/ui shim looks first).
+    Primary: `gh release download` the prebuilt asset + checksums.txt from the template repo (gh is
+    already authenticated for anyone who cloned a private template) and verify the sha256. Fallback
+    (contributor checkout): compile ui/ from source with bun. Steps are recorded in res['ran'];
+    fake/dry mode records the plan and runs nothing."""
+    target = _ui_target()
+    bindir = target.parent
+    asset = _ui_asset()
+    repo = _ui_repo()
+    if _gh_present() and asset and repo:
+        dl = ["gh", "release", "download", "--repo", repo, "--pattern", asset,
+              "--pattern", "checksums.txt", "--dir", str(bindir), "--clobber"]
+        if _fake(fake):
+            res["ran"].append(_run(dl, fake=fake))
+            res["ran"].append(f"verify sha256 (checksums.txt) + install {target}")
+            return
+        bindir.mkdir(parents=True, exist_ok=True)
+        res["ran"].append(_run(dl))
+        _ui_verify_and_install(bindir / asset, bindir / "checksums.txt", target)
+        res["ran"].append(f"verified sha256 + installed {target}")
+        return
+    if _ui_source_buildable():
+        src = paths.OPS_HOME / "ui"
+        if not _fake(fake):
+            bindir.mkdir(parents=True, exist_ok=True)
+        res["ran"].append(_run(["bun", "install", "--cwd", str(src)], fake=fake))
+        res["ran"].append(_run(["bun", "build", "--compile", str(src / "src" / "index.ts"),
+                                "--outfile", str(target)], fake=fake))
+        return
+    raise FileNotFoundError(
+        "no way to install ops-ui: need the GitHub CLI (gh) for the release download, "
+        "or ui/ source + bun to build from")
+
+
 def status(layer_id=None) -> list[dict]:
     selected = [_layer(layer_id)] if layer_id else list(LAYERS)
     out = []
@@ -349,6 +494,8 @@ def status(layer_id=None) -> list[dict]:
             out.append(_status_models(layer))
         elif layer.id == "automation":
             out.append(_status_automation(layer))
+        elif layer.id == "ui":
+            out.append(_status_ui(layer))
     return out
 
 
@@ -423,6 +570,10 @@ def advance(layer_id, *, yes: bool, fake: bool) -> dict:
             res["ran"].append(_venv_pip(*pkgs, fake=fake))
         elif layer.id == "automation":
             res["ran"].append(_run_verb("job", "apply", fake=fake))
+        elif layer.id == "ui":
+            # ADR-011: download the compiled ops-ui release binary (sha256-verified) into
+            # $OPS_HOME/.local/bin — or compile from ui/ source in a contributor checkout.
+            _install_ui(res, fake=fake)
     except BaseException as exc:
         exc.ops_partial_ran = list(res["ran"])
         raise

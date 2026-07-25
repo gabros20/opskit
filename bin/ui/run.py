@@ -16,21 +16,29 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lib import output  # noqa: E402
+from lib import output, paths  # noqa: E402
 
-INSTALL_HINT = ("install the ops terminal UI (a separate binary) and put `ops-ui` on your PATH, "
+INSTALL_HINT = ("run `ops setup ui --yes` to download the terminal UI binary into .local/bin, "
                 "or set OPS_UI_BIN=/path/to/ops-ui; then re-run `ops ui`")
 
 
+def _executable(p: str | None) -> str | None:
+    return p if (p and os.path.isfile(p) and os.access(p, os.X_OK)) else None
+
+
 def _resolve() -> str | None:
-    """Absolute path to an EXECUTABLE ops-ui binary — an explicit $OPS_UI_BIN wins, else PATH lookup.
-    `shutil.which` already guarantees an executable regular file; the explicit-path branch must check
-    the same (isfile + X_OK) so a stale/dir/non-exec OPS_UI_BIN degrades to the blocked hint rather
-    than crashing the later execv."""
+    """Absolute path to an EXECUTABLE ops-ui binary. Resolution order: explicit $OPS_UI_BIN wins;
+    then the vault-local install `ops setup ui` provisions ($OPS_HOME/.local/bin/ops-ui); then PATH.
+    `shutil.which` already guarantees an executable regular file; the other branches must check the
+    same (isfile + X_OK) so a stale/dir/non-exec candidate degrades to the blocked hint rather than
+    crashing the later execv."""
     override = os.environ.get("OPS_UI_BIN")
     if override:
         p = override if os.path.isabs(override) else shutil.which(override)
-        return p if (p and os.path.isfile(p) and os.access(p, os.X_OK)) else None
+        return _executable(p)
+    local = _executable(str(paths.OPS_HOME / ".local" / "bin" / "ops-ui"))
+    if local:
+        return local
     return shutil.which("ops-ui")
 
 

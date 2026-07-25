@@ -1,10 +1,15 @@
-# Personal Operating System (`~/ops`)
+# opskit — a personal operating system (`~/ops`)
 
 **A local-first, agent-agnostic platform for your knowledge, tasks, and work.**
 Plaintext is the truth, git is the spine, and one `ops <verb>` command drives everything — by hand in
 a terminal, on a schedule, through Obsidian or Raycast, or through any AI agent. No server, no cloud,
 no lock-in. Your notes are Markdown files in your own git repo; you can read them, grep them, and walk
 away from this tool at any time with nothing stranded.
+
+**Two faces, one door.** Humans get **`ops ui`** — a guided terminal UI (point-and-pick menus and
+forms generated from the machine contract, nothing to memorize). Agents and scripts get
+**`ops <verb> --json`** — the flag-based surface with a frozen envelope and exit-code protocol. Both
+enter the same dispatcher, so the guardrail and logs see every action identically.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · verbs generated (see `ops.json`) · offline test suites in CI · macOS / Linux · Python 3.10+ + git · zero required deps
 
@@ -73,13 +78,16 @@ to overwrite an existing install. Read it before you pipe it (that's the point o
 ```sh
 # inspect first — pin TLS, verify the published hash, read it, THEN run it
 curl --proto '=https' --tlsv1.2 -fsSL \
-  https://raw.githubusercontent.com/gabros20/personal-operating-system/main/script/get -o get.sh
+  https://raw.githubusercontent.com/gabros20/opskit/main/script/get -o get.sh
 shasum -a 256 get.sh   # compare against get.sh.sha256 published beside it
 sh get.sh              # installs a LEAN vault, non-interactively (add --full to keep the dev test/ tree)
 ```
-Then finish setup with the guided first-run — **`ops setup --wizard`** (≤5 skippable prompts, safe
-defaults: skeleton on, search/models/automation off) — or **`ops setup --all --yes`** to advance
-every safe layer non-interactively.
+Then finish setup with the guided first-run — **`ops setup --wizard`** (skippable prompts, safe
+defaults: skeleton and the terminal UI on, search/models/automation off) — or **`ops setup --all
+--yes`** to advance every safe layer non-interactively. The `ui` layer downloads the compiled
+`ops ui` binary (sha256-verified, via the authenticated `gh` CLI) into the vault's own
+`.local/bin/` — its TypeScript source lives in this template's `ui/`, but vaults only ever receive
+the self-contained binary (no Node required).
 
 **Kick the tyres first (`--demo`).** Clone into a throwaway tmp dir seeded with example notes — the
 roots, the `ops` symlink, and completion all land *inside* that one dir, so `capture`/`search`/`week`

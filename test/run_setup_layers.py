@@ -83,7 +83,8 @@ def main() -> int:
         mod = reload_setuplib(home)
 
         ids = [layer.id for layer in mod.LAYERS]
-        check("registry has L1-L5 in order", ids == ["skeleton", "search", "backups", "models", "automation"], str(ids))
+        check("registry has L1-L5 + ui in order",
+              ids == ["skeleton", "search", "backups", "models", "automation", "ui"], str(ids))
         check("registry exposes layer shape",
               all(layer.id and layer.title and layer.gate and isinstance(layer.required, bool) for layer in mod.LAYERS),
               str(mod.LAYERS))
@@ -92,7 +93,7 @@ def main() -> int:
 
         rows = mod.status()
         valid = {"ready", "partial", "absent", "blocked", "not_applicable"}
-        check("status returns public rows", len(rows) == 5 and all({"id", "title", "status", "required", "detail", "items", "next"}.issubset(r) for r in rows), str(rows))
+        check("status returns public rows", len(rows) == 6 and all({"id", "title", "status", "required", "detail", "items", "next"}.issubset(r) for r in rows), str(rows))
         check("status values are valid", {r["status"] for r in rows} <= valid, str(rows))
         check("single-layer status filters", [r["id"] for r in mod.status("search")] == ["search"])
 
@@ -275,6 +276,77 @@ def main() -> int:
             unknown_advance_ok = "unknown layer" in str(e)
         check("unknown layer advance is clear error", unknown_advance_ok)
 
+        # --- ui layer (ADR-011): host-independent probes via the _gh_present/_ui_* seams. The layer
+        # is absent (attemptable) when the release download OR a source build is possible; blocked
+        # with a teaching hint when neither is; not_applicable on a platform with no prebuilt asset;
+        # ready once an executable binary is where the bin/ui shim looks. Fake advance previews the
+        # gh download + sha256 verify without touching the network. ---
+        old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: "ops-ui-test-arm64",
+                          _ui_repo=lambda: "owner/template", _ui_source_buildable=lambda: False,
+                          _gh_present=lambda: True)
+        try:
+            u_abs = mod.status("ui")[0]
+            check("ui absent (attemptable) when downloadable but not installed",
+                  u_abs["status"] == "absent" and u_abs["next"] == "ops setup ui --yes", str(u_abs))
+            u_adv = mod.advance("ui", yes=True, fake=True)
+            u_joined = " | ".join(u_adv["ran"])
+            check("fake ui advance previews gh release download + sha256 verify (no network)",
+                  "gh release download" in u_joined and "owner/template" in u_joined
+                  and "checksums.txt" in u_joined and "sha256" in u_joined, str(u_adv["ran"]))
+        finally:
+            restore(mod, old)
+
+        old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: "ops-ui-test-arm64",
+                          _ui_repo=lambda: None, _ui_source_buildable=lambda: False,
+                          _gh_present=lambda: False)
+        try:
+            u_blk = mod.status("ui")[0]
+            check("ui blocked without gh, hint teaches the install",
+                  u_blk["status"] == "blocked" and "gh" in u_blk["next"], str(u_blk))
+            u_badv = mod.advance("ui", yes=True, fake=True)
+            check("blocked ui advance skips with the handoff (never attempts)",
+                  not u_badv["ran"] and "ui" in u_badv["skipped"]
+                  and any("gh" in h for h in u_badv["handoff"]), str(u_badv))
+        finally:
+            restore(mod, old)
+
+        old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: None,
+                          _ui_repo=lambda: "owner/template", _ui_source_buildable=lambda: False,
+                          _gh_present=lambda: True)
+        try:
+            u_na = mod.status("ui")[0]
+            check("ui not_applicable on a platform with no prebuilt asset and no source build",
+                  u_na["status"] == "not_applicable", str(u_na))
+        finally:
+            restore(mod, old)
+
+        # Source-build fallback (contributor checkout): no gh, but ui/ + bun → still attemptable,
+        # and the fake advance previews the bun compile into .local/bin.
+        old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: "ops-ui-test-arm64",
+                          _ui_repo=lambda: None, _ui_source_buildable=lambda: True,
+                          _gh_present=lambda: False)
+        try:
+            u_src = mod.status("ui")[0]
+            check("ui attemptable via source build when gh is absent", u_src["status"] == "absent", str(u_src))
+            u_sadv = mod.advance("ui", yes=True, fake=True)
+            u_sjoined = " | ".join(u_sadv["ran"])
+            check("fake ui source advance previews bun install + compile",
+                  "bun install" in u_sjoined and "bun build --compile" in u_sjoined
+                  and ".local/bin/ops-ui" in u_sjoined, str(u_sadv["ran"]))
+        finally:
+            restore(mod, old)
+
+        # Ready once an executable binary sits where the shim looks first (.local/bin/ops-ui).
+        ui_bin = home / ".local" / "bin" / "ops-ui"
+        ui_bin.parent.mkdir(parents=True, exist_ok=True)
+        ui_bin.write_text("#!/bin/sh\n")
+        ui_bin.chmod(0o755)
+        u_rdy = mod.status("ui")[0]
+        check("ui ready once .local/bin/ops-ui is installed+executable", u_rdy["status"] == "ready", str(u_rdy))
+        u_skip = mod.advance("ui", yes=True, fake=True)
+        check("ready ui advance is idempotent (skips)", not u_skip["ran"] and "ui" in u_skip["skipped"], str(u_skip))
+        ui_bin.unlink()
+
         # --- Best-effort --all (Task 8): a failure in ONE attempted AUTO layer must not abort the
         # others; only an ATTEMPTED failure yields a nonzero exit; ready/blocked/not_applicable layers
         # are skipped (not attempted). Drive the real bin/setup/run.py:_advance_all with stubbed
@@ -287,13 +359,13 @@ def main() -> int:
         _spec.loader.exec_module(setup_run)
 
         _ALL_STATUS = {"skeleton": "partial", "search": "absent", "backups": "blocked",
-                       "models": "not_applicable", "automation": "absent"}
+                       "models": "not_applicable", "automation": "absent", "ui": "blocked"}
 
         def fake_status(layer_id=None):
             def row(i):
                 return {"id": i, "title": i, "status": _ALL_STATUS[i], "required": i == "skeleton",
                         "detail": "", "items": [], "next": f"next-{i}"}
-            order = ["skeleton", "search", "backups", "models", "automation"]
+            order = ["skeleton", "search", "backups", "models", "automation", "ui"]
             return [row(layer_id)] if layer_id else [row(i) for i in order]
 
         def fake_advance(layer_id, *, yes, fake):
@@ -342,13 +414,13 @@ def main() -> int:
         # every confirm-class AUTO layer is blocked/not_applicable, `--all` attempts nothing and must
         # NOT demand --yes (that was a spurious exit 3, e.g. on a host with no ollama). ---
         _F4_STATUS = {"skeleton": "ready", "search": "blocked", "backups": "blocked",
-                      "models": "not_applicable", "automation": "ready"}
+                      "models": "not_applicable", "automation": "ready", "ui": "blocked"}
 
         def f4_status(layer_id=None):
             def row(i):
                 return {"id": i, "title": i, "status": _F4_STATUS[i], "required": i == "skeleton",
                         "detail": "", "items": [], "next": f"next-{i}"}
-            order = ["skeleton", "search", "backups", "models", "automation"]
+            order = ["skeleton", "search", "backups", "models", "automation", "ui"]
             return [row(layer_id)] if layer_id else [row(i) for i in order]
 
         def f4_advance(layer_id, *, yes, fake):
@@ -385,13 +457,13 @@ def main() -> int:
         # --- FIX 5: best-effort `--all` preserves partial progress (steps that ran before a failure)
         # AND aggregates every blocked/skipped layer's `next` remediation into the top-level handoff. ---
         _F5_STATUS = {"skeleton": "absent", "search": "absent", "backups": "blocked",
-                      "models": "blocked", "automation": "absent"}
+                      "models": "blocked", "automation": "absent", "ui": "blocked"}
 
         def f5_status(layer_id=None):
             def row(i):
                 return {"id": i, "title": i, "status": _F5_STATUS[i], "required": i == "skeleton",
                         "detail": "", "items": [], "next": f"next-{i}"}
-            order = ["skeleton", "search", "backups", "models", "automation"]
+            order = ["skeleton", "search", "backups", "models", "automation", "ui"]
             return [row(layer_id)] if layer_id else [row(i) for i in order]
 
         def f5_advance(layer_id, *, yes, fake):
@@ -445,6 +517,8 @@ def main() -> int:
              "detail": "file-processing models ready", "items": [], "next": ""},
             {"id": "automation", "title": "Schedules", "status": "absent", "required": False,
              "detail": "", "items": [], "next": "ops setup automation"},
+            {"id": "ui", "title": "Terminal UI", "status": "absent", "required": False,
+             "detail": "", "items": [], "next": "ops setup ui --yes"},
         ]
         wiz_calls = []
 
@@ -454,9 +528,10 @@ def main() -> int:
             r["ran"].append(f"did {layer_id}")
             return r
 
-        # Prompts fire only for attemptable layers, in LAYERS order: skeleton, search, automation.
-        # Answers: Enter (accept default-Y skeleton), Enter (skip default-N search), 'y' (accept automation).
-        wiz_answers = iter(["", "", "y"])
+        # Prompts fire only for attemptable layers, in LAYERS order: skeleton, search, automation, ui.
+        # Answers: Enter (accept default-Y skeleton), Enter (skip default-N search), 'y' (accept
+        # automation), Enter (accept default-Y ui — the TUI defaults ON for the wizard's audience).
+        wiz_answers = iter(["", "", "y", ""])
         wiz_lines = []
         _saved_w = setup_run.setuplib.advance
         setup_run.setuplib.advance = wiz_advance
@@ -466,12 +541,14 @@ def main() -> int:
             setup_run.setuplib.advance = _saved_w
         wiz_out = "\n".join(wiz_lines)
         check("wizard advances accepted layers via the SAME advance(yes=True)",
-              wiz_calls == [("skeleton", True), ("automation", True)], str(wiz_calls))
+              wiz_calls == [("skeleton", True), ("automation", True), ("ui", True)], str(wiz_calls))
+        check("wizard ui default is ON (Enter accepts the TUI download)",
+              ("ui", True) in wiz_calls, str(wiz_calls))
         check("wizard skips a default-N layer left at its default (search)",
               "search" in wiz_summary["skipped"] and "search" not in [c[0] for c in wiz_calls],
               str(wiz_summary))
-        check("wizard summary lists what advanced", wiz_summary["advanced"] == ["skeleton", "automation"],
-              str(wiz_summary))
+        check("wizard summary lists what advanced",
+              wiz_summary["advanced"] == ["skeleton", "automation", "ui"], str(wiz_summary))
         check("wizard notes an already-ready layer and never advances it",
               "already ready" in wiz_out and ("models", True) not in wiz_calls, wiz_out)
         check("wizard surfaces the backups handoff (never prompts/auto-runs it)",
@@ -532,20 +609,20 @@ def main() -> int:
         cli_home = make_home(tmp / "cli")
         dashboard = run_setup([], cli_home)
         check("setup dashboard exits ok", dashboard.returncode == 0, dashboard.stderr + dashboard.stdout)
-        check("setup dashboard lists five layers",
-              all(layer in dashboard.stdout for layer in ("skeleton", "search", "backups", "models", "automation")),
+        check("setup dashboard lists six layers",
+              all(layer in dashboard.stdout for layer in ("skeleton", "search", "backups", "models", "automation", "ui")),
               dashboard.stdout)
         check("setup dashboard shows next commands", "ops setup search --yes" in dashboard.stdout, dashboard.stdout)
 
         json_dash = run_setup(["--json"], cli_home)
         try:
             lines = [json.loads(ln) for ln in json_dash.stdout.splitlines() if ln.strip()]
-            json_ok = json_dash.returncode == 0 and len(lines) == 6 and lines[0]["count"] == 5
+            json_ok = json_dash.returncode == 0 and len(lines) == 7 and lines[0]["count"] == 6
         except Exception as e:
             lines = []
             json_ok = False
             json_dash.stderr += str(e)
-        check("setup --json emits header plus five parseable layer rows", json_ok, json_dash.stdout + json_dash.stderr)
+        check("setup --json emits header plus six parseable layer rows", json_ok, json_dash.stdout + json_dash.stderr)
         check("setup --json rows expose public fields",
               bool(lines) and all({"id", "title", "status", "required", "detail", "items", "next"}.issubset(r) for r in lines[1:]),
               str(lines))

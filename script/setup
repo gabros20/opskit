@@ -11,7 +11,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-UPSTREAM_URL="https://github.com/gabros20/personal-operating-system.git"
+UPSTREAM_URL="https://github.com/gabros20/opskit.git"
 ROOTS_HOME="${OPS_ROOTS_HOME:-$HOME}"          # where ~/work, ~/files are created (override for tests)
 BIN_DIR="${OPS_BIN_DIR:-$HOME/.local/bin}"      # where the `ops` symlink goes
 COMP_DIR="${OPS_COMP_DIR:-$HOME/.zsh/completions}"  # where the zsh completion symlink goes

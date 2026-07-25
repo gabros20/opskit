@@ -32,7 +32,8 @@
     "~/files",
     "~/work",
     "Python package index / configured pip indexes (external, confirm-gated)",
-    "Ollama daemon and model registry (external/local, confirm-gated)"
+    "Ollama daemon and model registry (external/local, confirm-gated)",
+    "template repo GitHub release assets via the gh CLI (ops-ui binary, confirm-gated)"
   ],
   "writes": [
     "wiki/",
@@ -41,9 +42,10 @@
     "jobs/launchd/",
     ".obsidian/",
     "Python environment / site-packages (pip install, confirm-gated)",
-    "~/.ollama/models (model pulls, confirm-gated)"
+    "~/.ollama/models (model pulls, confirm-gated)",
+    ".local/bin/ (ops-ui binary, sha256-verified, confirm-gated)"
   ],
-  "hints": "Bare `ops setup` is a read-only layered dashboard. `ops setup <layer>` advances one layer idempotently. `ops setup --wizard` is a guided, interactive first-run: one skippable prompt per layer with safe defaults (skeleton on; search/models/automation off), interactive-only (needs a tty; not with --json/--dry-run — those exit 2 pointing at `ops setup --all --yes` / `ops setup --json`). Search and model layers can install Python packages and pull Ollama models into external stores, so they require `--yes`; backups is a human handoff and is never included in `--all`. `--dry-run` previews any advance (single layer or `--all`) without installing/writing and needs no `--yes`.",
+  "hints": "Bare `ops setup` is a read-only layered dashboard. `ops setup <layer>` advances one layer idempotently. `ops setup --wizard` is a guided, interactive first-run: one skippable prompt per layer with safe defaults (skeleton and the terminal UI on; search/models/automation off), interactive-only (needs a tty; not with --json/--dry-run — those exit 2 pointing at `ops setup --all --yes` / `ops setup --json`). Search and model layers can install Python packages and pull Ollama models into external stores, and the ui layer downloads the compiled ops-ui binary (sha256-verified, via the authenticated gh CLI) into .local/bin, so they require `--yes`; backups is a human handoff and is never included in `--all`. `--dry-run` previews any advance (single layer or `--all`) without installing/writing and needs no `--yes`.",
   "dry_run": true,
   "output": {
     "mode": "rows",

@@ -285,3 +285,36 @@ implemented in `bin/setup/run.py` (`_run_wizard`, `_ask_yes_no`, `_wizard` guard
 mention it; `script/setup`'s closing banner points at it as the guided next step; the `curl … | sh`
 funnel (`script/get`) installs LEAN + non-interactive by default with a `--full` contributor escape
 hatch. Together the dashboard + wizard fulfil roadmap Part 5.4.
+
+## ADR-011 — One repo (`opskit`), two stacks, binary-distributed TUI (2026-07-25)
+**Context.** The system had sprawled across three repos: `personal-operating-system` (the template:
+Python engine + funnel), the private vault (`gabros20/ops`, a derived copy), and a standalone
+`ops-ui` repo (the TypeScript terminal UI). Three repos for one system was unmaintainable, and the
+name no longer fit a repo that is a *kit* — engine + TUI + funnel — rather than anyone's data. A
+full single-stack rewrite was considered and rejected: Go/Rust is blocked outright (the search layer
+runs on `lancedb`/`fastembed`, the models layer on `mlx-vlm` — Python libraries), and a TS engine
+rewrite would re-verify ~32 green verbs to gain nothing the `ops.json/3` contract seam doesn't
+already provide, while losing the bare-`python3` zero-install floor macOS ships with.
+**Decision.**
+1. **Rename the template to `opskit`** (GitHub redirects the old URLs; `script/get`/`script/setup`
+   now point at it). The private vault keeps its name and derives from the template exactly as
+   before — the template/instance split is unchanged.
+2. **Merge the TUI into the template as `ui/`** (git-subtree, history preserved; the standalone repo
+   retires). `ui/` is **template-only source**: it is NOT in `script/engine.txt`, so `script/update`
+   never propagates TS source, `node_modules`, or a toolchain requirement into any vault.
+3. **Vaults receive a compiled binary, not source.** `.github/workflows/release-ui.yml` (tag
+   `ui-v*`) cross-compiles `ui/` with `bun build --compile` into self-contained binaries
+   (darwin-arm64/x64, linux-x64/arm64) + `checksums.txt` on a GitHub release. A sixth setup layer —
+   `ops setup ui` (optional, confirm-gated, wizard default ON) — downloads the matching asset with
+   the **authenticated `gh` CLI** (the template may be private; anonymous curl cannot reach its
+   assets), verifies the sha256, and installs to `$OPS_HOME/.local/bin/ops-ui`, which the stdlib
+   `bin/ui/` shim now resolves first ($OPS_UI_BIN → `.local/bin` → PATH). Contributor checkouts
+   (with `ui/` + bun) build from source instead. The release host is derived from the vault's
+   `upstream` remote (else `origin`) — never hardcoded.
+**Why.** One repo to maintain, zero new floor requirements: the engine stays stdlib Python (tested,
+data-adjacent, agent-patchable without a toolchain), the TUI stays TypeScript (the maintainer's
+stack), and the machine contract remains the seam that makes the stacks irrelevant to each other.
+Binary distribution resolves the only real objection to co-location — a Node payload flowing into
+every derived vault via `script/update`. **Status.** Done. Layer + probes + seams
+(`_gh_present`/`_ui_*`) in `setuplib`, tests in `run_setup_layers` (host-independent), CI `ui` job
+(typecheck + compile smoke + non-TTY exit-2 contract), release workflow, docs updated.

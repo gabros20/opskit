@@ -6,7 +6,24 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
 
 ## [Unreleased]
 
+### Added
+- **`ui/` — the ops terminal UI lives in this repo now, and `ops setup ui` installs it**
+  ([`docs/DECISIONS.md`](docs/DECISIONS.md) ADR-011). The TypeScript TUI (formerly the standalone
+  `ops-ui` repo; history preserved via subtree) is template-only source under `ui/` — NOT in
+  `script/engine.txt`, so no TS/Node ever flows into a vault. Vaults install a **self-contained
+  compiled binary** instead: a new optional, confirm-gated `ui` setup layer (wizard default ON)
+  downloads the platform asset from the template repo's GitHub release via the authenticated `gh`
+  CLI, verifies its sha256 against `checksums.txt`, and places it at `$OPS_HOME/.local/bin/ops-ui`
+  — where the `bin/ui/` shim now resolves first (`$OPS_UI_BIN` → `.local/bin` → PATH). Release
+  binaries (darwin-arm64/x64, linux-x64/arm64) are cross-compiled with `bun build --compile` by
+  `.github/workflows/release-ui.yml` on `ui-v*` tags; CI gains a `ui` job (typecheck + compile
+  smoke + the non-TTY exit-2 contract).
+
 ### Changed
+- **Repo renamed: `personal-operating-system` → `opskit`** (ADR-011). The template is the *kit* —
+  engine + TUI + funnel — not anyone's data; GitHub redirects the old URLs, and
+  `script/get`/`script/setup` now point at `gabros20/opskit` (`script/get.sh.sha256` regenerated).
+  Derived vaults are untouched (update the `upstream` remote URL at leisure; redirects cover it).
 - **BREAKING: `ops share` moved from zero-knowledge encryption to capability URLs**
   ([`docs/design/proposals/2026-07-10-capability-url-share.md`](docs/design/proposals/2026-07-10-capability-url-share.md),
   [`docs/DECISIONS.md`](docs/DECISIONS.md) ADR-008). HTTP never sends the URL `#fragment` to a

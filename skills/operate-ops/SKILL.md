@@ -163,7 +163,8 @@ Discover the live, authoritative set with `ops help`; this is the working summar
 - System:            `ops status` · `ops doctor` · `ops setup [<layer>] [--all] [--yes|--wizard]`
   (layered installer; paired with `ops doctor` as checker; see
   [`docs/setup.md`](../../docs/setup.md)) · `ops backup` · `ops index` · `ops job …` · `ops sweep`
-  · `ops complete --json` (completion candidates) · `ops ui` (human TUI — not for agents)
+  · `ops complete --json` (completion candidates) · `ops ui` (human TUI — not for agents;
+  installed by `ops setup ui --yes` as a compiled binary into `.local/bin/`)
 
 `triage`, `files ingest`, and `invoice` PROPOSE; the human approves. `archive`, `sweep`,
 `start`/`close`/`week`, and anything mutating support `--dry-run` — use it when unsure what a

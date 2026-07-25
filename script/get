@@ -6,7 +6,7 @@
 # Inspect before you run (never pipe a script you haven't read):
 #
 #   curl --proto '=https' --tlsv1.2 -fsSL \
-#     https://raw.githubusercontent.com/gabros20/personal-operating-system/main/script/get -o get.sh
+#     https://raw.githubusercontent.com/gabros20/opskit/main/script/get -o get.sh
 #   shasum -a 256 get.sh          # compare against the published get.sh.sha256 for the same ref
 #   less get.sh                    # read it
 #   sh get.sh                      # then, and only then, run it
@@ -33,7 +33,7 @@
 # PowerShell path).
 set -euo pipefail
 
-REPO_URL="${OPS_GET_REPO:-https://github.com/gabros20/personal-operating-system.git}"
+REPO_URL="${OPS_GET_REPO:-https://github.com/gabros20/opskit.git}"
 TARGET="${OPS_GET_DIR:-$HOME/ops}"
 DEMO=0; DRY=0; YES=0; FULL=0
 

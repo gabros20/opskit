@@ -16,7 +16,7 @@ GLYPHS = {
     "blocked": "!",
     "not_applicable": "—",
 }
-AUTO_LAYERS = ("skeleton", "search", "models", "automation")
+AUTO_LAYERS = ("skeleton", "search", "models", "automation", "ui")
 # Statuses `--all` neither attempts nor counts as a failure (Task 8): already done, gated on a missing
 # prerequisite, or not applicable to this host.
 SKIP_STATUSES = ("ready", "blocked", "not_applicable")
@@ -221,7 +221,9 @@ def _advance_all(*, yes: bool, dry: bool = False) -> int:
 # OFF"): the required, safe-write skeleton is pre-selected ON; the heavy/opt-in layers default OFF (no
 # vectors, no model pulls, no scheduled jobs). backups is never a yes/no here — it's a human handoff
 # (gate="blocked"), surfaced as a printed next-step, never auto-run.
-WIZARD_DEFAULTS = {"skeleton": True, "search": False, "models": False, "automation": False}
+# The `ui` layer defaults ON: the wizard's audience is exactly who the TUI serves, and the install
+# is a small, sha256-verified binary download into the vault's own .local/bin (no system writes).
+WIZARD_DEFAULTS = {"skeleton": True, "search": False, "models": False, "automation": False, "ui": True}
 
 
 def _ask_yes_no(prompt: str, default: bool, ask) -> bool:
@@ -253,6 +255,7 @@ def _run_wizard(rows, ask, say) -> dict:
     say("ops setup — guided first run")
     say("  safe defaults are pre-selected; press Enter to accept each.")
     say("  search / models / automation default to OFF (no vectors, no model pulls, no jobs).")
+    say("  the terminal UI (ops ui) defaults to ON — a small verified binary download.")
     for row in rows:
         lid, status = row["id"], row["status"]
         if status == "ready":

@@ -43,3 +43,9 @@ skills/**/.system/
 
 # Per-vault Cloudflare Worker deploy config (KV namespace id). Synced template ships wrangler.toml.example only.
 bin/share/worker/wrangler.toml
+
+# ops-ui (ui/): TS source is template-only (NOT in engine.txt — vaults get a compiled binary via
+# `ops setup ui` instead). Build outputs + deps are regenerable; the installed binary is a cache.
+ui/node_modules/
+ui/dist/
+/.local/

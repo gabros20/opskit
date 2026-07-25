@@ -13,7 +13,8 @@ is in [the machine contract §7](machine-contract.md#7-ops-setup-layer-status-en
 ## Guided first-run (`ops setup --wizard`)
 
 The easiest way to finish setup interactively. `ops setup --wizard` walks the layers in order with
-**≤5 skippable prompts** and safe defaults pre-selected — skeleton **on** (required, safe), and
+**skippable prompts** and safe defaults pre-selected — skeleton **on** (required, safe), the
+terminal UI **on** (a small sha256-verified binary download into the vault's own `.local/bin`), and
 search / models / automation **off** (no vectors, no model pulls, no scheduled jobs). Press Enter to
 accept each default; type `y`/`n` to override. Already-`ready` layers are noted and skipped;
 `blocked` / `not_applicable` layers show their reason and next step and are never prompted to install.
@@ -49,6 +50,7 @@ ops setup skeleton --yes
 ops setup search --yes
 ops setup models --yes
 ops setup automation --yes
+ops setup ui --yes
 ```
 
 Use `--yes` when the layer is allowed to install packages, pull models, or write generated local
@@ -95,6 +97,16 @@ migrates that layer's deps into the venv. The venv is disposable and rebuildable
 (`rm -rf .venv && ops setup search --yes && ops setup models --yes`); a broken or half-built venv is
 repaired automatically on the next `ops setup search`/`models`. This is the single install story; see
 [ADR-009](DECISIONS.md) and [the agent-terminal guide](agent-terminal-search.md).
+
+### The terminal UI layer (`ops setup ui`)
+
+`ops setup ui --yes` installs the compiled **`ops ui`** binary (ADR-011) — the guided human terminal
+UI — into `$OPS_HOME/.local/bin/ops-ui`, where the `bin/ui/` shim looks first. It downloads the
+matching platform asset from the template repo's GitHub release with the **authenticated `gh` CLI**
+(the template may be private; install gh with `brew install gh` if the layer reports `blocked`) and
+verifies its sha256 against the release's `checksums.txt` before installing. The binary is fully
+self-contained — no Node or Bun is needed on this machine. In a full contributor checkout (with
+`ui/` source present) plus `bun` on PATH, the layer compiles from source instead.
 
 Blocked layers stay blocked and print the exact remediation in `next`. Backups are blocked because
 encrypted off-machine backup setup needs human choices and secrets (and `restic` installed):
