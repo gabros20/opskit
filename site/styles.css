@@ -102,9 +102,11 @@
 @media (max-width: 640px) {
   :root {
     --pad-container-x: var(--pad-container-x-mobile);
-    /* Headings step down ~2px on small screens so long words never overflow */
-    --fs-display-xl: clamp(2.6rem, 6vw, 5rem);
-    --fs-display-lg: clamp(1.775rem, 4vw, 3.1rem);
+    /* Typography discipline: the 55-char hero headline caps at display-small on phones —
+       ~18 chars per line gives 3 balanced lines instead of a ragged 5-line stack. */
+    --fs-display-xl: clamp(2.1rem, 8.5vw, 5rem);
+    --fs-display-lg: clamp(1.55rem, 6.5vw, 3.1rem);
+    --fs-body-lg: 1.0625rem;
   }
 }
 
@@ -221,7 +223,10 @@ p code, li code, td code, .t-body code {
 }
 .section--hero, .section--closing { padding-block: var(--pad-section-y-hero); }
 @media (max-width: 640px) {
-  .section, .section--hero, .section--closing { padding-block: var(--pad-section-y-mobile); }
+  .section, .section--closing { padding-block: var(--pad-section-y-mobile); }
+  /* The sticky header + anchor strip already eat vertical space on phones —
+     the hero starts sooner so the headline isn't half a screen down. */
+  .section--hero { padding-block: 2.5rem 4.5rem; }
 }
 .section-heading { max-width: var(--measure); }
 .pull-line { margin-top: 2.5rem; max-width: var(--measure); color: var(--rust-deep); font-family: var(--font-display); font-weight: 600; font-size: 1.3rem; line-height: 1.4; letter-spacing: -0.01em; }
