@@ -1,26 +1,32 @@
 # Mobile & capture — the documented (not-an-app) surface
 
-**Mobile-lite is documentation, not code** (proposal Part 3.4). ops has no server, no daemon, no
-account. The vault is plaintext + git; the ONLY sync transport is `git push`/`pull` over your own
-private remote. Everything below rides on that one fact. Nothing here bypasses the `ops` dispatcher
-or the guardrail.
+This guide shows how to capture and read your vault away from your desk: a global hotkey on macOS, a Shortcut on iOS, and reading/editing on a phone. It is for anyone running opskit who wants mobile access without a native app.
 
-The golden rule, restated: **URIs and share-sheets OPEN and CAPTURE; all writes still go through a
-verb.** Capture drops a file into `inbox/`; you `ops triage` it later on a real machine. Nothing on
-mobile edits the wiki or tasks directly.
+## The one rule
+
+opskit has no server, no daemon, no account. The vault is plaintext plus git. Mobile-lite is documentation, not code (proposal Part 3.4).
+
+The only sync transport is `git push` / `git pull` over your own private remote. Everything here rides on that one fact.
+
+**URIs and share-sheets OPEN and CAPTURE. All writes still go through a verb.**
+
+- Capture drops a file into `inbox/`.
+- You run `ops triage` later on a real machine.
+- Nothing on mobile edits the wiki or tasks directly.
+- Nothing here bypasses the `ops` dispatcher or the guardrail.
 
 ---
 
-## 1. Desktop global-hotkey capture — Apple Shortcut → `ops capture`
+## 1. Desktop capture — a global hotkey on macOS
 
-The fastest capture path on macOS: an [Apple Shortcut](https://support.apple.com/guide/shortcuts-mac/welcome/mac)
-bound to a global hotkey or the share sheet.
+The fastest capture path on macOS is an [Apple Shortcut](https://support.apple.com/guide/shortcuts-mac/welcome/mac) bound to a global hotkey or the share sheet. It shells straight to `ops capture`.
+
+**Build it:**
 
 1. Shortcuts.app → **＋** → name it *Ops Capture*.
-2. Add **Receive Text** as input (also tick *Show in Share Sheet* so it accepts selected text /
-   URLs from any app).
-3. Add **Run Shell Script**:
-   - Shell: `/bin/zsh`  (or bash)
+2. Add **Receive Text** as input. Tick *Show in Share Sheet* so it accepts selected text and URLs from any app.
+3. Add **Run Shell Script** with these settings:
+   - Shell: `/bin/zsh` (or bash)
    - Pass input: **as arguments**
    - Script:
      ```bash
@@ -28,60 +34,58 @@ bound to a global hotkey or the share sheet.
      OPS="$(command -v ops || echo "$HOME/ops/ops")"
      "$OPS" capture "$*"
      ```
-4. Assign a keyboard shortcut in *Shortcuts → Settings → keyboard*, or invoke it from Raycast /
-   the share sheet.
+4. Assign a keyboard shortcut in *Shortcuts → Settings → Keyboard*, or trigger it from Raycast or the share sheet.
 
-Because it shells to `ops capture`, the guardrail and `.logs/` apply — the Shortcut is just another
-unprivileged caller. Pair it with the Raycast **Ops Capture** command
-([`frontends/raycast`](../frontends/raycast/README.md)) for a Spotlight-style capture box.
+Because it shells to `ops capture`, the guardrail and `.logs/` apply. The Shortcut is just another unprivileged caller.
+
+Pair it with the Raycast **Ops Capture** command ([`frontends/raycast`](../frontends/raycast/README.md)) for a Spotlight-style capture box.
 
 ---
 
-## 2. iOS capture — a Shortcut that appends into `inbox/`
+## 2. iOS capture — a Shortcut that writes into `inbox/`
 
-On iPhone/iPad there is no shell, so the Shortcut writes a file into the vault and **git carries it
-home**. Two workable shapes:
+iPhone and iPad have no shell. So the Shortcut writes a file into the vault, and git carries it home.
+
+Two workable shapes follow. Working Copy is the lower-friction path for most people.
 
 ### 2a. Working Copy (recommended — real git on iOS)
-[Working Copy](https://workingcopy.app) clones your private `~/ops` remote on-device and exposes a
-*Write File* / *Append* Shortcut action.
+
+[Working Copy](https://workingcopy.app) clones your private `~/ops` remote on-device and exposes *Write File* and *Append* Shortcut actions.
 
 1. Clone the ops remote into Working Copy once.
-2. Shortcut *Ops Capture* → **Receive Text/URL from Share Sheet** → **Text** (timestamp + body) →
-   Working Copy **Write File** into `inbox/cap-<timestamp>.md` (append or new file).
+2. Build a Shortcut *Ops Capture*:
+   - **Receive Text/URL from Share Sheet**
+   - **Text** (timestamp + body)
+   - Working Copy **Write File** into `inbox/cap-<timestamp>.md` (append or new file)
 3. End the Shortcut with Working Copy **Commit** + **Push**.
-4. Next time you're at a machine: `git pull` then `ops triage`.
+4. Next time you're at a machine: `git pull`, then `ops triage`.
 
-Keep the file shape trivial so triage handles it — a plain markdown file with your text is enough;
-`ops triage` classifies and routes it.
+Keep the file shape trivial. A plain markdown file with your text is enough — `ops triage` classifies and routes it.
 
 ### 2b. a-Shell / iSH (a POSIX shell on iOS)
-If you run [a-Shell](https://holzschu.github.io/a-Shell_iOS/) you can `git clone` the remote and run
-a cut-down capture (write to `inbox/`, `git commit`, `git push`). Heavier to set up; Working Copy is
-the lower-friction path for most.
 
-> Never point iCloud/Dropbox/Syncthing at the `.git` directory to "sync" the vault — see
-> anti-roadmap #9 and `ops doctor` (it fails if `~/ops` resolves under a sync-wall). git push/pull is
-> the transport; a file-sync tool corrupts the repo.
+If you run [a-Shell](https://holzschu.github.io/a-Shell_iOS/), you can `git clone` the remote and run a cut-down capture: write to `inbox/`, `git commit`, `git push`.
+
+This is heavier to set up than Working Copy.
+
+> **Never** point iCloud, Dropbox, or Syncthing at the `.git` directory to "sync" the vault. See anti-roadmap #9. `ops doctor` fails if `~/ops` resolves under a sync-wall. git push/pull is the transport; a file-sync tool corrupts the repo.
 
 ---
 
 ## 3. Read & edit on mobile — Obsidian mobile or GitJournal
 
-The vault is Obsidian-compatible (see [`docs/obsidian-compat.md`](obsidian-compat.md)); on mobile you
-rent an existing app rather than building one.
+The vault is Obsidian-compatible (see [`docs/obsidian-compat.md`](obsidian-compat.md)). On mobile you rent an existing app rather than build one.
 
-- **Obsidian mobile** over a git remote: use the
-  [Obsidian Git](https://github.com/Vinzent03/obsidian-git) plugin (or Working Copy's repository as
-  the vault folder on iOS via the Files provider) to pull/commit/push. Native wikilinks, backlinks,
-  graph, and Properties — the same notes you edit on desktop.
-- **[GitJournal](https://gitjournal.io)**: a git-native notes app that speaks markdown frontmatter
-  and `[[wikilinks]]` directly, cloning your private remote. Lighter than Obsidian for pure
-  capture/edit.
+| App | What you get | Sync |
+| --- | --- | --- |
+| **Obsidian mobile** | Native wikilinks, backlinks, graph, and Properties — the same notes you edit on desktop | [Obsidian Git](https://github.com/Vinzent03/obsidian-git) plugin, or Working Copy's repository as the vault folder on iOS via the Files provider |
+| **[GitJournal](https://gitjournal.io)** | A git-native notes app that speaks markdown frontmatter and `[[wikilinks]]` directly. Lighter than Obsidian for pure capture/edit | Clones your private remote with its own git |
 
-Either way the sync is **git over your private remote via Working Copy / the app's own git**. Edits
-you make on mobile land as commits; you pull them on desktop. Re-index after pulling:
-`ops index --changed` picks up externally-edited notes (it never rewrites your files).
+Either way, sync is git over your private remote (via Working Copy or the app's own git).
+
+Edits you make on mobile land as commits. You pull them on desktop.
+
+Re-index after pulling: `ops index --changed` picks up externally-edited notes. It never rewrites your files.
 
 ---
 
@@ -97,6 +101,6 @@ you make on mobile land as commits; you pull them on desktop. Re-index after pul
  desktop (~/ops, the ops verbs, the index)
 ```
 
-No provider ever sees plaintext beyond your chosen git host, and no piece here transmits on its own:
-you push, you pull. Capture is additive (`inbox/`), triage is deliberate, and the guardrail sits on
-every write on the desktop side.
+No provider ever sees plaintext beyond your chosen git host. No piece here transmits on its own — you push, you pull.
+
+Capture is additive (`inbox/`). Triage is deliberate. The guardrail sits on every write on the desktop side.

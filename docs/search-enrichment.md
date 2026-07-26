@@ -1,33 +1,41 @@
 # Search enrichment — generated meta for every source
 
-**How-to.** Set up the model behind `ops enrich` (and the auto-enrich wired into `ops files extract` /
-`ops bookmark`), and know what you get with none installed at all. Full design:
-`docs/design/proposals/2026-07-07-search-enrichment-pipeline.md`.
+This guide sets up the local model behind `ops enrich` and the `ops models` surface that manages it.
+It is for anyone who wants notes to be more findable, and it covers what still works with no model
+installed at all.
+
+Full design: [`docs/design/proposals/2026-07-07-search-enrichment-pipeline.md`](design/proposals/2026-07-07-search-enrichment-pipeline.md).
 
 ## What it does
 
-A source is only as findable as the text that describes it. `ops enrich` reads a note's derived text
-— the `.extract.md` buffer for a file, or the note's own body for a bookmark/wiki note — and writes a
-short `description` + `keywords` into that note's frontmatter via a small local LLM. Frontmatter is
-already the top FTS chunk and leads the file within the embed window, so this makes the source both
-keyword- and semantically-searchable with no new index code.
+A source is only as findable as the text that describes it.
 
-`ops files extract` and `ops bookmark` call this automatically after writing their own note (unless
-`OPS_ENRICH=off`) — best-effort and non-fatal, so a model hiccup never fails the extract/save.
+`ops enrich` reads a note's derived text and writes a short `description` + `keywords` into that
+note's frontmatter, using a small local LLM. The derived text is the `.extract.md` buffer for a
+file, or the note's own body for a bookmark or wiki note.
+
+Frontmatter is the top FTS chunk and leads the file inside the embed window. So this meta makes a
+source both keyword- and semantically-searchable, with no new index code.
+
+It runs on its own too. `ops files extract` and `ops bookmark` call enrichment automatically after
+writing their note, unless `OPS_ENRICH=off`. The call is best-effort and non-fatal, so a model
+hiccup never fails the extract or save.
 
 ## Prerequisites & install
 
-> [!IMPORTANT]
-> Install the model into **the same Ollama that `ops` actually talks to** — not some other host or
-> profile. This is the same "same interpreter/daemon `ops` runs" trap as vector search; see
-> [`docs/agent-terminal-search.md`](agent-terminal-search.md) if enrichment works in your shell but
-> not from an agent terminal.
+Pull the default model:
 
 ```bash
 ollama pull gemma4:e4b              # default — EN + Hungarian (140+ languages), ~5 GB
 ```
 
-Alternatives (set via `OPS_ENRICH_MODEL`):
+> [!IMPORTANT]
+> Install the model into **the same Ollama that `ops` actually talks to** — not some other host or
+> profile. This is the same "same interpreter/daemon `ops` runs" trap as vector search. If
+> enrichment works in your shell but not from an agent terminal, see
+> [`docs/agent-terminal-search.md`](agent-terminal-search.md).
+
+Pick a different model with `OPS_ENRICH_MODEL`:
 
 | Model | When |
 |---|---|
@@ -35,15 +43,15 @@ Alternatives (set via `OPS_ENRICH_MODEL`):
 | `OpenEuroLLM-Hungarian` | Hungarian-max quality override |
 | `gemma4:e2b` | low-RAM hosts |
 
-No model pulled, and no Ollama running at all? Enrichment still runs — see **Degradation** below.
+No model pulled, or no Ollama running at all? Enrichment still runs. See [Degradation](#degradation).
 
 ## Env knobs
 
 | Knob | Values | Default | Effect |
 |---|---|---|---|
-| `OPS_ENRICH` | `auto`, `off` | `auto` | `off` disables enrichment entirely (no model call, no floor) |
-| `OPS_ENRICH_MODEL` | an Ollama model tag | `gemma4:e4b` | Model used for `description`/`keywords` generation |
-| `OPS_ENRICH_KEEP_ALIVE` | Ollama `keep_alive` value | `0` | `0` unloads the model after each call; `ops enrich --all` raises this to `5m` for the batch so a multi-GB model isn't reloaded per note |
+| `OPS_ENRICH` | `auto`, `off` | `auto` | `off` disables enrichment entirely — no model call, no floor |
+| `OPS_ENRICH_MODEL` | an Ollama model tag | `gemma4:e4b` | Model used to generate `description` / `keywords` |
+| `OPS_ENRICH_KEEP_ALIVE` | Ollama `keep_alive` value | `0` | `0` unloads the model after each call. `ops enrich --all` raises this to `5m` for the batch so a multi-GB model isn't reloaded per note |
 | `OPS_STT_MODEL` | a model id for whichever ASR backend runs | backend's hardcoded default | Overrides the transcription model in `ops files extract`'s audio tier |
 | `OPS_STT_RUNTIME` | `parakeet`, `mlx-whisper`, `faster-whisper`, `whisper-cli`, `auto` | `auto` | Pins one ASR backend instead of cascading through all installed ones |
 
@@ -56,12 +64,12 @@ ops enrich --all               # sweep every note lacking a current key, sequent
 ```
 
 `ops files extract` and `ops bookmark` call the same path automatically once they've written their
-note — nothing to opt into beyond having a model reachable (or accepting the floor).
+note. There is nothing to opt into beyond having a model reachable, or accepting the floor.
 
 ## `ops models` — see and swap what each stage uses
 
-`ops models` is the management surface for every model-backed stage (`stt`, `ocr`, `vlm`, `enrich`,
-`embed`, `rerank`), not just enrichment:
+`ops models` manages every model-backed stage, not just enrichment. The stages are `stt`, `ocr`,
+`vlm`, `enrich`, `embed`, and `rerank`.
 
 ```bash
 ops models list                        # per stage: configured model, runtime, pulled/available?
@@ -71,9 +79,13 @@ ops models pull --stage enrich --yes   # ollama pull the configured model for on
 ops models test enrich --yes           # run the stage's configured model on a sample, print output + timing
 ```
 
-`pull` and `test` self-gate behind `--yes` — both can pull gigabytes. `test` is how you A/B a
-candidate model before adopting it: run it with `--model <candidate>`, compare the output, then set
-the stage's env var (e.g. `OPS_ENRICH_MODEL`) to make it permanent.
+`pull` and `test` both self-gate behind `--yes`, because both can pull gigabytes.
+
+Use `test` to A/B a candidate before adopting it:
+
+1. Run `ops models test enrich --model <candidate> --yes`.
+2. Compare the output.
+3. Set the stage's env var (e.g. `OPS_ENRICH_MODEL`) to make it permanent.
 
 ## Verify
 
@@ -81,8 +93,9 @@ the stage's env var (e.g. `OPS_ENRICH_MODEL`) to make it permanent.
 ops doctor
 ```
 
-`ops doctor` probes the configured enrich model against the local Ollama daemon (unless
-`OPS_ENRICH=off`) and prints one of:
+`ops doctor` probes the configured enrich model against the local Ollama daemon, unless
+`OPS_ENRICH=off`. It prints one of:
+
 - `enrich model reachable (gemma4:e4b via Ollama)`
 - `enrich model/Ollama not reachable — files extract/bookmark auto-enrich will fall back to the
   stdlib keyword floor (no description, no LLM keywords). Fix: run ollama and pull the configured
@@ -90,14 +103,14 @@ ops doctor
 
 ## Degradation
 
-Enrichment never crashes an extract/save and never hallucinates on garbage input:
+Enrichment never crashes an extract or save, and never hallucinates on garbage input.
 
 | Condition | Result |
 |---|---|
-| No model reachable | `description` falls back to the leading sentence(s) of the source text; `keywords` fall back to a deterministic stdlib frequency+stopword extractor (`keyword_floor`) — no pip deps, works with nothing installed |
-| Text shorter than ~40 chars, empty, or the `_(no text extracted)_` sentinel | Skipped entirely — no model call, no floor description (an empty `description`, floor `keywords` if any text at all) |
-| `OPS_ENRICH=off` | No enrichment at all — `files extract`/`bookmark` skip the call |
+| No model reachable | `description` falls back to the leading sentence(s) of the source text. `keywords` fall back to a deterministic stdlib frequency+stopword extractor (`keyword_floor`) — no pip deps, works with nothing installed |
+| Text shorter than ~40 chars, empty, or the `_(no text extracted)_` sentinel | Skipped entirely — no model call, no floor description (empty `description`, floor `keywords` if there's any text at all) |
+| `OPS_ENRICH=off` | No enrichment at all — `files extract` / `bookmark` skip the call |
 | Model reachable | Full `{description, keywords}` from `OPS_ENRICH_MODEL`, deterministic (temperature 0, fixed seed) so a re-run on unchanged text is a true no-op |
 
-The floor keeps search improving even with zero models installed; a reachable model just makes the
+The floor keeps search improving even with zero models installed. A reachable model just makes the
 `description` prose and the `keywords` sharper.

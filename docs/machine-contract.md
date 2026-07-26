@@ -1,8 +1,10 @@
 # The machine contract — `--json`, exit codes, `ops.json/3`, `cmd.json`
 
-**Reference.** The exact shapes a program (or agent) can rely on when driving `ops`. Everything here
-is frozen per version and covered by a contract test (`test/run_json.py`); the envelope only ever
-changes with an explicit `ops_json` version bump.
+**Reference.** The exact shapes a program or agent can rely on when driving `ops`. Read this to
+build a frontend, an MCP layer, or any tool that shells out to `ops`.
+
+Everything here is frozen per version and covered by a contract test (`test/run_json.py`). The
+envelope only ever changes with an explicit `ops_json` version bump.
 
 ---
 
@@ -37,7 +39,7 @@ The header may carry extra verb-specific fields (e.g. `queue`, `applied`, `dry_r
 ```
 
 Without `--json`, the same message (plus the hint) goes to stderr. Either way the exit code is the
-same — the error surface is identical for humans and machines.
+same. The error surface is identical for humans and machines.
 
 ## 2. The exit-code protocol
 
@@ -51,16 +53,19 @@ same — the error surface is identical for humans and machines.
 | `5` | guardrail: deny-class — never runs | guardrail |
 
 Constants: `output.EXIT_OK / EXIT_UNEXPECTED / EXIT_USAGE / EXIT_CONFIRM / EXIT_NOT_FOUND / EXIT_DENY`.
-The dispatcher propagates guardrail codes verbatim (a refused call is `3`/`5`, never a flattened `1`).
+The dispatcher propagates guardrail codes verbatim — a refused call is `3`/`5`, never a flattened `1`.
 
 ## 3. The `--dry-run` contract
 
 Every mutating verb declares `"dry_run": true` in its `cmd.json` and implements `--dry-run` as a true
-preview: print what *would* happen, write nothing. The guardrail honours the declaration — a
-confirm-class verb invoked with `--dry-run` is **downgraded to a read** and allowed without `--yes`
-(a true dry-run *is* a read). This makes the entire surface explorable: `ops archive foo --dry-run`,
-`ops organize apply --dry-run`, `ops share <slug> --dry-run` all run freely and mutate nothing.
-(Untrusted plugin verbs are the one exception: the confirm ceiling holds even for `--dry-run`.)
+preview: print what *would* happen, write nothing.
+
+The guardrail honours the declaration. A confirm-class verb invoked with `--dry-run` is **downgraded
+to a read** and allowed without `--yes` — a true dry-run *is* a read. This makes the entire surface
+explorable: `ops archive foo --dry-run`, `ops organize apply --dry-run`, and
+`ops share <slug> --dry-run` all run freely and mutate nothing.
+
+One exception: untrusted plugin verbs keep the confirm ceiling even for `--dry-run`.
 
 ## 4. `ops.json/3` — the generated surface description
 
@@ -83,8 +88,14 @@ in it is hand-maintained, and nothing is persisted that isn't re-detected at wri
 }
 ```
 
-The three top-level version fields are **independent** and version different things: `json_envelope`
-freezes the `--json` envelope (§1), `api_version` the plugin SDK, and `schema` the *shape of this file*.
+The three top-level version fields are **independent** and version different things:
+
+| Field | Freezes |
+|---|---|
+| `json_envelope` | the `--json` envelope (§1) |
+| `api_version` | the plugin SDK |
+| `schema` | the *shape of this file* |
+
 Only `schema` moved in this revision (`ops.json/2` → `ops.json/3`); the envelope and SDK are unchanged.
 
 Per verb (copied from its `cmd.json` sidecar, plus injected fields):
@@ -96,7 +107,7 @@ Per verb (copied from its `cmd.json` sidecar, plus injected fields):
 | `reads`, `writes` | declared filesystem footprint |
 | `source` | `engine` or `plugin:<name>` (injected by the manifest) |
 | `group` | **(ops.json/3)** the display group the verb renders under (`SYSTEM`/`FLOW`/`KNOWLEDGE`/`TASKS`/`WORK`/`BUSINESS`/`JOBS`, else `OTHER`) — injected by the manifest from its `GROUPS` table so a UI groups verbs without re-encoding that table |
-| `output` | `{mode: "scalar"|"rows", fields: {name: type}}` — the `--json` shape of the verb's default action |
+| `output` | `{mode: "scalar"\|"rows", fields: {name: type}}` — the `--json` shape of the verb's default action |
 | `hints` | when-to-use + the common mistake (also shown by `ops help <verb>`; becomes the MCP tool description) |
 | `dry_run` | `true` if the verb supports the dry-run contract |
 | `tty` | **(ops.json/3, optional)** `true` if the verb (or, per-action in `actions[]`, a subaction) prompts or takes over the terminal — a frontend must hand off stdio rather than capture `--json` (see §5.1) |
@@ -106,7 +117,7 @@ Both new fields are additive: every `ops.json/2` field is retained, so a `schema
 keyed on the v2 shape keeps working. `group` is present on **every** verb; `actions` only on compound
 verbs that declare it.
 
-A third party can drive the whole system from `ops.json` alone — that is what `ops mcp` does: its MCP
+A third party can drive the whole system from `ops.json` alone. That is what `ops mcp` does: its MCP
 tool list is generated from this file, and every tool call shells back through `ops <verb> --json`.
 
 ## 5. `cmd.json` — the per-verb sidecar (what a verb author writes)
@@ -128,6 +139,7 @@ Example (`bin/search/cmd.json`, abbreviated):
 ```
 
 Notes for authors:
+
 - `"hidden": true` keeps a plumbing verb (`__complete`, `mcp`) out of `ops help`/`ops.json` while the
   guardrail still gates it.
 - For subcommand verbs, `output` describes the **default** action's rows (`task`→list, `wiki`→list,
@@ -140,7 +152,8 @@ A **compound verb** (one whose first positional arg selects a subcommand — `ta
 may declare an **optional** `actions` array in its `cmd.json`. It is the machine-readable form of the
 grammar that the verb's `usage` string states in prose and that `bin/__complete` hardcodes — one source
 a generated form/TUI, `__complete`, the MCP layer, and an agent can all read instead of re-parsing usage.
-It rides through into the verb's `ops.json` entry verbatim. It is purely additive: a verb keeps its
+
+It rides through into the verb's `ops.json` entry verbatim, and is purely additive: a verb keeps its
 top-level `args`/`risk`/`output`/`dry_run`, which continue to describe the **default** action.
 
 ```json
@@ -181,16 +194,20 @@ a positional. The rest are optional.
 | `help` | one-line description (optional) |
 | `example` | a sample value for a generated form's placeholder (optional) |
 
-Rules a consumer can rely on:
-- The `name` values are the subcommand tokens the verb accepts — **except** an action marked
-  `"default": true`, whose `name` is a descriptive label, not a typed token. A default action is the
-  one selected when the first argument is not another action's name: for most compound verbs that is
-  also a real keyword (`task list`, `files ingest` — discoverable from the top-level `args[0].default`),
-  but two verbs have a **tokenless** default — `share` (`ops share <slug>` publishes; there is no
-  `publish` keyword) and `backup` (bare `ops backup` nags). For a tokenless default a consumer must not
-  offer the `name` as a literal completion; it offers the action's first positional's values instead
-  (this is exactly what `ops complete` does — see §8). There is at most one `default` action per verb.
-- Each action's `args` are listed in invocation order.
+**Rules a consumer can rely on.**
+
+- **Subcommand tokens come from `name`.** Each action's `name` is a token the verb accepts — **except**
+  an action marked `"default": true`, whose `name` is a descriptive label, not a typed token. A default
+  action is the one selected when the first argument is not another action's name. For most compound
+  verbs that is also a real keyword (`task list`, `files ingest` — discoverable from the top-level
+  `args[0].default`), but two verbs have a **tokenless** default:
+  - `share` — `ops share <slug>` publishes; there is no `publish` keyword.
+  - `backup` — bare `ops backup` nags.
+
+  For a tokenless default a consumer must **not** offer the `name` as a literal completion; it offers
+  the action's first positional's values instead (this is exactly what `ops complete` does — see §8).
+  There is at most one `default` action per verb.
+- **Args are in invocation order.** Each action's `args` are listed in the order they are typed.
 - **`risk` inherits, `dry_run` does not.** A per-action `risk` omitted ⇒ the verb's top-level `risk`
   applies to that subcommand. A per-action `dry_run` omitted ⇒ that subcommand does **not** honour
   `--dry-run` (the top-level `dry_run` describes only the **default** action, per the note above — it is
@@ -199,11 +216,11 @@ Rules a consumer can rely on:
 - **`tty` means hand off the terminal.** An action (or a non-compound verb, top-level) with
   `"tty": true` prompts or takes over the terminal — `$EDITOR` (`wiki edit`), an fzf picker (`wiki
   open` with no slug), or a password prompt (`backup init`), and the interactive `triage` flows. A
-  frontend must **suspend and hand off stdio** for these rather than capture `--json`; for the
-  headless path it uses the action's non-interactive sibling instead (e.g. `triage decide` /
+  frontend must **suspend and hand off stdio** for these rather than capture `--json`; for the headless
+  path it uses the action's non-interactive sibling instead (e.g. `triage decide` /
   `triage drafts decide` rather than the interactive pager). Omitted ⇒ `false`.
 - **Per-action `risk` is declarative; the guardrail gates on the verb's top-level `risk`.** The
-  dispatcher's guardrail reads the verb's top-level `risk` (a confirm-class *verb* needs `--yes`); a
+  dispatcher's guardrail reads the verb's top-level `risk` (a confirm-class *verb* needs `--yes`). A
   subaction that is stricter than its verb — e.g. a `confirm` subaction under a `safe_write` verb
   (`share revoke`, `backup run --target cloud`, `models pull`) — enforces that stricter class **inside
   the verb**, self-gating on `--yes` and returning `EXIT_CONFIRM` (3). So the per-action `risk` is an
@@ -220,7 +237,7 @@ in their enums) and fails the build on drift.
 - The envelope changes only with an `ops_json` bump; `ops.json` structure only with a `schema` bump.
 - **`ops.json/2` → `ops.json/3`** added two verb fields — `group` (always present) and the optional
   `actions[]` subcommand grammar (§5.1) — additively. Every v2 field is retained, so the bump is
-  backward-compatible for a consumer that ignores the new fields; it is a `schema` bump (not an
+  backward-compatible for a consumer that ignores the new fields. It is a `schema` bump (not an
   `ops_json`/`api_version` bump) because only this file's shape changed, not the envelope or SDK.
 - `test/run_json.py` round-trips every read-class verb against its declared `output` block, asserts the
   `schema` value + every verb's `group` + every declared `actions[]`'s well-formedness, and fails the
@@ -230,7 +247,7 @@ in their enums) and fails the build on drift.
 ## 7. `ops setup` layer `status` enum
 
 Each row `ops setup` emits (`ops setup --json`, and the same rows `ops doctor` folds in) carries a
-`status` field from a **closed enum** — a program keys on this, never on the human `detail` string:
+`status` field from a **closed enum**. A program keys on this, never on the human `detail` string:
 
 | `status` | Meaning | `ops doctor` severity |
 |---|---|---|
@@ -242,17 +259,20 @@ Each row `ops setup` emits (`ops setup --json`, and the same rows `ops doctor` f
 
 `blocked` and `not_applicable` are the two the machine must special-case: neither is a defect, and
 `ops setup --all` **skips** both (and `ready`) rather than attempting them — so they never contribute
-to its exit code. `--all` is otherwise best-effort: it advances every attemptable layer and exits `1`
-iff some *attempted* layer failed (a semantic at-risk exit per §2, not a crash; the envelope `ok`
-stays `true` and the per-layer `results` carry each failure). Reading `next` is how an agent learns
-the remediation for a `blocked` layer — it must never invent an install command from `detail`.
+to its exit code.
+
+`--all` is otherwise best-effort: it advances every attemptable layer and exits `1` iff some
+*attempted* layer failed (a semantic at-risk exit per §2, not a crash; the envelope `ok` stays `true`
+and the per-layer `results` carry each failure). Reading `next` is how an agent learns the remediation
+for a `blocked` layer — it must never invent an install command from `detail`.
 
 ## 8. The completion contract (`ops complete --json`)
 
 `ops complete [<typed word>...] [--json]` returns the candidates for the **next** word, given the words
 already typed after `ops` (everything *before* the word being completed). It is the structured sibling
-of the zsh helper `ops __complete` (which prints the same candidates as lossy `value:description` text);
-both share one brain (`bin/lib/completion.py`) that derives everything from the verb surface + each
+of the zsh helper `ops __complete` (which prints the same candidates as lossy `value:description` text).
+
+Both share one brain (`bin/lib/completion.py`) that derives everything from the verb surface + each
 compound verb's `actions[]`/args (§5.1) and the live content providers. There are **no** hardcoded
 subaction tables anywhere — the grammar in `cmd.json` is the single source, so completion, `ops help`,
 the MCP layer, and a future TUI can never drift apart.
@@ -271,10 +291,14 @@ Rows (NDJSON, the standard §1 rows envelope — a header then one object per ca
 | `description` | a short human hint (an action's summary, a note's type, a task's status+title; may be empty) |
 | `kind` | `verb` \| `action` \| `enum` \| a provider name (`note-slug`/`asset-slug`/`task-id`/`hub`/`note-type`/`status`/`layer`) — what the candidate *is*, so a UI can group/icon them |
 
-Resolution mirrors §5.1: with no words, `kind: "verb"` rows; after a compound verb, its keyworded
-action names (`kind: "action"`) plus, for a tokenless-default verb, its default action's first
-positional's values; within an action, the values for the next positional (or a value-flag's value) —
-from that arg's `enum` (`kind: "enum"`) or its `complete` provider. Pass only the words **before** the
-one being completed (`ops complete task move` lists statuses; `ops complete wiki open` lists note slugs).
-`test/run_completion.py` asserts this shape and that the offered subactions equal each verb's `actions[]`
-names (the anti-drift gate).
+Resolution mirrors §5.1:
+
+- With no words: `kind: "verb"` rows.
+- After a compound verb: its keyworded action names (`kind: "action"`) plus, for a tokenless-default
+  verb, its default action's first positional's values.
+- Within an action: the values for the next positional (or a value-flag's value) — from that arg's
+  `enum` (`kind: "enum"`) or its `complete` provider.
+
+Pass only the words **before** the one being completed (`ops complete task move` lists statuses;
+`ops complete wiki open` lists note slugs). `test/run_completion.py` asserts this shape and that the
+offered subactions equal each verb's `actions[]` names (the anti-drift gate).
