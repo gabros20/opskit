@@ -328,7 +328,7 @@ html.js .reveal.is-visible { opacity: 1; transform: translateY(0); }
   color: var(--ink);
 }
 .site-header__logo { width: 28px; height: auto; flex-shrink: 0; }
-.lg-frame { stroke: var(--ink); }
+.lg-bg { fill: var(--ink); }
 .lg-slot { fill: var(--rust); }
 .site-header__nav { display: flex; gap: 1.75rem; align-items: center; }
 .site-header__nav a, .site-header__github {
