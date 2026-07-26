@@ -1,0 +1,118 @@
+(function () {
+  "use strict";
+
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- Sticky header background ---------- */
+  var header = document.getElementById("site-header");
+  function updateHeader() {
+    if (window.scrollY > 8) header.classList.add("is-scrolled");
+    else header.classList.remove("is-scrolled");
+  }
+  updateHeader();
+  window.addEventListener("scroll", updateHeader, { passive: true });
+
+  /* ---------- Scroll reveal ---------- */
+  var revealEls = Array.prototype.slice.call(document.querySelectorAll(".reveal"));
+  if (reduceMotion || !("IntersectionObserver" in window)) {
+    revealEls.forEach(function (el) { el.classList.add("is-visible"); });
+  } else {
+    var revealObserver = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -60px 0px" }
+    );
+    revealEls.forEach(function (el) { revealObserver.observe(el); });
+  }
+
+  /* ---------- Prompt gutter: markers + progress ---------- */
+  var markers = Array.prototype.slice.call(document.querySelectorAll(".prompt-marker"));
+  var sections = markers
+    .map(function (m) { return document.getElementById(m.getAttribute("data-target")); })
+    .filter(Boolean);
+
+  markers.forEach(function (m) {
+    m.addEventListener("click", function () {
+      var target = document.getElementById(m.getAttribute("data-target"));
+      if (target) {
+        target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+      }
+    });
+  });
+
+  var gutterFill = document.getElementById("gutter-fill");
+  var gutterRail = document.getElementById("gutter-rail");
+
+  function updateGutter() {
+    var doc = document.documentElement;
+    var scrollTop = window.scrollY || doc.scrollTop;
+    var scrollHeight = (doc.scrollHeight - window.innerHeight) || 1;
+    var progress = Math.min(1, Math.max(0, scrollTop / scrollHeight));
+
+    if (gutterFill) gutterFill.style.height = (progress * 100).toFixed(2) + "%";
+    if (gutterRail) gutterRail.style.width = (progress * 100).toFixed(2) + "%";
+
+    var viewportMid = scrollTop + window.innerHeight * 0.4;
+    var passedIndex = -1;
+    sections.forEach(function (sec, i) {
+      if (sec.offsetTop <= viewportMid) passedIndex = i;
+    });
+    markers.forEach(function (m, i) {
+      m.classList.toggle("is-passed", i <= passedIndex);
+    });
+  }
+
+  updateGutter();
+  window.addEventListener("scroll", updateGutter, { passive: true });
+  window.addEventListener("resize", updateGutter);
+
+  /* ---------- Copy to clipboard ---------- */
+  var copyButtons = Array.prototype.slice.call(document.querySelectorAll("[data-copy]"));
+  copyButtons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var text = btn.getAttribute("data-copy") || "";
+      var done = function () {
+        var original = btn.textContent;
+        btn.textContent = "Copied";
+        window.setTimeout(function () { btn.textContent = original; }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, done);
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch (e) { /* clipboard unsupported — silently no-op */ }
+        document.body.removeChild(ta);
+        done();
+      }
+    });
+  });
+
+  /* ---------- Terminal panel overflow affordance ----------
+     Real command output must never silently clip: panels that need horizontal
+     scroll get a visible right-edge fade + a styled scrollbar. */
+  var panelBodies = Array.prototype.slice.call(document.querySelectorAll(".terminal-panel__body"));
+  function updatePanel(el) {
+    var scrollable = el.scrollWidth > el.clientWidth + 1;
+    var atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+    var panel = el.closest(".terminal-panel");
+    if (panel) panel.classList.toggle("has-fade", scrollable && !atEnd);
+  }
+  function updateScrollAffordance() { panelBodies.forEach(updatePanel); }
+  panelBodies.forEach(function (el) {
+    el.addEventListener("scroll", function () { updatePanel(el); }, { passive: true });
+  });
+  updateScrollAffordance();
+  window.addEventListener("resize", updateScrollAffordance);
+  window.addEventListener("load", updateScrollAffordance);
+})();

@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>document.documentElement.classList.add('js');</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>opskit — a personal operating system in a folder of plaintext</title>
+<meta name="description" content="opskit turns a folder of Markdown files into a system that runs your knowledge, tasks, and work — operable by you, by schedules, and by AI agents, all through one command. Plaintext is the truth, git is the spine, nothing leaves your machine without you.">
+<link rel="canonical" href="https://opskit.vercel.app/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://opskit.vercel.app/">
+<meta property="og:title" content="opskit — a personal operating system in a folder of plaintext">
+<meta property="og:description" content="One folder, one command, two faces: humans get a guided terminal UI, agents get a frozen JSON contract. Both pass the same guardrail. No server, no cloud, no lock-in.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="opskit — a personal operating system in a folder of plaintext">
+<meta name="twitter:description" content="One folder, one command, two faces: humans get a guided terminal UI, agents get a frozen JSON contract. Both pass the same guardrail.">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="visually-hidden" href="#main">Skip to content</a>
+
+<nav class="prompt-gutter" aria-label="Section progress">
+  <div class="prompt-gutter__line" aria-hidden="true"><div class="prompt-gutter__fill" id="gutter-fill"></div></div>
+  <div class="prompt-gutter__rail" id="gutter-rail"></div>
+  <div class="prompt-gutter__markers">
+    <button class="prompt-marker" data-target="hero" aria-label="Jump to top">❯</button>
+    <button class="prompt-marker" data-target="two-faces" aria-label="Jump to Two faces">❯</button>
+    <button class="prompt-marker" data-target="roots" aria-label="Jump to The four roots">❯</button>
+    <button class="prompt-marker" data-target="day" aria-label="Jump to A day in the vault">❯</button>
+    <button class="prompt-marker" data-target="guardrail" aria-label="Jump to The guardrail">❯</button>
+    <button class="prompt-marker" data-target="agents" aria-label="Jump to Agents">❯</button>
+    <button class="prompt-marker" data-target="pipeline" aria-label="Jump to The knowledge pipeline">❯</button>
+    <button class="prompt-marker" data-target="quickstart" aria-label="Jump to Quickstart">❯</button>
+    <button class="prompt-marker" data-target="updates" aria-label="Jump to Staying current">❯</button>
+    <button class="prompt-marker" data-target="positioning" aria-label="Jump to Why opskit">❯</button>
+    <button class="prompt-marker" data-target="closing" aria-label="Jump to Get started">❯</button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <header class="site-header" id="site-header">
+    <div class="container site-header__bar">
+      <a class="site-header__brand" href="#hero">
+        <svg class="site-header__logo" viewBox="0 0 64 64" aria-hidden="true">
+          <rect x="2" y="2" width="60" height="60" rx="10" class="lg-bg"/>
+          <path d="M16 22 L30 32 L16 42" fill="none" class="lg-caret" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="36" y="38" width="14" height="7" rx="1.5" class="lg-cursor"/>
+        </svg>
+        opskit
+      </a>
+      <nav class="site-header__nav" aria-label="Primary">
+        <a href="#two-faces">Two faces</a>
+        <a href="#roots">The roots</a>
+        <a href="#guardrail">Guardrail</a>
+        <a href="#agents">Agents</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="https://github.com/gabros20/opskit/tree/main/docs">Docs</a>
+      </nav>
+      <div class="site-header__actions">
+        <a class="site-header__github" href="https://github.com/gabros20/opskit">GitHub</a>
+        <a class="btn btn-primary" href="#quickstart">Install</a>
+      </div>
+    </div>
+    <div class="mobile-anchor-nav-wrap">
+      <nav class="mobile-anchor-nav" aria-label="Sections">
+        <a href="#two-faces">Two faces</a>
+        <a href="#roots">Roots</a>
+        <a href="#day">A day</a>
+        <a href="#guardrail">Guardrail</a>
+        <a href="#agents">Agents</a>
+        <a href="#pipeline">Pipeline</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#updates">Updates</a>
+        <a href="#positioning">Why opskit</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ================= HERO ================= -->
+    <section class="section section--hero" id="hero">
+      <div class="container">
+        <div class="hero">
+          <div class="hero__copy reveal">
+            <h1 class="t-display-xl">A personal operating&nbsp;system, in a folder of plaintext.</h1>
+            <p class="t-body-lg hero__subhead">opskit turns Markdown files in your own git repo into a system that runs your knowledge, tasks, and work — drivable by you, by schedules, and by AI agents, all through one <code class="t-mono-sm">ops</code> command. No server, no cloud, no lock-in: you can grep your notes or walk away at any time.</p>
+            <div class="hero__install">
+              <code id="install-cmd">curl -fsSL https://raw.githubusercontent.com/gabros20/opskit/main/script/get -o get.sh &amp;&amp; sh get.sh</code>
+              <button type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/gabros20/opskit/main/script/get -o get.sh && sh get.sh" aria-label="Copy install command">Copy</button>
+            </div>
+            <p class="t-body-sm hero__meta">macOS / Linux · Python 3.10+ + git · zero required deps · MIT. Verify the published hash before running — <a href="https://github.com/gabros20/opskit#quick-start">the README shows the ritual</a>.</p>
+            <div class="hero__ctas">
+              <a class="btn btn-primary" href="#quickstart">Get started</a>
+              <a class="btn btn-secondary" href="https://github.com/gabros20/opskit/tree/main/docs">Read the docs</a>
+            </div>
+          </div>
+          <div class="hero__panel reveal">
+            <div class="terminal-panel">
+              <div class="terminal-panel__bar"><span class="terminal-panel__dot"></span>~/ops — ops ui</div>
+              <div class="terminal-panel__body">
+<pre>┌  <span class="tk-brand">ops</span>  <span class="tk-dim">the guided terminal UI — humans point-and-pick,</span>
+│       <span class="tk-dim">agents use ops &lt;verb&gt; --json</span>
+│
+◇  What do you want to do? <span class="tk-dim">(type to filter)</span>
+│  <span class="tk-brand">＋ Capture a thought</span>       <span class="tk-dim">quick note → inbox</span>
+│  <span class="tk-ok">●</span> orient    <span class="tk-dim">where was I — journal, tasks, inbox, health</span>
+│  <span class="tk-ok">●</span> search    <span class="tk-dim">ranked note hits</span>
+│  <span class="tk-cyan">●</span> task      <span class="tk-dim">list / add / done</span>
+│  <span class="tk-cyan">●</span> wiki      <span class="tk-dim">open · edit · new · backlinks</span>
+│  <span class="tk-cyan">●</span> triage    <span class="tk-dim">propose filing of inbox items</span>
+│  <span class="tk-warn">●</span> share     <span class="tk-dim">capability link — you send it</span>
+│  <span class="tk-dim">…</span>
+│
+<span class="tk-dim">◇  every pick re-enters `ops &lt;verb&gt; --json` — one door</span></pre>
+            </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TWO FACES ================= -->
+    <section class="section" id="two-faces">
+      <div class="container">
+        <div class="section-heading reveal">
+          <h2 class="t-display-lg">Two faces. One door.</h2>
+          <p class="t-body" style="margin-top:1.5rem;">Humans get <code class="heading-mono">ops ui</code> — menus and forms generated from the machine contract, nothing to memorize. Agents and scripts get <code class="heading-mono">ops &lt;verb&gt; --json</code> — one frozen envelope and a strict exit-code protocol. Both enter the same dispatcher, so the guardrail and the logs see every action identically. The UI is not a second implementation: it <em>reads the contract and generates itself</em>, so a new verb appears in the menus the moment it exists.</p>
+        </div>
+
+        <div class="panels-2 reveal">
+          <div class="terminal-panel">
+            <div class="terminal-panel__bar"><span class="terminal-panel__dot"></span>the human face — guided</div>
+            <div class="terminal-panel__body">
+<pre>◇  task — pick an action
+│  <span class="tk-cyan">●</span> list   <span class="tk-cyan">●</span> add   <span class="tk-cyan">●</span> show   <span class="tk-cyan">●</span> move   <span class="tk-cyan">●</span> done
+│
+◇  title
+│  Fix the Acme webhook
+│
+<span class="tk-ok">✓</span>  ops task add
+   id      <span class="tk-ok">T-20260726-01</span>
+   status  active
+   title   Fix the Acme webhook</pre>
+            </div>
+          </div>
+          <div class="terminal-panel">
+            <div class="terminal-panel__bar"><span class="terminal-panel__dot"></span>the agent face — flags + JSON</div>
+            <div class="terminal-panel__body">
+<pre><span class="tk-prompt">$</span> ops task add "Fix the Acme webhook" --json
+{<span class="tk-key">"ops_json"</span>:1,<span class="tk-key">"ok"</span>:<span class="tk-ok">true</span>,<span class="tk-key">"verb"</span>:<span class="tk-str">"task"</span>,
+ <span class="tk-key">"data"</span>:{<span class="tk-key">"id"</span>:<span class="tk-str">"T-20260726-01"</span>,<span class="tk-key">"status"</span>:<span class="tk-str">"active"</span>}}
+
+<span class="tk-prompt">$</span> ops backup run --json          <span class="tk-dim"># confirm-class, no --yes</span>
+{<span class="tk-key">"ops_json"</span>:1,<span class="tk-key">"ok"</span>:<span class="tk-err">false</span>,<span class="tk-key">"error"</span>:{<span class="tk-key">"code"</span>:3,
+ <span class="tk-key">"message"</span>:<span class="tk-str">"restic backup of the working set needs --yes"</span>,
+ <span class="tk-key">"hint"</span>:<span class="tk-str">"re-run: ops backup run --yes"</span>}}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="exit-strip reveal" role="list" aria-label="Exit code protocol">
+          <span role="listitem"><b>0</b> ok</span>
+          <span role="listitem"><b>2</b> usage</span>
+          <span role="listitem"><b>3</b> needs <code class="t-mono-sm">--yes</code></span>
+          <span role="listitem"><b>4</b> not found</span>
+          <span role="listitem"><b>5</b> denied</span>
+        </div>
+        <p class="t-body pull-line reveal">A refusal is not a dead end — the error carries the exact corrected command. Refusals teach.</p>
+      </div>
+    </section>
+
+    <!-- ================= THE FOUR ROOTS ================= -->
+    <section class="section" id="roots">
+      <div class="container">
+        <div class="section-heading reveal">
+          <h2 class="t-display-lg">Four roots. Separated on purpose.</h2>
+          <p class="t-body" style="margin-top:1.5rem;">Siblings sit <em>next to</em> <code class="t-mono-sm">~/ops</code>, never inside it. The knowledge repo stays small, plaintext, and fast — and the safety wall is rooted in this layout. Inside <code class="t-mono-sm">~/ops</code>, everything is a Markdown file; indexes and embeddings are disposable caches rebuilt from the text.</p>
+        </div>
+
+        <div class="roots-grid reveal">
+          <div class="root-card root-card--primary">
+            <span class="root-card__path t-mono-sm">~/ops</span>
+            <p class="root-card__desc">Knowledge (wiki), tasks, journal, the verbs, your plugins.</p>
+            <span class="root-card__git">✅ your own git repo</span>
+          </div>
+          <div class="root-card">
+            <span class="root-card__path t-mono-sm">~/work</span>
+            <p class="root-card__desc">Code — each project its own repo (<code class="t-mono-sm">products/ labs/ tools/ clients/</code>).</p>
+            <span class="root-card__git">each repo separately</span>
+          </div>
+          <div class="root-card">
+            <span class="root-card__path t-mono-sm">~/files</span>
+            <p class="root-card__desc">Binary assets — client docs, PDFs, datasets.</p>
+            <span class="root-card__git">restic backup, not git</span>
+          </div>
+          <div class="root-card">
+            <span class="root-card__path t-mono-sm">~/dotfiles</span>
+            <p class="root-card__desc">Machine config; puts <code class="t-mono-sm">ops</code> on PATH.</p>
+            <span class="root-card__git">✅ separately</span>
+          </div>
+        </div>
+
+        <p class="t-heading pull-line reveal">Plaintext is the truth. Git is the spine. Everything else is a rebuildable cache.</p>
+      </div>
+    </section>
+
+    <!-- ================= A DAY IN THE VAULT ================= -->
+    <section class="section" id="day">
+      <div class="container">
+        <div class="section-heading reveal">
+          <h2 class="t-display-lg">The daily rhythm is five verbs.</h2>
+          <p class="t-body" style="margin-top:1.5rem;"><code class="t-mono-sm">start → capture / triage / task → close</code>, with <code class="t-mono-sm">week</code> on Fridays. You never memorize paths or formats — the verb owns placement; you provide the content. Everything else is discoverable through <code class="t-mono-sm">ops help</code>, tab-completion fed by your actual note slugs and task IDs, or the guided UI.</p>
+        </div>
+
+        <div class="terminal-panel session-panel reveal">
+          <div class="terminal-panel__bar"><span class="terminal-panel__dot"></span>a day in the vault</div>
+          <div class="terminal-panel__body">
+<pre><span class="tk-prompt">$</span> ops start                             <span class="tk-dim"># morning: today's journal, carry-forward, dashboard</span>
+<span class="tk-prompt">$</span> ops capture "RRF beats naive hybrid"  <span class="tk-dim"># a thought → inbox/ (zero decisions)</span>
+<span class="tk-prompt">$</span> ops triage                            <span class="tk-dim"># proposes: wiki note? task? — you approve</span>
+<span class="tk-prompt">$</span> ops search "ranking fusion"           <span class="tk-dim"># ranked file#heading hits with snippets</span>
+<span class="tk-prompt">$</span> ops open rrf                          <span class="tk-dim"># one resolver: task id → note slug → asset → search</span>
+<span class="tk-prompt">$</span> ops close                             <span class="tk-dim"># evening: summarize the day, flag loose ends</span></pre>
+          </div>
+        </div>
+
+        <div class="verb-groups reveal">
+          <table>
+            <thead><tr><th>Group</th><th>Verbs</th></tr></thead>
+            <tbody>
+              <tr><td>Flow</td><td><code>capture · triage · start · close · week</code></td></tr>
+              <tr><td>Knowledge</td><td><code>search · open · wiki · bookmark · enrich · organize</code></td></tr>
+              <tr><td>Tasks</td><td><code>task</code> <span class="tk-note">— folder = status: inbox / active / waiting / done</span></td></tr>
+              <tr><td>Work</td><td><code>new · repo · archive · files · sweep</code></td></tr>
+              <tr><td>Business</td><td><code>invoice</code> <span class="tk-note">(draft only)</span> <code>· share</code> <span class="tk-note">(capability links)</span></td></tr>
+              <tr><td>Jobs</td><td><code>job</code> <span class="tk-note">— schedule the nightly verbs</span></td></tr>
+              <tr><td>System</td><td><code>status · orient · doctor · setup · backup · index · models · plugin · ui · help</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="t-body-sm verb-groups__note reveal">The verb list is generated, not maintained — <code class="t-mono-sm">ops.json</code> describes the whole surface, and every new verb (or installed plugin) appears in <code class="t-mono-sm">help</code>, completion, the UI, and MCP automatically.</p>
+      </div>
+    </section>
+
+    <!-- ================= GUARDRAIL ================= -->
+    <section class="section" id="guardrail">
+      <div class="container">
+        <div class="section-heading reveal">
+          <h2 class="t-display-lg">Every call passes the same wall.</h2>
+          <p class="t-body" style="margin-top:1.5rem;">Before any verb runs, the guardrail classifies it — yours, a cron job's, a plugin's, or an agent's. New and untrusted verbs default to <code class="t-mono-sm">confirm</code>. It's all git underneath, so even a mistaken write is one <code class="t-mono-sm">git revert</code> away.</p>
+        </div>
+
+        <div class="risk-table reveal">
+          <table>
+            <thead><tr><th>Class</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><span class="pill pill--read">read</span></td><td>pure read — runs freely, even unattended</td></tr>
+              <tr><td><span class="pill pill--safe">safe_write</span></td><td>writes inside the roots — every change is a revertible git diff</td></tr>
+              <tr><td><span class="pill pill--draft">draft_only</span></td><td>produces a draft (e.g. <code class="t-mono-sm">invoice</code>) — the system never transmits</td></tr>
+              <tr><td><span class="pill pill--confirm">confirm</span></td><td>needs an explicit <code class="t-mono-sm">--yes</code> — exit 3 with the exact re-run when missing</td></tr>
+              <tr><td><span class="pill pill--deny">deny</span></td><td>always refused: force-push, <code class="t-mono-sm">rm -rf</code>, secrets, paths outside the wall</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="t-body pull-line reveal"><code class="heading-mono">--dry-run</code> on any mutating verb prints what would happen and writes nothing — it counts as a read, so even confirm-class verbs are explorable without <code class="heading-mono">--yes</code>.</p>
+      </div>
+    </section>
+
+    <!-- ================= AGENTS ================= -->
+    <section class="section" id="agents">
+      <div class="container">
+        <div class="section-heading reveal">
+          <h2 class="t-display-lg">Any agent. Same door, same wall.</h2>
+          <p class="t-body" style="margin-top:1.5rem;">Point any capable agent at <code class="t-mono-sm">~/ops</code> and it drives the same system. It reads <code class="t-mono-sm">AGENTS.md</code> (the open contract standard) and the <code class="t-mono-sm">operate-ops</code> skill; it parses the generated <code class="t-mono-sm">ops.json</code> — every verb's args, schemas, risk class, per-action grammar, completion providers; and for MCP hosts, <code class="t-mono-sm">ops mcp</code> is a stateless stdio server whose tool list is generated from the same contract. An agent never gets more power than you do.</p>
+        </div>
+
+        <div class="panels-2 reveal">
+          <div class="terminal-panel">
+            <div class="terminal-panel__bar"><span class="terminal-panel__dot"></span>ops.json — one verb, trimmed</div>
+            <div class="terminal-panel__body">
+<pre>{<span class="tk-key">"verb"</span>:<span class="tk-str">"task"</span>, <span class="tk-key">"risk"</span>:<span class="tk-str">"safe_write"</span>, <span class="tk-key">"group"</span>:<span class="tk-str">"TASKS"</span>,
+ <span class="tk-key">"dry_run"</span>:<span class="tk-ok">true</span>,
+ <span class="tk-key">"actions"</span>:[
+   {<span class="tk-key">"name"</span>:<span class="tk-str">"add"</span>,  <span class="tk-key">"args"</span>:[{<span class="tk-key">"name"</span>:<span class="tk-str">"title"</span>,<span class="tk-key">"required"</span>:<span class="tk-ok">true</span>}]},
+   {<span class="tk-key">"name"</span>:<span class="tk-str">"move"</span>, <span class="tk-key">"args"</span>:[
+     {<span class="tk-key">"name"</span>:<span class="tk-str">"id"</span>,<span class="tk-key">"complete"</span>:<span class="tk-str">"task-id"</span>},
+     {<span class="tk-key">"name"</span>:<span class="tk-str">"status"</span>,<span class="tk-key">"enum"</span>:[<span class="tk-str">"inbox"</span>,<span class="tk-str">"active"</span>,<span class="tk-str">"waiting"</span>,<span class="tk-str">"done"</span>]}]},
+   {<span class="tk-key">"name"</span>:<span class="tk-str">"done"</span>, <span class="tk-key">"args"</span>:[{<span class="tk-key">"name"</span>:<span class="tk-str">"id"</span>,<span class="tk-key">"complete"</span>:<span class="tk-str">"task-id"</span>}]}]}</pre>
+            </div>
+          </div>
+          <div class="terminal-panel">
+            <div class="terminal-panel__bar"><span class="terminal-panel__dot"></span>hook up an MCP host</div>
+            <div class="terminal-panel__body">
+<pre><span class="tk-prompt">$</span> ops mcp --setup
+claude mcp add ops -- /Users/you/ops/ops mcp
+
+<span class="tk-dim"># stateless stdio server — spawned per session, dies with it.</span>
+<span class="tk-dim"># tool list generated from ops.json: every verb + every</span>
+<span class="tk-dim"># installed plugin, with schemas and hints. each tool call</span>
+<span class="tk-dim"># shells back through `ops &lt;verb&gt; --json` — guardrail intact.</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="agent-table reveal">
+          <table>
+            <thead><tr><th>Agent</th><th>Reads the contract as</th><th>Point it at <code>~/ops</code></th></tr></thead>
+            <tbody>
+              <tr><td>Claude Code</td><td><code>CLAUDE.md</code> bridge, or <code>ops mcp</code></td><td>run <code>claude</code> from <code>~/ops</code></td></tr>
+              <tr><td>Codex CLI</td><td><code>AGENTS.md</code> (native)</td><td>run from <code>~/ops</code></td></tr>
+              <tr><td>Grok CLI</td><td><code>AGENTS.md</code> + <code>skills/</code></td><td>run in <code>~/ops</code></td></tr>
+              <tr><td>Any MCP host</td><td>tool list from <code>ops.json</code></td><td>register <code>ops mcp</code> as stdio</td></tr>
+              <tr><td>Anything else</td><td><code>AGENTS.md</code></td><td>can read a file + run a command? it can drive ops</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="t-body-sm agent-note reveal">Verified, not hoped: an 18-scenario simulation run by two different operator models ended 18/18 for both with <b>zero divergences</b> — same filing, same refusals, same traversal. The contract is unambiguous.</p>
+      </div>
+    </section>
+
+    <!-- ================= KNOWLEDGE PIPELINE ================= -->
+    <section class="section" id="pipeline">
+      <div class="container">
+        <div class="section-heading reveal">
+          <h2 class="t-display-lg">Artifacts in. Honest knowledge out.</h2>
+          <p class="t-body" style="margin-top:1.5rem;">PDFs, recordings, screenshots, and URLs become searchable, linked, <em>provenance-labeled</em> notes. Extraction is tiered and local — each format tries the best locally available tool and degrades gracefully. A model may propose, rank, or label; it may never directly write "truth" into your vault.</p>
+        </div>
+
+        <div class="terminal-panel session-panel reveal">
+          <div class="terminal-panel__bar"><span class="terminal-panel__dot"></span>the pipeline</div>
+          <div class="terminal-panel__body">
+<pre><span class="tk-prompt">$</span> ops files ingest talk.pdf --research --extract  <span class="tk-dim"># file it + extract text → a DERIVED note</span>
+<span class="tk-prompt">$</span> ops files distill talk                          <span class="tk-dim"># compile concept notes (drafts) from the extract</span>
+<span class="tk-prompt">$</span> ops organize                                    <span class="tk-dim"># scan for links/dupes/fixes → proposals, zero LLM writes</span>
+<span class="tk-prompt">$</span> ops organize review                             <span class="tk-dim"># page through each proposed op with its exact diff</span>
+<span class="tk-prompt">$</span> ops organize apply --yes                        <span class="tk-dim"># replay ONLY what you approved — one git commit per op</span></pre>
+          </div>
+        </div>
+
+        <div class="planes reveal">
+          <div class="plane-card"><span class="plane-card__name t-mono-sm">human</span><p>Notes you wrote. The default author; what search trusts most.</p></div>
+          <div class="plane-card"><span class="plane-card__name t-mono-sm">derived</span><p>Machine extractions — labeled with <code class="t-mono-sm">derived_from</code>, <code class="t-mono-sm">source_sha256</code>, and the tool that made them.</p></div>
+          <div class="plane-card"><span class="plane-card__name t-mono-sm">agent</span><p>Model-written drafts — gated as <code class="t-mono-sm">status: draft</code> until <em>you</em> promote them in triage. Machine material can never quietly become truth.</p></div>
+        </div>
+
+        <p class="t-body pull-line reveal">Three local search stages find it all again: keyword + wikilink graph out of the box; local vectors and reranking opt-in. The index is disposable — <code class="heading-mono">rm -rf .index &amp;&amp; ops index</code> rebuilds it from the text.</p>
+      </div>
+    </section>
+
+    <!-- ================= QUICKSTART ================= -->
+    <section class="section" id="quickstart">
+      <div class="container">
+        <div class="section-heading reveal">
+          <h2 class="t-display-lg">Template to vault in five minutes.</h2>
+          <p class="t-body" style="margin-top:1.5rem;">The repo is a <b>template, not your data</b>. The installer clones your own copy to <code class="t-mono-sm">~/ops</code>, wires the machine, and never pushes anywhere. Needs macOS or Linux, <code class="t-mono-sm">git</code>, Python 3.10+ — nothing else is required.</p>
+        </div>
+
+        <div class="terminal-panel quickstart__session reveal">
+          <div class="terminal-panel__bar"><span class="terminal-panel__dot"></span>quickstart session</div>
+          <div class="terminal-panel__body">
+            <span class="qs__line"><span class="tk-prompt">$</span><span class="qs__cmd">curl -fsSL https://raw.githubusercontent.com/gabros20/opskit/main/script/get -o get.sh</span></span>
+            <span class="qs__line"><span class="tk-prompt">$</span><span class="qs__cmd">shasum -a 256 get.sh</span>   <span class="qs__comment"># compare against script/get.sh.sha256 — read it, then run it</span></span>
+            <span class="qs__line"><span class="tk-prompt">$</span><span class="qs__cmd">sh get.sh</span>              <span class="qs__comment"># lean vault at ~/ops, non-interactive, no sudo</span></span>
+            <span class="qs__line"><span class="tk-prompt">$</span><span class="qs__cmd">ops setup --wizard</span>     <span class="qs__comment"># guided first-run: skeleton + terminal UI on, heavy layers off</span></span>
+            <span class="qs__line"><span class="tk-prompt">$</span><span class="qs__cmd">ops ui</span>                 <span class="qs__comment"># point-and-pick from here</span></span>
+          </div>
+        </div>
+
+        <p class="t-body-sm quickstart__note reveal">Kick the tyres first: <code class="t-mono-sm">sh get.sh --demo</code> installs a throwaway vault with example notes into a tmp dir — one <code class="t-mono-sm">rm -rf</code> removes it completely. Semantic search, local models, backups, and scheduled jobs are opt-in layers: <code class="t-mono-sm">ops setup</code> is the dashboard, <code class="t-mono-sm">ops setup &lt;layer&gt; --yes</code> advances one, <code class="t-mono-sm">--dry-run</code> previews anything.</p>
+      </div>
+    </section>
+
+    <!-- ================= STAYING CURRENT ================= -->
+    <section class="section" id="updates">
+      <div class="container">
+        <div class="section-heading reveal">
+          <h2 class="t-display-lg">Engine updates flow. Your notes never move.</h2>
+          <p class="t-body" style="margin-top:1.5rem;"><code class="heading-mono">./script/update</code> 3-way-merges <em>only the engine files</em>: unmodified files fast-forward, your local engine patches merge, conflicts get markers, and your wiki, tasks, and journal are never touched. The terminal UI updates the same way — the engine ships the version it expects, and the setup dashboard tells you when a newer binary is pinned and ready.</p>
+        </div>
+
+        <div class="terminal-panel session-panel reveal">
+          <div class="terminal-panel__bar"><span class="terminal-panel__dot"></span>ops setup — the layer dashboard</div>
+          <div class="terminal-panel__body">
+<pre>setup layers:
+  <span class="tk-ok">✓</span> skeleton    Vault structure         <span class="tk-ok">ready</span>    required  vault skeleton ready
+  <span class="tk-ok">✓</span> search      Semantic search         <span class="tk-ok">ready</span>    optional  semantic search operational
+  <span class="tk-warn">!</span> backups     Durability              <span class="tk-warn">blocked</span>  optional  restic is required
+    <span class="tk-dim">next: install restic: brew install restic</span>
+  <span class="tk-dim">◐</span> models      File-processing / LLM   partial  optional  model layer incomplete
+  <span class="tk-dim">○</span> automation  Schedules               absent   optional  job plists not rendered
+  <span class="tk-dim">◐</span> ui          Terminal UI             partial  optional  <span class="tk-warn">update available: 0.1.1 → 0.1.2</span>
+    <span class="tk-dim">next: ops setup ui --yes</span></pre>
+          </div>
+        </div>
+        <p class="t-body-sm reveal" style="margin-top:1.5rem; max-width: var(--measure);">The <code class="t-mono-sm">ui</code> layer downloads a self-contained compiled binary (sha256-verified, pinned to the release the engine was tested with) into the vault's own <code class="t-mono-sm">.local/bin/</code> — no Node on your machine, no <code class="t-mono-sm">node_modules</code> in your vault, ever.</p>
+      </div>
+    </section>
+
+    <!-- ================= POSITIONING ================= -->
+    <section class="section" id="positioning">
+      <div class="container">
+        <div class="section-heading reveal">
+          <h2 class="t-display-lg">Keeps the files. Adds the system.</h2>
+        </div>
+
+        <div class="positioning-table reveal">
+          <table>
+            <thead>
+              <tr><th>Instead of…</th><th>The tension</th><th>Where opskit sits</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>cloud PKM apps (Notion &amp; co.)</td>
+                <td>your notes live in someone's database and leave when it does</td>
+                <td>Markdown in your own git repo — grep it, fork it, walk away anytime</td>
+              </tr>
+              <tr>
+                <td>a bare Obsidian vault</td>
+                <td>files but no command surface — every writer (you, cron, agents) improvises placement and format</td>
+                <td>one verb surface owns placement + a guardrail gates every write; Obsidian stays as the free frontend</td>
+              </tr>
+              <tr>
+                <td>building on one agent CLI</td>
+                <td>your workflows get welded to one vendor's memory and tool primitives</td>
+                <td>an agent-agnostic contract — any CLI or MCP host drives the same verbs behind the same wall</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="t-body principles-line reveal">The principles it enforces: plaintext is the truth; git is the spine; one door (<code class="t-mono-sm">ops &lt;verb&gt;</code> is the only writer); agents are guests behind the same guardrail; nothing transmits without a human; reversible, zero-install, no server.</p>
+        <p class="t-body-sm no-place-line reveal">Named non-features, so they don't creep in: no server, no daemon, no cloud sync, no proprietary format, no auto-send. The vault plus git history is the whole platform.</p>
+      </div>
+    </section>
+
+    <!-- ================= CLOSING CTA ================= -->
+    <section class="section section--closing closing" id="closing">
+      <div class="container">
+        <div class="reveal">
+          <svg class="closing__glyph" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="2" y="2" width="60" height="60" rx="10" class="lg-bg"/>
+            <path d="M16 22 L30 32 L16 42" fill="none" class="lg-caret" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="36" y="38" width="14" height="7" rx="1.5" class="lg-cursor"/>
+          </svg>
+          <h2 class="t-display-lg">Plaintext outlives every app.</h2>
+          <p class="t-body closing__sub">Every verb guardrail-gated, documented in the machine contract, and covered by offline test suites in CI. MIT-licensed. Your notes stay yours.</p>
+          <div class="hero__install closing__install">
+            <code>curl -fsSL https://raw.githubusercontent.com/gabros20/opskit/main/script/get -o get.sh &amp;&amp; sh get.sh</code>
+            <button type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/gabros20/opskit/main/script/get -o get.sh && sh get.sh" aria-label="Copy install command">Copy</button>
+          </div>
+          <div class="closing__ctas">
+            <a class="btn btn-primary" href="#quickstart">Get started</a>
+            <a class="btn btn-secondary" href="https://github.com/gabros20/opskit">View on GitHub</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="site-footer__grid">
+        <div>
+          <span class="site-footer__heading">Docs</span>
+          <ul class="site-footer__list">
+            <li><a href="https://github.com/gabros20/opskit/blob/main/docs/setup.md">Layered setup</a></li>
+            <li><a href="https://github.com/gabros20/opskit/blob/main/docs/terminal-ui.md">The terminal UI</a></li>
+            <li><a href="https://github.com/gabros20/opskit/blob/main/docs/architecture.md">Architecture</a></li>
+            <li><a href="https://github.com/gabros20/opskit/blob/main/docs/machine-contract.md">Machine contract</a></li>
+            <li><a href="https://github.com/gabros20/opskit/blob/main/docs/plugins.md">Plugins</a></li>
+            <li><a href="https://github.com/gabros20/opskit/blob/main/docs/backup-and-share.md">Backup &amp; share</a></li>
+            <li><a href="https://github.com/gabros20/opskit/blob/main/docs/README.md">The docs map</a></li>
+            <li><a class="site-footer__llms" href="/llms.txt"><code class="t-mono-sm">llms.txt</code> — the docs, routed for AI agents</a></li>
+          </ul>
+        </div>
+        <div>
+          <span class="site-footer__heading">Project</span>
+          <ul class="site-footer__list">
+            <li><a href="https://github.com/gabros20/opskit">GitHub</a></li>
+            <li><a href="https://github.com/gabros20/opskit/blob/main/CHANGELOG.md">Changelog</a></li>
+            <li><a href="https://github.com/gabros20/opskit/blob/main/docs/DECISIONS.md">Decision log (ADRs)</a></li>
+            <li><a href="https://github.com/gabros20/opskit/blob/main/LICENSE">License (MIT)</a></li>
+          </ul>
+        </div>
+        <div>
+          <span class="site-footer__heading">The template pattern</span>
+          <p class="site-footer__lineage">opskit is the kit — engine, terminal UI, and installer. Your vault is a private copy that tracks it as a fetch-only upstream and pulls engine improvements without ever exposing a note. The tool is public; your operating system is yours.</p>
+        </div>
+      </div>
+      <div class="site-footer__bottom t-mono-sm">opskit · MIT · gabros20/opskit</div>
+    </div>
+  </footer>
+
+</div>
+
+<script src="main.js"></script>
+</body>
+</html>
