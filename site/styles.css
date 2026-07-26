@@ -342,6 +342,8 @@ html.js .reveal.is-visible { opacity: 1; transform: translateY(0); }
 }
 .site-header__nav a:hover, .site-header__github:hover { color: var(--rust-deep); }
 .site-header__actions { display: flex; align-items: center; gap: 1.25rem; }
+/* Compact button in the header bar — the full-size CTA belongs in the page, not the chrome */
+.site-header__actions .btn { padding: 0.5rem 1.05rem; font-size: 0.875rem; }
 @media (max-width: 900px) {
   .site-header__nav { display: none; }
 }
