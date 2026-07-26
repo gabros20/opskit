@@ -403,10 +403,46 @@ def _ui_source_buildable() -> bool:
     return (paths.OPS_HOME / "ui" / "package.json").is_file() and shutil.which("bun") is not None
 
 
+def _ui_expected_version() -> str | None:
+    """The ui version this engine expects (bin/ui/version.txt — engine-owned, so `script/update`
+    bumps it in every vault alongside the code that speaks to it). None on a pre-version engine."""
+    try:
+        v = (BIN / "ui" / "version.txt").read_text().strip()
+        return v or None
+    except OSError:
+        return None
+
+
+def _ui_installed_version(exe: str) -> str | None:
+    """What the installed binary reports for `--version`. A binary too old to know the flag (exits
+    non-zero via its TTY guard) returns None — which reads as 'unknown', i.e. update available."""
+    try:
+        r = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10)
+    except Exception:
+        return None
+    if r.returncode != 0:
+        return None
+    lines = r.stdout.strip().splitlines()
+    return lines[0].strip() if lines else None
+
+
 def _status_ui(layer: Layer) -> dict:
     exe = _ui_installed()
     items = [{"id": "binary", "title": ".local/bin/ops-ui (or $OPS_UI_BIN / PATH)", "ok": bool(exe)}]
     if exe:
+        # Offline update detection: the engine ships the version it expects (bin/ui/version.txt,
+        # bumped by `script/update`); the binary self-reports via `--version`. A mismatch makes the
+        # layer `partial` — attemptable — so the ordinary `ops setup ui --yes` performs the update
+        # (pinned to the expected release). No network in status; no extra flags to learn.
+        expected = _ui_expected_version()
+        if expected:
+            installed = _ui_installed_version(exe)
+            if installed != expected:
+                items.append({"id": "version", "title": f"ops-ui {expected}", "ok": False})
+                return _row(layer, "partial",
+                            f"update available: installed {installed or 'unknown'} → {expected}",
+                            items, "ops setup ui --yes")
+            items.append({"id": "version", "title": f"ops-ui {expected}", "ok": True})
         return _row(layer, "ready", f"ops ui launches {exe}", items)
     asset = _ui_asset()
     can_download = _gh_present() and asset is not None and _ui_repo() is not None
@@ -456,7 +492,11 @@ def _install_ui(res: dict, *, fake: bool) -> None:
     asset = _ui_asset()
     repo = _ui_repo()
     if _gh_present() and asset and repo:
-        dl = ["gh", "release", "download", "--repo", repo, "--pattern", asset,
+        # Pin to the engine's expected release when known (install and update land the exact version
+        # this engine's contract was tested with); a pre-version engine falls back to latest.
+        expected = _ui_expected_version()
+        tag = [f"ui-v{expected}"] if expected else []
+        dl = ["gh", "release", "download", *tag, "--repo", repo, "--pattern", asset,
               "--pattern", "checksums.txt", "--dir", str(bindir), "--clobber"]
         if _fake(fake):
             res["ran"].append(_run(dl, fake=fake))

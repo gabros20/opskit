@@ -18,6 +18,12 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
   binaries (darwin-arm64/x64, linux-x64/arm64) are cross-compiled with `bun build --compile` by
   `.github/workflows/release-ui.yml` on `ui-v*` tags; CI gains a `ui` job (typecheck + compile
   smoke + the non-TTY exit-2 contract).
+- **ui layer update detection (offline).** The engine ships its expected ui version in
+  `bin/ui/version.txt` (engine-owned → propagated by `script/update`); `ops-ui --version` reports
+  the installed one. On mismatch the layer reports `partial` — "update available: installed X → Y"
+  — and the ordinary `ops setup ui --yes` re-downloads, pinned to the expected release tag
+  (`ui-v<version>`). The release workflow fails on any drift between the tag, `ui/package.json`,
+  `bin/ui/version.txt`, and `ui/src/version.ts`.
 
 ### Changed
 - **Repo renamed: `personal-operating-system` → `opskit`** (ADR-011). The template is the *kit* —

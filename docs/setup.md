@@ -108,6 +108,13 @@ verifies its sha256 against the release's `checksums.txt` before installing. The
 self-contained — no Node or Bun is needed on this machine. In a full contributor checkout (with
 `ui/` source present) plus `bun` on PATH, the layer compiles from source instead.
 
+**Updates ride `script/update`.** The engine ships the ui version it expects in
+`bin/ui/version.txt` (engine-owned), and the installed binary self-reports via `ops-ui --version`.
+When they disagree — e.g. after a `script/update` pulled a newer engine — the layer's status turns
+`partial` with "update available", `ops doctor` nudges you, and the same `ops setup ui --yes`
+re-downloads the exact release the engine expects (the download is pinned to that tag). No separate
+update command; the dashboard tells you when, the layer does the rest.
+
 Blocked layers stay blocked and print the exact remediation in `next`. Backups are blocked because
 encrypted off-machine backup setup needs human choices and secrets (and `restic` installed):
 

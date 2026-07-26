@@ -283,7 +283,7 @@ def main() -> int:
         # gh download + sha256 verify without touching the network. ---
         old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: "ops-ui-test-arm64",
                           _ui_repo=lambda: "owner/template", _ui_source_buildable=lambda: False,
-                          _gh_present=lambda: True)
+                          _gh_present=lambda: True, _ui_expected_version=lambda: None)
         try:
             u_abs = mod.status("ui")[0]
             check("ui absent (attemptable) when downloadable but not installed",
@@ -293,6 +293,41 @@ def main() -> int:
             check("fake ui advance previews gh release download + sha256 verify (no network)",
                   "gh release download" in u_joined and "owner/template" in u_joined
                   and "checksums.txt" in u_joined and "sha256" in u_joined, str(u_adv["ran"]))
+        finally:
+            restore(mod, old)
+
+        # Update detection (offline): the engine ships bin/ui/version.txt; the binary self-reports
+        # --version. A mismatch (or a pre---version binary reporting None) makes the layer `partial`
+        # ("update available") so the ordinary `ops setup ui --yes` re-downloads, PINNED to the
+        # engine's expected release tag. Matching versions stay `ready` and skip.
+        old = patch_probe(mod, _ui_installed=lambda: "/fake/ops-ui",
+                          _ui_asset=lambda: "ops-ui-test-arm64", _ui_repo=lambda: "owner/template",
+                          _ui_source_buildable=lambda: False, _gh_present=lambda: True,
+                          _ui_expected_version=lambda: "9.9.9",
+                          _ui_installed_version=lambda exe: "1.0.0")
+        try:
+            u_upd = mod.status("ui")[0]
+            check("ui partial (update available) when installed version != engine's expected",
+                  u_upd["status"] == "partial" and "update available" in u_upd["detail"]
+                  and u_upd["next"] == "ops setup ui --yes", str(u_upd))
+            u_uadv = mod.advance("ui", yes=True, fake=True)
+            check("fake ui update advance pins the download to the expected release tag",
+                  any("gh release download ui-v9.9.9" in c for c in u_uadv["ran"]), str(u_uadv["ran"]))
+        finally:
+            restore(mod, old)
+
+        old = patch_probe(mod, _ui_installed=lambda: "/fake/ops-ui",
+                          _ui_expected_version=lambda: "9.9.9",
+                          _ui_installed_version=lambda exe: "9.9.9")
+        try:
+            u_cur = mod.status("ui")[0]
+            check("ui ready when installed version matches the engine's expected",
+                  u_cur["status"] == "ready"
+                  and any(i.get("id") == "version" and i.get("ok") for i in u_cur["items"]),
+                  str(u_cur))
+            u_cadv = mod.advance("ui", yes=True, fake=True)
+            check("up-to-date ui advance skips (no re-download)",
+                  not u_cadv["ran"] and "ui" in u_cadv["skipped"], str(u_cadv))
         finally:
             restore(mod, old)
 

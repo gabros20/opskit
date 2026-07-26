@@ -20,6 +20,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: version consistency (tag == package.json == bin/ui/version.txt == src/version.ts)
+        run: |
+          tag="${GITHUB_REF_NAME#ui-v}"
+          pkg="$(python3 -c "import json; print(json.load(open('ui/package.json'))['version'])")"
+          eng="$(tr -d ' \n' < bin/ui/version.txt)"
+          src="$(grep -o '"[0-9][0-9.]*"' ui/src/version.ts | tr -d '"')"
+          if [ "$tag" != "$pkg" ] || [ "$tag" != "$eng" ] || [ "$tag" != "$src" ]; then
+            echo "version drift: tag=$tag package.json=$pkg bin/ui/version.txt=$eng src/version.ts=$src"
+            echo "all four must match — vaults pin their download to bin/ui/version.txt"
+            exit 1
+          fi
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
