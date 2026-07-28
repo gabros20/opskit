@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-ops wiki open <slug> [--obsidian] | edit <slug> | new <type> <name> | backlinks <slug> |
+plainkeep wiki open <slug> [--obsidian] | edit <slug> | new <type> <name> | backlinks <slug> |
   stale [days] | orphans | canvas <hub|#tag> [--depth N] [--stdout] | list  [--dry-run] [--json]
 — navigate and grow the knowledge wiki (§10). Slugs resolve by basename ([[wikilinks]] style).
-`open --obsidian` (or OPS_OPEN=obsidian) prints an obsidian:// URI and opens it on macOS (Part 3.1);
+`open --obsidian` (or PLAINKEEP_OPEN=obsidian) prints an obsidian:// URI and opens it on macOS (Part 3.1);
 `canvas` emits a deterministic JSON Canvas over the wikilink graph (Part 3.2).
 """
 import json
@@ -29,10 +29,10 @@ def _notes():
 
 def _obsidian_uri(p: Path) -> str:
     """obsidian://open URI for a note — local IPC to OPEN only, never a write (Part 3.1)."""
-    rel = p.relative_to(paths.OPS_HOME).as_posix()
+    rel = p.relative_to(paths.PLAINKEEP_HOME).as_posix()
     if rel.endswith(".md"):
         rel = rel[:-3]
-    vault = os.environ.get("OPS_OBSIDIAN_VAULT") or paths.OPS_HOME.name
+    vault = os.environ.get("PLAINKEEP_OBSIDIAN_VAULT") or paths.PLAINKEEP_HOME.name
     return f"obsidian://open?vault={quote(vault, safe='')}&file={quote(rel, safe='/')}"
 
 
@@ -95,7 +95,7 @@ def _canvas_layout(dist, ordered, hub, w, h):
 
 def _canvas_doc(notes, ordered, edges, pos, w, h):
     nodes = [{"id": s, "type": "file",
-              "file": notes[s].relative_to(paths.OPS_HOME).as_posix(),
+              "file": notes[s].relative_to(paths.PLAINKEEP_HOME).as_posix(),
               "x": pos[s][0], "y": pos[s][1], "width": w, "height": h} for s in ordered]
     eds = [{"id": f"{a}--{b}", "fromNode": a, "toNode": b} for a, b in edges]
     return {"nodes": nodes, "edges": eds}
@@ -105,13 +105,13 @@ def _choose(notes, label):
     """No slug given: fuzzy-pick with fzf (live preview), else list what's available. §Tier-2."""
     items = sorted(notes)
     if not items:
-        print("no notes yet — capture and triage, or: ops wiki new note \"…\""); return None
-    ops_bin = paths.OPS_HOME / "ops"
-    preview = f'OPS_RENDER=plain "{ops_bin}" wiki open {{}}'
+        print("no notes yet — capture and triage, or: plainkeep wiki new note \"…\""); return None
+    pk_bin = paths.PLAINKEEP_HOME / "plainkeep"
+    preview = f'PLAINKEEP_RENDER=plain "{pk_bin}" wiki open {{}}'
     sel = render.fzf_pick(items, preview=preview, prompt=f"{label} note> ")
     if sel and sel in notes:
         return sel
-    print(f"{len(items)} note(s) — pass a slug (e.g. `ops wiki {label} <slug>`):")
+    print(f"{len(items)} note(s) — pass a slug (e.g. `plainkeep wiki {label} <slug>`):")
     for s in items:
         print(f"  {s}")
     return None
@@ -129,7 +129,7 @@ def _graph(notes):
 def main(argv):
     _, argv = output.parse_argv(argv)
     dry = "--dry-run" in argv
-    obsidian = ("--obsidian" in argv) or (os.environ.get("OPS_OPEN") == "obsidian")
+    obsidian = ("--obsidian" in argv) or (os.environ.get("PLAINKEEP_OPEN") == "obsidian")
     to_stdout = "--stdout" in argv
     depth = 1
     if "--depth" in argv:
@@ -152,14 +152,14 @@ def main(argv):
             output.fail(output.EXIT_NOT_FOUND, f"no note '{slug}'", verb="wiki")
         if obsidian:
             uri = _obsidian_uri(p)
-            data = {"slug": slug, "path": str(p.relative_to(paths.OPS_HOME)), "uri": uri}
+            data = {"slug": slug, "path": str(p.relative_to(paths.PLAINKEEP_HOME)), "uri": uri}
 
             def open_obsidian(_):
-                if not os.environ.get("OPS_NO_OPEN") and sys.platform == "darwin":
+                if not os.environ.get("PLAINKEEP_NO_OPEN") and sys.platform == "darwin":
                     subprocess.run(["open", uri], check=False)  # local IPC: OPEN only, never write
                 return uri
             return output.emit(data, "wiki", human=open_obsidian)
-        data = {"slug": slug, "path": str(p.relative_to(paths.OPS_HOME))}
+        data = {"slug": slug, "path": str(p.relative_to(paths.PLAINKEEP_HOME))}
         return output.emit(data, "wiki", human=lambda _: render.open_note(p))
 
     elif action == "edit":
@@ -171,7 +171,7 @@ def main(argv):
         p = notes.get(slug)
         if not p:
             output.fail(output.EXIT_NOT_FOUND, f"no note '{slug}'", verb="wiki")
-        editor = os.environ.get("OPS_EDITOR") or os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
+        editor = os.environ.get("PLAINKEEP_EDITOR") or os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
         try:
             rc = subprocess.run([*editor.split(), str(p)]).returncode
         except FileNotFoundError:
@@ -180,16 +180,16 @@ def main(argv):
 
     elif action == "new":
         if len(argv) < 3:
-            output.fail(output.EXIT_USAGE, "usage: ops wiki new <type> <name>", verb="wiki")
+            output.fail(output.EXIT_USAGE, "usage: plainkeep wiki new <type> <name>", verb="wiki")
         typ, name = argv[1], " ".join(argv[2:])
         if not notetype.is_type(typ):
             output.fail(output.EXIT_USAGE, f"type must be one of {sorted(notetype.load_types())}", verb="wiki")
         slug = paths.slugify(name)
         if slug in notes:
             output.fail(output.EXIT_UNEXPECTED,
-                        f"slug '{slug}' already exists ({notes[slug].relative_to(paths.OPS_HOME)}) — slugs are unique",
+                        f"slug '{slug}' already exists ({notes[slug].relative_to(paths.PLAINKEEP_HOME)}) — slugs are unique",
                         verb="wiki")
-        rel = (paths.WIKI / notetype.type_dir(typ) / f"{slug}.md").relative_to(paths.OPS_HOME)
+        rel = (paths.WIKI / notetype.type_dir(typ) / f"{slug}.md").relative_to(paths.PLAINKEEP_HOME)
         if dry:
             data = {"dry_run": True, "would_create": str(rel), "type": typ, "slug": slug}
             return output.emit(data, "wiki",
@@ -207,7 +207,7 @@ def main(argv):
         if slug not in notes:
             output.fail(output.EXIT_NOT_FOUND, f"no note '{slug}'", verb="wiki")
         ins = sorted(_graph(notes)[slug])
-        rows = [{"slug": s, "path": str(notes[s].relative_to(paths.OPS_HOME))} for s in ins]
+        rows = [{"slug": s, "path": str(notes[s].relative_to(paths.PLAINKEEP_HOME))} for s in ins]
 
         def render_bl(rs):
             return "\n".join([f"{len(rs)} backlink(s) to [[{slug}]]:", *[f"  {r['path']}" for r in rs]])
@@ -247,7 +247,7 @@ def main(argv):
         target = argv[1] if len(argv) > 1 else ""
         if not target:
             output.fail(output.EXIT_USAGE,
-                        "usage: ops wiki canvas <hub-slug|#tag> [--depth N] [--stdout]", verb="wiki")
+                        "usage: plainkeep wiki canvas <hub-slug|#tag> [--depth N] [--stdout]", verb="wiki")
         hub = target if target in notes else None
         tagset = set()
         if hub is None:
@@ -271,7 +271,7 @@ def main(argv):
             data = {"dry_run": True, "would_create": str(rel), "nodes": len(ordered), "edges": len(edges)}
             return output.emit(data, "wiki",
                                human=lambda _: f"would create -> {rel}  ({len(ordered)} nodes, {len(edges)} edges)  (dry run — nothing written)")
-        outp = paths.OPS_HOME / rel
+        outp = paths.PLAINKEEP_HOME / rel
         outp.parent.mkdir(parents=True, exist_ok=True)
         outp.write_text(text, encoding="utf-8")
         paths.append_journal(f"wiki canvas: {base} ({len(ordered)} nodes)")
@@ -292,7 +292,7 @@ def main(argv):
         return output.emit_rows(rows, "wiki", human=render_list, header={"notes": total})
     else:
         output.fail(output.EXIT_USAGE,
-                    "usage: ops wiki open <slug> [--obsidian]|edit <slug>|new <type> <name>|"
+                    "usage: plainkeep wiki open <slug> [--obsidian]|edit <slug>|new <type> <name>|"
                     "backlinks <slug>|stale [days]|orphans|canvas <hub|#tag> [--depth N] [--stdout]|list",
                     verb="wiki")
 

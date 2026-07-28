@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-run_backup_share.py — offline suite for the backup family (Part 5.1) + `ops share` (Part 5.2) +
+run_backup_share.py — offline suite for the backup family (Part 5.1) + `plainkeep share` (Part 5.2) +
 sweep share hygiene. NEVER contacts a network endpoint: the share transport is short-circuited by
-OPS_SHARE_FAKE, and restic paths run only their graceful-degrade branches (restic is not required).
+PLAINKEEP_SHARE_FAKE, and restic paths run only their graceful-degrade branches (restic is not required).
 
-`ops share` is a plaintext capability-URL model now — no crypto anywhere. The JS half of the worker
+`plainkeep share` is a plaintext capability-URL model now — no crypto anywhere. The JS half of the worker
 is covered by a Node route-contract test (below), which replaces the old Web-Crypto known-answer test.
 """
 from __future__ import annotations
@@ -44,9 +44,9 @@ def init_git(home):
 
 
 def run(verb, *args, home, roots=None, extra_env=None):
-    env = {**os.environ, "OPS_HOME": str(home)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home)}
     if roots:
-        env["OPS_ROOTS_HOME"] = str(roots)
+        env["PLAINKEEP_ROOTS_HOME"] = str(roots)
     if extra_env:
         env.update(extra_env)
     return subprocess.run([sys.executable, str(REPO / "bin" / verb / "run.py"), *args],
@@ -94,7 +94,7 @@ const fails = [];
 const A = (cond, msg) => { if (!cond) fails.push(msg); };
 
 (async () => {
-  const env = { OPS_SHARE: kvStub(), PUBLISH_TOKEN: undefined };
+  const env = { PLAINKEEP_SHARE: kvStub(), PUBLISH_TOKEN: undefined };
   const blob = buildOpsx("# hello agent", "<!doctype html><p>hi</p>");
 
   // PUT / → 200 JSON with a 24-char id + admin_token
@@ -106,7 +106,7 @@ const A = (cond, msg) => { if (!cond) fails.push(msg); };
   const id = j.id, admin = j.admin_token;
 
   // PUBLISH_TOKEN gating: missing header → 401; matching header → 200
-  const envT = { OPS_SHARE: kvStub(), PUBLISH_TOKEN: "sekret" };
+  const envT = { PLAINKEEP_SHARE: kvStub(), PUBLISH_TOKEN: "sekret" };
   r = await worker.fetch(new Request("https://w/", { method: "PUT", body: blob }), envT);
   A(r.status === 401, "PUT no-token status " + r.status);
   r = await worker.fetch(new Request("https://w/", { method: "PUT", body: blob, headers: { "X-Publish-Token": "sekret" } }), envT);
@@ -139,7 +139,7 @@ const A = (cond, msg) => { if (!cond) fails.push(msg); };
 
   // non-OPSX stored blob → 410 on GET
   const id2 = "b".repeat(24);
-  env.OPS_SHARE._map.set("blob:" + id2, new Uint8Array([1, 2, 3, 4, 5]));
+  env.PLAINKEEP_SHARE._map.set("blob:" + id2, new Uint8Array([1, 2, 3, 4, 5]));
   r = await worker.fetch(new Request("https://w/" + id2 + ".md"), env);
   A(r.status === 410, "non-OPSX status " + r.status);
 
@@ -293,7 +293,7 @@ def main() -> int:
         check("share unknown slug → exit 4", r.returncode == 4, r.stdout + r.stderr)
 
         # full flow with fake transport: JSON contract + ledger + frontmatter + journal
-        fenv = {"OPS_SHARE_FAKE": "1"}
+        fenv = {"PLAINKEEP_SHARE_FAKE": "1"}
         r = run("share", "alpha", "--expires", "1d", "--yes", "--json", home=h, extra_env=fenv)
         check("share --yes (fake) exits 0", r.returncode == 0, r.stdout + r.stderr)
         env = json.loads(r.stdout.splitlines()[0]) if r.stdout.strip() else {}
@@ -348,7 +348,7 @@ def main() -> int:
 
         # ---------- transport: a REAL publish carries a named User-Agent (issue #2 part 1) ----------
         # Cloudflare bot-management 403s the default `Python-urllib/x.y` UA. Point the client at a
-        # one-shot local server (no OPS_SHARE_FAKE) and assert the PUT's UA + OPSX body. This
+        # one-shot local server (no PLAINKEEP_SHARE_FAKE) and assert the PUT's UA + OPSX body. This
         # exercises the real _publish() path, header included.
         import http.server, threading
         cap = {}
@@ -371,7 +371,7 @@ def main() -> int:
         run("share", "alpha", "--yes", "--json", home=h)  # real transport, no FAKE
         th.join(timeout=5); srv.server_close()
         check("real publish sends a named User-Agent (Cloudflare 403 fix)",
-              cap.get("ua") == "ops-share/1.0", str(cap))
+              cap.get("ua") == "plainkeep-share/1.0", str(cap))
         check("real publish body is OPSX bundle (agent .md capable)",
               cap.get("body", b"")[:4] == b"OPSX", str(cap)[:80])
 
@@ -416,7 +416,7 @@ def main() -> int:
              "created_ts": now - 100000, "note_paths": ["wiki/notes/beta.md"]},
         ]}
         (h / ".share" / "ledger.json").write_text(json.dumps(ledger))
-        r = run("sweep", "--json", home=h, extra_env={"OPS_SWEEP_HOME": str(roots)})
+        r = run("sweep", "--json", home=h, extra_env={"PLAINKEEP_SWEEP_HOME": str(roots)})
         head = json.loads(r.stdout.splitlines()[0]) if r.stdout.strip() else {}
         srows = [json.loads(l) for l in r.stdout.splitlines()[1:]]
         check("sweep reports 2 share warnings", head.get("share_warnings") == 2, r.stdout)
@@ -458,16 +458,16 @@ def main() -> int:
         r = run("backup", "init", home=h, roots=roots)
         check("backup init without --yes → exit 3", r.returncode == 3, r.stdout + r.stderr)
         # init --yes → config with op:// references only + rendered plist
-        r = run("backup", "init", "--yes", "--local-repo", "/Volumes/Backup/restic-ops",
-                "--cloud-repo", "b2:mybucket:ops", home=h, roots=roots)
+        r = run("backup", "init", "--yes", "--local-repo", "/Volumes/Backup/restic-plainkeep",
+                "--cloud-repo", "b2:mybucket:plainkeep", home=h, roots=roots)
         check("backup init --yes exits 0", r.returncode == 0, r.stdout + r.stderr)
         cfg = json.loads((h / ".backup" / "config.json").read_text())
         refs = json.dumps(cfg)
         check("config stores op:// references (never resolved)", "op://" in refs)
         check("config resolves NO secret value", "password\":" not in refs.replace("password_ref", ""))
-        plist = (h / ".backup" / "com.ops.backup.cloud.plist").read_text()
+        plist = (h / ".backup" / "com.plainkeep.backup.cloud.plist").read_text()
         check("plist renders launchd job invoking restic directly",
-              "restic backup" in plist and "op read" in plist and "com.ops.backup.cloud" in plist)
+              "restic backup" in plist and "op read" in plist and "com.plainkeep.backup.cloud" in plist)
         check("plist is NOT auto-installed (LaunchAgents untouched)",
               not (Path(td) / "Library").exists())
 
@@ -497,15 +497,15 @@ def main() -> int:
         check("bundle exits 0", r.returncode == 0, r.stdout + r.stderr)
         bdir = roots / "files" / "backups" / "bundles"
         bundles = sorted(bdir.glob("*.bundle")) if bdir.exists() else []
-        check("bundle produced >=2 .bundle files (ops + work repo)", len(bundles) >= 2, str(bundles))
+        check("bundle produced >=2 .bundle files (plainkeep + work repo)", len(bundles) >= 2, str(bundles))
         ok = all(git(h, "bundle", "verify", str(b)).returncode == 0 for b in bundles)
         check("every produced bundle is a valid git bundle", ok)
 
         # retention: run 4 more times with keep=2 → at most 2 per repo
         for _ in range(4):
-            run("backup", "bundle", home=h, roots=roots, extra_env={"OPS_BUNDLE_KEEP": "2"})
-        ops_bundles = list(bdir.glob("ops-*.bundle"))
-        check("retention keeps last N per repo", len(ops_bundles) <= 2, str(ops_bundles))
+            run("backup", "bundle", home=h, roots=roots, extra_env={"PLAINKEEP_BUNDLE_KEEP": "2"})
+        plainkeep_bundles = list(bdir.glob("plainkeep-*.bundle"))
+        check("retention keeps last N per repo", len(plainkeep_bundles) <= 2, str(plainkeep_bundles))
 
     print(f"\n{BOLD}Backup family + share (Part 5.1/5.2) — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)

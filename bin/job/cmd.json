@@ -1,7 +1,7 @@
 {
   "verb": "job",
   "summary": "list | run <name> | apply \u2014 scheduler-neutral jobs (\u00a715); apply renders launchd plists",
-  "usage": "ops job [list|run <name>|apply]",
+  "usage": "plainkeep job [list|run <name>|apply]",
   "risk": "safe_write",
   "args": [
     {
@@ -43,7 +43,7 @@
       "risk": "safe_write",
       "dry_run": true,
       "args": [
-        { "name": "name", "type": "string", "required": true, "help": "the job name from `ops job list`" }
+        { "name": "name", "type": "string", "required": true, "help": "the job name from `plainkeep job list`" }
       ]
     },
     {

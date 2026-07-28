@@ -1,6 +1,6 @@
 {
   "roots": {
-    "ops": "~/ops",
+    "plainkeep": "~/plainkeep",
     "work": "~/work",
     "files": "~/files",
     "dotfiles": "~/dotfiles"

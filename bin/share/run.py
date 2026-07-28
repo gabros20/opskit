@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops share <slug> | collection <tag> | list | pull <url> | revoke <id> | init — capability-URL,
+plainkeep share <slug> | collection <tag> | list | pull <url> | revoke <id> | init — capability-URL,
 confirm-gated sharing (proposal Part 5.2). Render a note (or a tag collection) to ONE self-contained
 HTML blob plus its raw markdown LOCALLY, pack them into a plaintext OPSX bundle, PUT that bundle to a
 vendored Cloudflare Worker + KV, and hand back ONE link. The verb's output is a DRAFT link — the
@@ -15,7 +15,7 @@ secret, mirrored in `.share/config.json` as `publish_token`) so only this vault 
 Governance: risk safe_write at the surface so `list` stays free, but every TRANSMITTING subaction
 (share/collection/revoke, and `init` deploy) self-gates `--yes` → EXIT_CONFIRM(3). Publishing the
 note off-machine IS a transmission; the transport is factored into _publish()/_revoke_remote() and is
-NEVER exercised by tests (OPS_SHARE_FAKE short-circuits it deterministically). `--dry-run` renders
+NEVER exercised by tests (PLAINKEEP_SHARE_FAKE short-circuits it deterministically). `--dry-run` renders
 locally and stops before the PUT. Fallback for the unprovisioned: `--gist` (secret gist via
 `gh gist create`, confirm-gated).
 """
@@ -35,12 +35,12 @@ GREEN, YEL, DIM, RESET = "\033[32m", "\033[33m", "\033[2m", "\033[0m"
 
 # Cloudflare bot-management 403s the default `Python-urllib/x.y` User-Agent (a PUT that succeeds
 # from curl fails from urllib for this reason alone). A named UA passes the edge.
-UA = "ops-share/1.0"
+UA = "plainkeep-share/1.0"
 
-SHARE_DIR = paths.OPS_HOME / ".share"
+SHARE_DIR = paths.PLAINKEEP_HOME / ".share"
 CONFIG = SHARE_DIR / "config.json"
 LEDGER = SHARE_DIR / "ledger.json"
-IMG_CAP = int(os.environ.get("OPS_SHARE_IMG_CAP", str(512 * 1024)))  # inline-image size cap (bytes)
+IMG_CAP = int(os.environ.get("PLAINKEEP_SHARE_IMG_CAP", str(512 * 1024)))  # inline-image size cap (bytes)
 IMG_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
             ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml"}
 
@@ -89,7 +89,7 @@ def _image_resolver(base: Path):
                 cand.relative_to(paths.FILES_ROOT.resolve())
             except Exception:
                 try:
-                    cand.relative_to(paths.OPS_HOME.resolve())
+                    cand.relative_to(paths.PLAINKEEP_HOME.resolve())
                 except Exception:
                     continue
             if cand.is_file() and cand.stat().st_size <= IMG_CAP:
@@ -103,12 +103,12 @@ def _image_resolver(base: Path):
 # --------------------------------------------------------------------------- transport (never in tests)
 
 def _fake() -> bool:
-    return os.environ.get("OPS_SHARE_FAKE", "").lower() in ("1", "true", "yes")
+    return os.environ.get("PLAINKEEP_SHARE_FAKE", "").lower() in ("1", "true", "yes")
 
 
 def _publish(endpoint: str, body: bytes, ttl: int, publish_token: str = "") -> dict:
     """PUT the plaintext OPSX bundle to the worker; returns {id, admin_token}. Deterministic
-    no-network stub under OPS_SHARE_FAKE (the ONLY path tests take)."""
+    no-network stub under PLAINKEEP_SHARE_FAKE (the ONLY path tests take)."""
     if _fake():
         import hashlib
         h = hashlib.sha256(body).hexdigest()[:16]
@@ -155,7 +155,7 @@ def _collect(argv):
     if argv and argv[0] == "collection":
         tag = argv[1] if len(argv) > 1 else ""
         if not tag:
-            output.fail(output.EXIT_USAGE, "usage: ops share collection <tag>", verb="share")
+            output.fail(output.EXIT_USAGE, "usage: plainkeep share collection <tag>", verb="share")
         tag = tag.lstrip("#")
         sel = [(s, p) for s, p in notes.items() if tag in paths.fm_list(p, "tags")]
         return "collection", tag, sel
@@ -223,13 +223,13 @@ def cmd_share(argv):
     if not yes:
         output.fail(output.EXIT_CONFIRM,
                     f"publishing the note off-machine is a transmission ({len(body)} bytes)",
-                    hint=f"re-run: ops share {' '.join(pos)} --yes", verb="share")
+                    hint=f"re-run: plainkeep share {' '.join(pos)} --yes", verb="share")
 
     cfg = _config()
     endpoint = cfg.get("endpoint")
     if not endpoint and not _fake():
         output.fail(output.EXIT_UNEXPECTED, "no share endpoint configured",
-                    hint="run: ops share init  (or use --gist)", verb="share")
+                    hint="run: plainkeep share init  (or use --gist)", verb="share")
     res = _publish(endpoint or "https://fake.invalid", body, ttl, cfg.get("publish_token", ""))
     sid, token = res["id"], res.get("admin_token", "")
     pub_origin = (endpoint or "https://fake.invalid").rstrip("/")
@@ -238,7 +238,7 @@ def cmd_share(argv):
 
     entry = {"id": sid, "kind": kind, "key": key, "url": url, "admin_token": token,
              "notes": [d["slug"] for d in docs],
-             "note_paths": [str(p.relative_to(paths.OPS_HOME)) for _, p in sel],
+             "note_paths": [str(p.relative_to(paths.PLAINKEEP_HOME)) for _, p in sel],
              "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
              "created_ts": int(datetime.now(timezone.utc).timestamp()),
              "expires_ts": int(datetime.now(timezone.utc).timestamp()) + ttl}
@@ -256,7 +256,7 @@ def cmd_share(argv):
                        f"  {url}\n"
                        f"  {YEL}agents / LLMs: {agent_url}   (raw markdown — paste into any chat or "
                        f"coding agent){RESET}\n"
-                       f"  {DIM}revoke: ops share revoke {sid} --yes{RESET}")
+                       f"  {DIM}revoke: plainkeep share revoke {sid} --yes{RESET}")
 
 
 def _gist(docs, yes):
@@ -298,7 +298,7 @@ def cmd_list():
 
     def render(rs):
         if not rs:
-            return "no shares yet — `ops share <slug> --yes`"
+            return "no shares yet — `plainkeep share <slug> --yes`"
         out = [f"{len(rs)} share(s):"]
         for r in rs:
             out.append(f"  {r['id']:<18} {r['state']:<8} {r['kind']}:{r['key']}")
@@ -311,14 +311,14 @@ def cmd_revoke(argv):
     sid = next((a for a in argv if not a.startswith("-")), "")
     yes = ("--yes" in argv) or ("-y" in argv)
     if not sid:
-        output.fail(output.EXIT_USAGE, "usage: ops share revoke <id> --yes", verb="share")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep share revoke <id> --yes", verb="share")
     led = _ledger()
     entry = next((s for s in led["shares"] if s["id"] == sid), None)
     if not entry:
         output.fail(output.EXIT_NOT_FOUND, f"no share '{sid}' in ledger", verb="share")
     if not yes:
         output.fail(output.EXIT_CONFIRM, f"revoking '{sid}' deletes the published blob",
-                    hint=f"re-run: ops share revoke {sid} --yes", verb="share")
+                    hint=f"re-run: plainkeep share revoke {sid} --yes", verb="share")
     cfg = _config()
     _revoke_remote(cfg.get("endpoint", "https://fake.invalid"), sid, entry.get("admin_token", ""))
     entry["revoked"] = True
@@ -361,7 +361,7 @@ def cmd_pull(argv):
         out = argv[argv.index("--out") + 1]
     if not url:
         output.fail(output.EXIT_USAGE,
-                    "usage: ops share pull <https://<worker>/<id>> [--out file.md]",
+                    "usage: plainkeep share pull <https://<worker>/<id>> [--out file.md]",
                     verb="share")
     try:
         origin, sid = sharelib.parse_share_link(url)
@@ -398,13 +398,13 @@ def cmd_init(argv):
     steps = [
         f"cd {WORKER_DIR}",
         "cp wrangler.toml.example wrangler.toml   # once per vault; file is gitignored",
-        "wrangler kv namespace create OPS_SHARE",
+        "wrangler kv namespace create PLAINKEEP_SHARE",
         "# paste the namespace id into wrangler.toml, then:",
         "wrangler deploy",
         'python3 -c "import secrets; print(secrets.token_urlsafe(24))" | wrangler secret put '
         "PUBLISH_TOKEN   # then put the same value in .share/config.json as publish_token",
-        "ops share init --endpoint https://<your-worker>.workers.dev",
-        "# canonical flow: once wrangler.toml has its KV id, just re-run `ops share init --yes` —",
+        "plainkeep share init --endpoint https://<your-worker>.workers.dev",
+        "# canonical flow: once wrangler.toml has its KV id, just re-run `plainkeep share init --yes` —",
         "# it deploys, generates + sets PUBLISH_TOKEN, and mirrors it into .share/config.json.",
     ]
     if not yes:
@@ -421,7 +421,7 @@ def cmd_init(argv):
     if not _wrangler_kv_configured():
         output.fail(output.EXIT_UNEXPECTED,
                     "wrangler.toml still has placeholder KV id",
-                    hint=f"edit {WRANGLER_TOML} after `wrangler kv namespace create OPS_SHARE`", verb="share")
+                    hint=f"edit {WRANGLER_TOML} after `wrangler kv namespace create PLAINKEEP_SHARE`", verb="share")
     r = subprocess.run(["wrangler", "deploy"], cwd=str(WORKER_DIR))
     deployed = r.returncode == 0
     token_set = bool(_config().get("publish_token"))
@@ -453,7 +453,7 @@ def main(argv):
         return cmd_share(argv)
     if not action or action.startswith("-"):
         output.fail(output.EXIT_USAGE,
-                    "usage: ops share <slug> [--expires 7d] | collection <tag> | list | pull <url> | revoke <id> | init",
+                    "usage: plainkeep share <slug> [--expires 7d] | collection <tag> | list | pull <url> | revoke <id> | init",
                     verb="share")
     return cmd_share(argv)
 

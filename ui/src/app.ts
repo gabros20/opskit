@@ -1,29 +1,29 @@
 // The guided loop: group → verb → (action) → form → optional dry-run preview → run → render →
-// exit-3 confirm. Every action re-enters `ops <verb> --json` as a subprocess (one door).
+// exit-3 confirm. Every action re-enters `plainkeep <verb> --json` as a subprocess (one door).
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { loadManifest, groupVerbs, type Manifest, type Verb, type Action } from "./contract.js";
 import { fillForm } from "./form.js";
 import { renderResult } from "./render.js";
-import { runOps, runOpsInteractive, OpsMissing, EXIT } from "./ops.js";
+import { runPlainkeep, runPlainkeepInteractive, PlainkeepMissing, EXIT } from "./plainkeep.js";
 
 export async function main(): Promise<number> {
-  // Interactive-only, like `ops setup --wizard`: no TTY means no menus. Point at the agent surface.
+  // Interactive-only, like `plainkeep setup --wizard`: no TTY means no menus. Point at the agent surface.
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     console.error(
-      "ops-ui is an interactive terminal UI — run it in a real terminal.\n" +
-        "For non-interactive / scripted use, drive ops directly: `ops <verb> --json` (see `ops help`).",
+      "plainkeep-ui is an interactive terminal UI — run it in a real terminal.\n" +
+        "For non-interactive / scripted use, drive plainkeep directly: `plainkeep <verb> --json` (see `plainkeep help`).",
     );
     return 2;
   }
   console.clear();
-  p.intro(pc.bgCyan(pc.black(" ops ")) + pc.dim("  the guided terminal UI — humans point-and-pick, agents use ops <verb> --json"));
+  p.intro(pc.bgCyan(pc.black(" plainkeep ")) + pc.dim("  the guided terminal UI — humans point-and-pick, agents use plainkeep <verb> --json"));
 
   let manifest: Manifest;
   try {
     manifest = await loadManifest();
   } catch (e) {
-    if (e instanceof OpsMissing) p.cancel(e.message);
+    if (e instanceof PlainkeepMissing) p.cancel(e.message);
     else p.cancel(String((e as Error).message ?? e));
     return 1;
   }
@@ -40,7 +40,7 @@ export async function main(): Promise<number> {
     await drive(verb);
   }
 
-  p.outro(pc.dim("bye — everything you did went through `ops`, guardrail and all."));
+  p.outro(pc.dim("bye — everything you did went through `plainkeep`, guardrail and all."));
   return 0;
 }
 
@@ -84,8 +84,8 @@ async function drive(verb: Verb): Promise<void> {
 
   // tty verbs (wiki edit → $EDITOR, backup init password): hand off the real terminal.
   if (verb.tty) {
-    p.log.info(pc.dim("handing the terminal to ops…"));
-    await runOpsInteractive([verb.verb, ...form.argv]);
+    p.log.info(pc.dim("handing the terminal to plainkeep…"));
+    await runPlainkeepInteractive([verb.verb, ...form.argv]);
     return;
   }
 
@@ -102,7 +102,7 @@ async function drive(verb: Verb): Promise<void> {
     if (preview) {
       const s = p.spinner();
       s.start("previewing");
-      const res = await runOps([verb.verb, ...form.argv, "--dry-run"]);
+      const res = await runPlainkeep([verb.verb, ...form.argv, "--dry-run"]);
       s.stop("preview");
       renderResult(res);
       const go = await p.confirm({ message: "Run it for real now?", initialValue: false });
@@ -116,9 +116,9 @@ async function drive(verb: Verb): Promise<void> {
 // Run the verb; if it refuses with exit 3 (confirm), surface the message and offer the exact re-run.
 async function execute(verb: Verb, argv: string[]): Promise<void> {
   const s = p.spinner();
-  s.start(`running ops ${verb.verb}${argv.length ? " " + argv.join(" ") : ""}`);
-  let res = await runOps([verb.verb, ...argv]);
-  s.stop(`ops ${verb.verb}`);
+  s.start(`running plainkeep ${verb.verb}${argv.length ? " " + argv.join(" ") : ""}`);
+  let res = await runPlainkeep([verb.verb, ...argv]);
+  s.stop(`plainkeep ${verb.verb}`);
 
   if (res.exitCode === EXIT.CONFIRM) {
     // The verb self-gated — "refusals teach". Show its message + hint, then offer to confirm.
@@ -127,7 +127,7 @@ async function execute(verb: Verb, argv: string[]): Promise<void> {
     if (p.isCancel(yes) || !yes) return;
     const s2 = p.spinner();
     s2.start("running (confirmed)");
-    res = await runOps([verb.verb, ...argv, "--yes"]);
+    res = await runPlainkeep([verb.verb, ...argv, "--yes"]);
     s2.stop("done");
   }
   renderResult(res);
@@ -139,7 +139,7 @@ async function quickCapture(): Promise<void> {
   if (p.isCancel(text) || !String(text).trim()) return;
   const s = p.spinner();
   s.start("capturing");
-  const res = await runOps(["capture", String(text)]);
+  const res = await runPlainkeep(["capture", String(text)]);
   s.stop("captured");
   renderResult(res);
 }

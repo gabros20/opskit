@@ -1,7 +1,7 @@
 """
 notetype.py — data-driven note types (§10.1, issue #1 gap D). The type→folder registry and the
 per-type body templates live as DATA under templates/wiki/ (types.json + <type>.md), so adding a
-note type is config, not code — `ops wiki new <type>`, completion, and `ops bookmark` all read from
+note type is config, not code — `plainkeep wiki new <type>`, completion, and `plainkeep bookmark` all read from
 here. A built-in fallback (below) mirrors the shipped data, so a bare/temp vault still works even
 before templates/wiki/ exists; types.json overrides/extends it.
 
@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import paths  # type: ignore  # (namespace sibling)
 
-TDIR = paths.OPS_HOME / "templates" / "wiki"
+TDIR = paths.PLAINKEEP_HOME / "templates" / "wiki"
 
 # Built-in fallback (kept in sync with templates/wiki/types.json — the JSON overrides this).
 DEFAULT_TYPES = {

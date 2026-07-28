@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# script/setup — turn a fresh clone of the template into YOUR living ~/ops vault on this machine.
+# script/setup — turn a fresh clone of the template into YOUR living ~/plainkeep vault on this machine.
 # Idempotent and non-destructive by default. It does NOT push anything (that step stays yours, §3).
 #
-#   ~/ops/script/setup [--lean|--full] [--yes] [--dry-run] [--no-commit] [--upstream URL]
+#   ~/plainkeep/script/setup [--lean|--full] [--yes] [--dry-run] [--no-commit] [--upstream URL]
 #
-# What it does: puts `ops` on PATH, creates the sibling roots (~/work, ~/files), adds the template
-# as `upstream` (so `script/update` can pull engine fixes), optionally strips dev-only test/+ref/
-# for a lean vault, runs `ops doctor --init`, and makes the first commit. Then it tells you how to
-# point the vault at your own GitHub and push.
+# What it does: puts `plainkeep` on PATH, creates the sibling roots (~/work, ~/files), adds the
+# template as `upstream` (so `script/update` can pull engine fixes), optionally strips dev-only
+# test/+ref/ for a lean vault, runs `plainkeep doctor --init`, and makes the first commit. Then it
+# tells you how to point the vault at your own GitHub and push.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-UPSTREAM_URL="https://github.com/gabros20/opskit.git"
-ROOTS_HOME="${OPS_ROOTS_HOME:-$HOME}"          # where ~/work, ~/files are created (override for tests)
-BIN_DIR="${OPS_BIN_DIR:-$HOME/.local/bin}"      # where the `ops` symlink goes
-COMP_DIR="${OPS_COMP_DIR:-$HOME/.zsh/completions}"  # where the zsh completion symlink goes
+UPSTREAM_URL="https://github.com/gabros20/plainkeep.git"
+ROOTS_HOME="${PLAINKEEP_ROOTS_HOME:-$HOME}"          # where ~/work, ~/files are created (override for tests)
+BIN_DIR="${PLAINKEEP_BIN_DIR:-$HOME/.local/bin}"      # where the `plainkeep` symlink goes
+COMP_DIR="${PLAINKEEP_COMP_DIR:-$HOME/.zsh/completions}"  # where the zsh completion symlink goes
 LEAN="ask"; YES=0; DRY=0; COMMIT=1; ENGINE_REF=""
 
 while [ $# -gt 0 ]; do
@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY=1 ;;
     --no-commit) COMMIT=0 ;;
     --upstream) shift; UPSTREAM_URL="$1" ;;
-    --engine-ref) shift; ENGINE_REF="$1" ;;   # cloned template SHA (from script/get) → .ops-engine-ref
+    --engine-ref) shift; ENGINE_REF="$1" ;;   # cloned template SHA (from script/get) → .plainkeep-engine-ref
     -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac; shift
@@ -42,19 +42,19 @@ ask() { [ "$YES" = 1 ] && return 0; read -r -p "  $1 [Y/n] " a; [ -z "$a" ] || [
 TREE_WAS_CLEAN=0
 [ -z "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ] && TREE_WAS_CLEAN=1
 
-say "ops setup — making this clone your ~/ops vault"
+say "plainkeep setup — making this clone your ~/plainkeep vault"
 echo "  repo:  $ROOT"
-[ "$ROOT" = "$ROOTS_HOME/ops" ] || echo "  note:  for the path-wall, the vault should live at ~/ops (you're at $ROOT)"
+[ "$ROOT" = "$ROOTS_HOME/plainkeep" ] || echo "  note:  for the path-wall, the vault should live at ~/plainkeep (you're at $ROOT)"
 echo
 
-say "1. put 'ops' on PATH"
+say "1. put 'plainkeep' on PATH"
 run mkdir -p "$BIN_DIR"
-run ln -sf "$ROOT/ops" "$BIN_DIR/ops"
+run ln -sf "$ROOT/plainkeep" "$BIN_DIR/plainkeep"
 case ":$PATH:" in *":$BIN_DIR:"*) : ;; *) echo "  note:  $BIN_DIR is not on PATH — add it to your shell rc" ;; esac
 
 say "1b. shell completion (zsh — tab-complete verbs, note slugs, task ids)"
 run mkdir -p "$COMP_DIR"
-run ln -sf "$ROOT/script/completions/_ops" "$COMP_DIR/_ops"
+run ln -sf "$ROOT/script/completions/_plainkeep" "$COMP_DIR/_plainkeep"
 echo "  note:  add to ~/.zshrc (before 'compinit'):  fpath=($COMP_DIR \$fpath)"
 
 say "2. create the sibling roots (never inside this repo)"
@@ -82,19 +82,19 @@ else
   echo "  note:  no origin yet — you'll add yours below"
 fi
 
-say "3b. record the engine sync ref (.ops-engine-ref) for script/update's 3-way merge"
+say "3b. record the engine sync ref (.plainkeep-engine-ref) for script/update's 3-way merge"
 existing_ref=""
-[ -f "$ROOT/.ops-engine-ref" ] && existing_ref="$(tr -d '[:space:]' < "$ROOT/.ops-engine-ref")"
+[ -f "$ROOT/.plainkeep-engine-ref" ] && existing_ref="$(tr -d '[:space:]' < "$ROOT/.plainkeep-engine-ref")"
 if [ -n "$existing_ref" ] && printf '%s' "$existing_ref" | grep -qiE '^[0-9a-f]{40}$' \
-   && git -C "$ROOT" ls-files --error-unmatch .ops-engine-ref >/dev/null 2>&1; then
-  echo "  ok:    .ops-engine-ref already present and valid — keeping it"
+   && git -C "$ROOT" ls-files --error-unmatch .plainkeep-engine-ref >/dev/null 2>&1; then
+  echo "  ok:    .plainkeep-engine-ref already present and valid — keeping it"
 elif [ -z "$ENGINE_REF" ]; then
   echo "  note:  no --engine-ref given; script/update treats the first sync as a fresh checkout"
 elif printf '%s' "$ENGINE_REF" | grep -qiE '^[0-9a-f]{40}$'; then
   if [ "$DRY" = 1 ]; then
-    echo "  + write .ops-engine-ref $ENGINE_REF"
+    echo "  + write .plainkeep-engine-ref $ENGINE_REF"
   else
-    printf '%s\n' "$ENGINE_REF" > "$ROOT/.ops-engine-ref"   # single clean write: one 40-hex SHA + newline
+    printf '%s\n' "$ENGINE_REF" > "$ROOT/.plainkeep-engine-ref"   # single clean write: one 40-hex SHA + newline
     echo "  ok:    recorded engine ref $ENGINE_REF"
   fi
 else
@@ -115,7 +115,7 @@ else
 fi
 
 say "5. validate the skeleton"
-run "$ROOT/ops" doctor --init
+run "$ROOT/plainkeep" doctor --init
 
 say "6. first commit"
 if [ "$COMMIT" = 1 ]; then
@@ -123,11 +123,11 @@ if [ "$COMMIT" = 1 ]; then
     echo "  note:  the working tree had uncommitted changes before setup — skipping the auto first-commit"
     echo "         (setup never stages unrelated changes). Review and commit yourself:"
     echo "           git -C '$ROOT' status"
-    echo "           git -C '$ROOT' commit -am 'ops: machine setup'"
+    echo "           git -C '$ROOT' commit -am 'plainkeep: machine setup'"
   else
     run git -C "$ROOT" add -A
     if [ "$DRY" = 1 ] || ! git -C "$ROOT" diff --cached --quiet; then
-      run git -C "$ROOT" -c commit.gpgsign=false commit -q -m 'ops: machine setup (vault initialized)'
+      run git -C "$ROOT" -c commit.gpgsign=false commit -q -m 'plainkeep: machine setup (vault initialized)'
     else
       echo "  ok:    nothing to commit"
     fi
@@ -137,9 +137,9 @@ fi
 echo
 say "done. next (these are yours to run — setup never pushes):"
 cat <<EOF
-  • finish setup (guided):     ops setup --wizard      (interactive first-run, safe defaults)
-                    or all-in:  ops setup --all --yes   (non-interactive; 'ops setup' = dashboard)
-  • point at your GitHub:      git -C "$ROOT" remote set-url origin git@github.com:<you>/ops.git
+  • finish setup (guided):     plainkeep setup --wizard      (interactive first-run, safe defaults)
+                    or all-in:  plainkeep setup --all --yes   (non-interactive; 'plainkeep setup' = dashboard)
+  • point at your GitHub:      git -C "$ROOT" remote set-url origin git@github.com:<you>/plainkeep.git
                                git -C "$ROOT" push -u origin main
-  • daily:                     ops start  ·  ops capture "…"  ·  ops triage  ·  ops close
+  • daily:                     plainkeep start  ·  plainkeep capture "…"  ·  plainkeep triage  ·  plainkeep close
 EOF

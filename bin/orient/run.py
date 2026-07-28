@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops orient [--json|--line] — one-call session bootstrap (proposal Part 3.4). Read-only: journal
+plainkeep orient [--json|--line] — one-call session bootstrap (proposal Part 3.4). Read-only: journal
 tail (today+yesterday), active/waiting task counts + top items, inbox count, pending organize
 proposals (glob defensively — a later package lands inbox/organize/), index/backup age, git
 dirtiness, and recent notes. Three renders: human dashboard (default), `--json` (one envelope for
@@ -16,8 +16,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import output, paths  # noqa: E402
 
-DB = paths.OPS_HOME / ".index" / "ops.sqlite"
-LINE_CACHE = paths.OPS_HOME / ".cache" / "orient.line"
+DB = paths.PLAINKEEP_HOME / ".index" / "plainkeep.sqlite"
+LINE_CACHE = paths.PLAINKEEP_HOME / ".cache" / "orient.line"
 LINE_MAX = 60
 
 
@@ -41,7 +41,7 @@ def _tasks(status: str):
 
 def _git_dirty():
     try:
-        out = subprocess.run(["git", "-C", str(paths.OPS_HOME), "status", "--porcelain"],
+        out = subprocess.run(["git", "-C", str(paths.PLAINKEEP_HOME), "status", "--porcelain"],
                              capture_output=True, text=True, timeout=10).stdout.strip()
         return len(out.splitlines()) if out else 0
     except Exception:
@@ -50,7 +50,7 @@ def _git_dirty():
 
 def _last_commit_age():
     try:
-        out = subprocess.run(["git", "-C", str(paths.OPS_HOME), "log", "-1", "--format=%ct"],
+        out = subprocess.run(["git", "-C", str(paths.PLAINKEEP_HOME), "log", "-1", "--format=%ct"],
                              capture_output=True, text=True, timeout=10).stdout.strip()
         return _age_min(float(out)) if out.isdigit() else None
     except Exception:
@@ -62,7 +62,7 @@ def _recent_notes(n: int = 5) -> list[dict]:
         return []
     notes = [p for p in paths.WIKI.rglob("*.md")]
     notes.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return [{"slug": p.stem, "path": str(p.relative_to(paths.OPS_HOME))} for p in notes[:n]]
+    return [{"slug": p.stem, "path": str(p.relative_to(paths.PLAINKEEP_HOME))} for p in notes[:n]]
 
 
 def _proposals() -> int:
@@ -99,7 +99,7 @@ def _line(data: dict) -> str:
 
 def _dashboard(data: dict):
     a, w = data["active"], data["waiting"]
-    print(f"ops orient — {paths.OPS_HOME}")
+    print(f"plainkeep orient — {paths.PLAINKEEP_HOME}")
     print(f"  tasks:   {a} active, {w} waiting")
     for t in data["top_tasks"]:
         mark = "•" if t["status"] == "active" else "⏸"
@@ -107,7 +107,7 @@ def _dashboard(data: dict):
     print(f"  inbox:   {data['inbox']} item(s) to triage" +
           (f", {data['proposals']} organize proposal file(s)" if data["proposals"] else ""))
     ia, ba, gd = data["index_age_min"], data["backup_age_min"], data["git_dirty"]
-    print(f"  index:   {'built ' + str(ia) + ' min ago' if ia is not None else 'not built (run: ops index)'}")
+    print(f"  index:   {'built ' + str(ia) + ' min ago' if ia is not None else 'not built (run: plainkeep index)'}")
     print(f"  backup:  {'last commit ' + str(ba) + ' min ago' if ba is not None else 'no commits yet'}"
           + ("" if gd in (0, None) else f", {gd} uncommitted change(s)"))
     if data["recent_notes"]:
@@ -123,7 +123,7 @@ def main(argv):
     line_mode = "--line" in argv
 
     if line_mode:
-        ttl = int(os.environ.get("OPS_ORIENT_TTL", "30"))
+        ttl = int(os.environ.get("PLAINKEEP_ORIENT_TTL", "30"))
         try:
             if ttl > 0 and LINE_CACHE.exists() \
                     and (datetime.now().timestamp() - LINE_CACHE.stat().st_mtime) < ttl:

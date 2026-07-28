@@ -1,7 +1,7 @@
 {
   "verb": "repo",
   "summary": "~/work fleet: health | clone <slug>|--all | adopt <path> --kind <k> | nuke-modules --stale <days>",
-  "usage": "ops repo <action> [args]",
+  "usage": "plainkeep repo <action> [args]",
   "risk": "safe_write",
   "args": [
     {

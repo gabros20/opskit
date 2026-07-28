@@ -17,7 +17,7 @@ from lib.jobsmodel import check_jobs  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 # The design-model registry (adversarial fixture) AND the registry actually shipped in the repo —
-# both must obey §15. The shipped one being legal is what makes `ops job apply` safe to run.
+# both must obey §15. The shipped one being legal is what makes `plainkeep job apply` safe to run.
 REGISTRIES = [("model fixture", HERE / "world" / "jobs.json"),
               ("shipped jobs/registry.json", HERE.parent / "jobs" / "registry.json")]
 GREEN, RED, DIM, BOLD, RESET = "\033[32m", "\033[31m", "\033[2m", "\033[1m", "\033[0m"

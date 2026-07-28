@@ -1,7 +1,7 @@
 """
 wiki.py — parse a fixture wiki and check the §10 conventions.
 
-Models the rules an `ops wiki`/`ops doctor`/`ops consolidate` pass would enforce:
+Models the rules a `plainkeep wiki`/`plainkeep doctor`/`plainkeep consolidate` pass would enforce:
   - every note has YAML frontmatter with the required keys,
   - `type` is in the allowed taxonomy,
   - every [[wikilink]] resolves to an existing note (broken links are findings),

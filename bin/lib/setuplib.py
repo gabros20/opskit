@@ -1,4 +1,4 @@
-"""Shared setup layer registry for `ops setup` and `ops doctor`.
+"""Shared setup layer registry for `plainkeep setup` and `plainkeep doctor`.
 
 This module is deliberately verb-agnostic. It may invoke sibling verbs by path, but it does not
 import their `run.py` modules, so setup status can be reused without cross-verb import side effects.
@@ -21,11 +21,11 @@ REQUIRED_DIRS = ["wiki", "tasks/inbox", "tasks/active", "tasks/waiting", "tasks/
                  "journal", "inbox", "templates", "jobs", "skills", "bin"]
 # Layer status enum (documented in docs/machine-contract.md §7 and docs/setup.md). `not_applicable`
 # (Task 8) means the layer cannot apply on THIS host — e.g. launchd scheduling off macOS — and is
-# advisory-only: it never fails `ops doctor` and never causes a nonzero `--all` exit.
+# advisory-only: it never fails `plainkeep doctor` and never causes a nonzero `--all` exit.
 STATUSES = {"ready", "partial", "absent", "blocked", "not_applicable"}
 
 # The SEARCH-ONLY dependency set (ADR-009): a strict subset of requirements.txt, isolated in
-# $OPS_HOME/.venv so the retrieval planes never drag in the file-processing packages (Pillow /
+# $PLAINKEEP_HOME/.venv so the retrieval planes never drag in the file-processing packages (Pillow /
 # trafilatura / mlx-vlm) that belong to the `models` layer. requirements-search.txt is the source of
 # truth when present (the committed, human-followable install story); this inline mirror is the
 # fallback for a lean vault that dropped the file. Env markers ride through pip on the command line.
@@ -49,10 +49,10 @@ class Layer:
 LAYERS: list[Layer] = [
     Layer("skeleton", "Vault structure", "Required folders and Obsidian seed files", True, "safe_write"),
     Layer("search", "Semantic search", "Vector index dependencies and embedding model", False, "confirm"),
-    Layer("backups", "Durability", "Encrypted off-machine backup configuration", False, "blocked", "ops backup init"),
+    Layer("backups", "Durability", "Encrypted off-machine backup configuration", False, "blocked", "plainkeep backup init"),
     Layer("models", "File-processing / LLM", "Local models and optional file-processing runtimes", False, "confirm"),
     Layer("automation", "Schedules", "Rendered launchd job plists", False, "safe_write"),
-    Layer("ui", "Terminal UI", "The guided ops-ui binary for humans (`ops ui`)", False, "confirm"),
+    Layer("ui", "Terminal UI", "The guided plainkeep-ui binary for humans (`plainkeep ui`)", False, "confirm"),
 ]
 
 
@@ -61,7 +61,7 @@ def _truthy(v: str | None) -> bool:
 
 
 def _fake(fake: bool = False) -> bool:
-    return fake or _truthy(os.environ.get("OPS_SETUP_FAKE"))
+    return fake or _truthy(os.environ.get("PLAINKEEP_SETUP_FAKE"))
 
 
 def _has(mod: str) -> bool:
@@ -96,30 +96,30 @@ def _ollama_has(model: str) -> bool:
 
 
 def _embed_model() -> str:
-    return os.environ.get("OPS_EMBED_MODEL", embed.model_name())
+    return os.environ.get("PLAINKEEP_EMBED_MODEL", embed.model_name())
 
 
 def _ollama_present() -> bool:
     """Is the ollama binary on PATH? (The external prerequisite for pulling any local model.)
 
-    `OPS_ASSUME_OLLAMA` (truthy) forces this True — an install/test seam mirroring `OPS_SETUP_FAKE`:
+    `PLAINKEEP_ASSUME_OLLAMA` (truthy) forces this True — an install/test seam mirroring `PLAINKEEP_SETUP_FAKE`:
     it lets a host-independent test exercise the confirm/attemptable path for the ollama-gated layers
     (search/models) on a machine or CI runner that has no ollama, and lets a user whose ollama lives
     on a nonstandard PATH opt out of the `blocked` gate."""
-    if _truthy(os.environ.get("OPS_ASSUME_OLLAMA")):
+    if _truthy(os.environ.get("PLAINKEEP_ASSUME_OLLAMA")):
         return True
     return shutil.which("ollama") is not None
 
 
 def _venv_python() -> "os.PathLike[str] | str":
     """The optional venv's interpreter path (may not exist yet)."""
-    return paths.OPS_HOME / ".venv" / "bin" / "python3"
+    return paths.PLAINKEEP_HOME / ".venv" / "bin" / "python3"
 
 
 def _usable_venv_python() -> str | None:
     """The ONE "is the venv interpreter actually usable" probe, shared by the dispatcher's interpreter
     choice, `_search_interpreter`, and the create-if-missing logic (FIX 3). Returns the path ONLY if
-    `$OPS_HOME/.venv/bin/python3` exists AND actually STARTS — mirroring the dispatcher's `-x`+start
+    `$PLAINKEEP_HOME/.venv/bin/python3` exists AND actually STARTS — mirroring the dispatcher's `-x`+start
     probe. A half-built or ABI-broken venv (dir/symlink present but python won't run) returns None so
     callers REPAIR it rather than trusting an existing `.venv` dir as complete. Never raises."""
     vp = _venv_python()
@@ -131,12 +131,12 @@ def _usable_venv_python() -> str | None:
 
 
 def _ensure_venv(res: dict, *, fake: bool) -> None:
-    """Provision `$OPS_HOME/.venv` as the single home for ALL optional deps (search + models, ADR-009 /
+    """Provision `$PLAINKEEP_HOME/.venv` as the single home for ALL optional deps (search + models, ADR-009 /
     FIX 2). Idempotent: a usable venv is left untouched; a MISSING or half-built/broken one is
     (re)created via the same start-probe as the dispatcher (FIX 3), so a partial `.venv` dir can't wedge
     a later `_venv_pip`. Records the create command in `res['ran']`. In fake/dry mode it only previews
     the create (records the string, runs nothing)."""
-    venv = paths.OPS_HOME / ".venv"
+    venv = paths.PLAINKEEP_HOME / ".venv"
     if _fake(fake):
         res["ran"].append(_run([sys.executable, "-m", "venv", str(venv)], fake=fake))
         return
@@ -158,7 +158,7 @@ def _search_interpreter() -> str:
 
 def _deps_importable() -> bool:
     """OPERATIONAL probe (Task 10): can the dispatcher-selected interpreter actually import BOTH
-    vector-plane deps? A file being pip-installed isn't enough — `ops index` imports through the
+    vector-plane deps? A file being pip-installed isn't enough — `plainkeep index` imports through the
     venv, so we import through the same interpreter. Never raises."""
     interp = _search_interpreter()
     try:
@@ -170,13 +170,13 @@ def _deps_importable() -> bool:
 
 
 def _index_built() -> bool:
-    return (paths.OPS_HOME / ".index" / "ops.sqlite").exists()
+    return (paths.PLAINKEEP_HOME / ".index" / "plainkeep.sqlite").exists()
 
 
 def _search_pip_args() -> list[str]:
     """`pip install` args for the search-only set: `-r requirements-search.txt` when the committed
     file is present, else the inline SEARCH_DEPS mirror (lean vault)."""
-    req = paths.OPS_HOME / "requirements-search.txt"
+    req = paths.PLAINKEEP_HOME / "requirements-search.txt"
     if req.exists():
         return ["-r", str(req)]
     return list(SEARCH_DEPS)
@@ -201,10 +201,10 @@ def _run(cmd: list[str], *, fake: bool = False) -> str:
 def _run_verb(verb: str, *args: str, fake: bool = False) -> str:
     """Invoke a sibling verb through the DISPATCHER (Task 9, "one door") — not `bin/<verb>/run.py`
     directly — so doctor/models/job/index re-enter the guardrail + resolver + logs like any other
-    caller. Non-recursive (none of these verbs call setup). OPS_SETUP_FAKE keeps a dry-run inert
+    caller. Non-recursive (none of these verbs call setup). PLAINKEEP_SETUP_FAKE keeps a dry-run inert
     (the display string is recorded, nothing runs). The dispatcher itself prefers the .venv python
-    (ADR-009), so a re-entered `ops index` sees the vector deps with no PATH surgery here."""
-    return _run([str(paths.OPS_HOME / "ops"), verb, *args], fake=fake)
+    (ADR-009), so a re-entered `plainkeep index` sees the vector deps with no PATH surgery here."""
+    return _run([str(paths.PLAINKEEP_HOME / "plainkeep"), verb, *args], fake=fake)
 
 
 def _venv_pip(*pkgs_or_reqs: str, fake: bool = False) -> str:
@@ -237,26 +237,26 @@ def _row(layer: Layer, state: str, detail: str, items: list[dict], next_: str = 
 
 def _status_skeleton(layer: Layer) -> dict:
     # Required-readiness depends ONLY on REQUIRED_DIRS. The .obsidian/* config-pack items stay
-    # visible in the row (so `ops setup` shows their state) but are advisory: they report ok/not-ok
+    # visible in the row (so `plainkeep setup` shows their state) but are advisory: they report ok/not-ok
     # and never flip this required layer to non-ready (a fresh clone that hasn't seeded .obsidian/
-    # must still let `ops doctor` pass). Seeding is handled by `ops doctor --init`.
-    required = [{"id": str(rel), "title": str(rel), "ok": (paths.OPS_HOME / rel).is_dir()} for rel in REQUIRED_DIRS]
+    # must still let `plainkeep doctor` pass). Seeding is handled by `plainkeep doctor --init`.
+    required = [{"id": str(rel), "title": str(rel), "ok": (paths.PLAINKEEP_HOME / rel).is_dir()} for rel in REQUIRED_DIRS]
     items = list(required)
-    pack = paths.OPS_HOME / "templates" / "obsidian"
+    pack = paths.PLAINKEEP_HOME / "templates" / "obsidian"
     if pack.is_dir():
         for src in sorted(pack.glob("*.json")):
             rel = f".obsidian/{src.name}"
             items.append({"id": rel, "title": rel, "advisory": True,
-                          "ok": (paths.OPS_HOME / ".obsidian" / src.name).is_file()})
+                          "ok": (paths.PLAINKEEP_HOME / ".obsidian" / src.name).is_file()})
     state = _items_status(required, optional=False)
     detail = "vault skeleton ready" if state == "ready" else "required vault structure is incomplete"
-    return _row(layer, state, detail, items, "ops setup skeleton" if state != "ready" else "")
+    return _row(layer, state, detail, items, "plainkeep setup skeleton" if state != "ready" else "")
 
 
 def _status_search(layer: Layer) -> dict:
     """OPERATIONAL readiness (Task 10): "ready" means search actually works end to end, not merely
     that a wheel is on disk. Core = deps import through the dispatcher's interpreter + the embed model
-    is pulled + the index is built; OPS_VECTORS/OPS_RERANK are advisory (surfaced as a handoff if
+    is pulled + the index is built; PLAINKEEP_VECTORS/PLAINKEEP_RERANK are advisory (surfaced as a handoff if
     unset, never blocking). ollama is the hard external prerequisite — absent, the layer is `blocked`
     with the exact install command (Task 8), because `advance` would otherwise crash pulling the
     model."""
@@ -264,14 +264,14 @@ def _status_search(layer: Layer) -> dict:
     deps = _deps_importable()
     model_pulled = _ollama_has(model)
     index_built = _index_built()
-    vectors_env = _truthy(os.environ.get("OPS_VECTORS"))
-    rerank_env = _truthy(os.environ.get("OPS_RERANK"))
+    vectors_env = _truthy(os.environ.get("PLAINKEEP_VECTORS"))
+    rerank_env = _truthy(os.environ.get("PLAINKEEP_RERANK"))
     items = [
         {"id": "deps-importable", "title": "lancedb + fastembed importable", "ok": deps},
         {"id": "model-pulled", "title": model, "ok": model_pulled},
-        {"id": "index-built", "title": ".index/ops.sqlite", "ok": index_built},
-        {"id": "OPS_VECTORS", "title": "OPS_VECTORS=1", "ok": vectors_env, "advisory": True},
-        {"id": "OPS_RERANK", "title": "OPS_RERANK=1", "ok": rerank_env, "advisory": True},
+        {"id": "index-built", "title": ".index/plainkeep.sqlite", "ok": index_built},
+        {"id": "PLAINKEEP_VECTORS", "title": "PLAINKEEP_VECTORS=1", "ok": vectors_env, "advisory": True},
+        {"id": "PLAINKEEP_RERANK", "title": "PLAINKEEP_RERANK=1", "ok": rerank_env, "advisory": True},
     ]
     if not _ollama_present():
         return _row(layer, "blocked", "ollama is required to pull the embedding model", items,
@@ -279,16 +279,16 @@ def _status_search(layer: Layer) -> dict:
     core = [deps, model_pulled, index_built]
     if all(core):
         # Operational; nudge the advisory env flags so retrieval actually uses the vector/rerank arms.
-        nxt = "" if (vectors_env and rerank_env) else "export OPS_VECTORS=1 OPS_RERANK=1"
+        nxt = "" if (vectors_env and rerank_env) else "export PLAINKEEP_VECTORS=1 PLAINKEEP_RERANK=1"
         detail = "semantic search ready" if (vectors_env and rerank_env) else \
-            "semantic search operational (set OPS_VECTORS=1 / OPS_RERANK=1 to enable the arms)"
+            "semantic search operational (set PLAINKEEP_VECTORS=1 / PLAINKEEP_RERANK=1 to enable the arms)"
         return _row(layer, "ready", detail, items, nxt)
     state = "partial" if any(core) else "absent"
-    return _row(layer, state, "semantic search prerequisites are incomplete", items, "ops setup search --yes")
+    return _row(layer, state, "semantic search prerequisites are incomplete", items, "plainkeep setup search --yes")
 
 
 def _status_backups(layer: Layer) -> dict:
-    config_ok = (paths.OPS_HOME / ".backup" / "config.json").exists()
+    config_ok = (paths.PLAINKEEP_HOME / ".backup" / "config.json").exists()
     restic_ok = shutil.which("restic") is not None
     items = [
         {"id": "config", "title": ".backup/config.json", "ok": config_ok},
@@ -305,7 +305,7 @@ def _status_backups(layer: Layer) -> dict:
 
 
 def _status_models(layer: Layer) -> dict:
-    vlm_model = (os.environ.get("OPS_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip()
+    vlm_model = (os.environ.get("PLAINKEEP_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip()
     vlm_ok = False if vlm_model.lower() == "none" else (imagelib._has_mlx() or (_ollama_has(vlm_model) if imagelib._has_ollama() else False))
     items = [
         {"id": "enrich", "title": enrichlib.DEFAULT_MODEL, "ok": _ollama_has(enrichlib.DEFAULT_MODEL)},
@@ -313,14 +313,14 @@ def _status_models(layer: Layer) -> dict:
         {"id": "vlm", "title": vlm_model, "ok": vlm_ok},
         {"id": "stt", "title": "speech-to-text runtime", "ok": any(_has(m) for m in ("parakeet_mlx", "mlx_whisper", "faster_whisper"))},
     ]
-    # ollama backs the enrich/embed model pulls; without it `advance` (→ `ops models pull`) can't run.
+    # ollama backs the enrich/embed model pulls; without it `advance` (→ `plainkeep models pull`) can't run.
     # Report `blocked` with the install command (Task 8) instead of letting it crash mid-pull.
     if not _ollama_present():
         return _row(layer, "blocked", "ollama is required for local model runtimes", items,
                     "install ollama: https://ollama.com")
     state = _items_status(items)
     detail = "file-processing models ready" if state == "ready" else "file-processing model layer is incomplete"
-    return _row(layer, state, detail, items, "ops setup models --yes" if state != "ready" else "")
+    return _row(layer, state, detail, items, "plainkeep setup models --yes" if state != "ready" else "")
 
 
 def _status_automation(layer: Layer) -> dict:
@@ -330,44 +330,44 @@ def _status_automation(layer: Layer) -> dict:
     if _platform_system() != "Darwin":
         return _row(layer, "not_applicable", "launchd scheduling is macOS-only (no plists on this host)",
                     [{"id": "launchd", "title": "jobs/launchd/*.plist", "ok": False, "advisory": True}], "")
-    launchd = paths.OPS_HOME / "jobs" / "launchd"
+    launchd = paths.PLAINKEEP_HOME / "jobs" / "launchd"
     plists = sorted(launchd.glob("*.plist")) if launchd.exists() else []
     items = [{"id": "launchd", "title": "jobs/launchd/*.plist", "ok": bool(plists)}]
     state = "ready" if plists else "absent"
     detail = "job plists rendered" if state == "ready" else "job plists have not been rendered"
-    return _row(layer, state, detail, items, "ops setup automation" if state != "ready" else "")
+    return _row(layer, state, detail, items, "plainkeep setup automation" if state != "ready" else "")
 
 
-# --- the `ui` layer (ADR-011): the ops-ui terminal binary for humans. The TS source lives in the
+# --- the `ui` layer (ADR-011): the plainkeep-ui terminal binary for humans. The TS source lives in the
 # template's ui/ (NOT in engine.txt, so it never propagates to vaults); what a vault installs is a
 # self-contained compiled binary from the template repo's GitHub release, placed where the
-# `bin/ui/run.py` shim looks first ($OPS_HOME/.local/bin/ops-ui). The template may be PRIVATE, so
+# `bin/ui/run.py` shim looks first ($PLAINKEEP_HOME/.local/bin/plainkeep-ui). The template may be PRIVATE, so
 # the download uses the authenticated GitHub CLI, never anonymous curl.
 
 UI_ASSETS = {
-    ("Darwin", "arm64"): "ops-ui-darwin-arm64",
-    ("Darwin", "x86_64"): "ops-ui-darwin-x64",
-    ("Linux", "x86_64"): "ops-ui-linux-x64",
-    ("Linux", "aarch64"): "ops-ui-linux-arm64",
-    ("Linux", "arm64"): "ops-ui-linux-arm64",
+    ("Darwin", "arm64"): "plainkeep-ui-darwin-arm64",
+    ("Darwin", "x86_64"): "plainkeep-ui-darwin-x64",
+    ("Linux", "x86_64"): "plainkeep-ui-linux-x64",
+    ("Linux", "aarch64"): "plainkeep-ui-linux-arm64",
+    ("Linux", "arm64"): "plainkeep-ui-linux-arm64",
 }
 
 
 def _ui_target():
-    return paths.OPS_HOME / ".local" / "bin" / "ops-ui"
+    return paths.PLAINKEEP_HOME / ".local" / "bin" / "plainkeep-ui"
 
 
 def _ui_installed() -> str | None:
-    """Mirror of the bin/ui shim's resolution: explicit $OPS_UI_BIN wins, then the vault-local
+    """Mirror of the bin/ui shim's resolution: explicit $PLAINKEEP_UI_BIN wins, then the vault-local
     install this layer provisions, then PATH. Same isfile+X_OK bar everywhere."""
-    override = os.environ.get("OPS_UI_BIN")
+    override = os.environ.get("PLAINKEEP_UI_BIN")
     if override:
         p = override if os.path.isabs(override) else shutil.which(override)
         return p if (p and os.path.isfile(p) and os.access(p, os.X_OK)) else None
     target = _ui_target()
     if target.is_file() and os.access(target, os.X_OK):
         return str(target)
-    return shutil.which("ops-ui")
+    return shutil.which("plainkeep-ui")
 
 
 def _ui_asset() -> str | None:
@@ -381,12 +381,12 @@ def _gh_present() -> bool:
 
 
 def _ui_repo() -> str | None:
-    """The template repo (owner/repo) hosting the ops-ui releases: a derived vault's fetch-only
+    """The template repo (owner/repo) hosting the plainkeep-ui releases: a derived vault's fetch-only
     `upstream` remote when present, else `origin` (the template checkout itself). Never hardcoded —
     the same remote script/update trusts for engine files is the one trusted for binaries."""
     for remote in ("upstream", "origin"):
         try:
-            r = subprocess.run(["git", "-C", str(paths.OPS_HOME), "remote", "get-url", remote],
+            r = subprocess.run(["git", "-C", str(paths.PLAINKEEP_HOME), "remote", "get-url", remote],
                                capture_output=True, text=True, timeout=10)
         except Exception:
             return None
@@ -400,7 +400,7 @@ def _ui_repo() -> str | None:
 
 def _ui_source_buildable() -> bool:
     """Contributor fallback: a full template checkout carries ui/ source, compilable with bun."""
-    return (paths.OPS_HOME / "ui" / "package.json").is_file() and shutil.which("bun") is not None
+    return (paths.PLAINKEEP_HOME / "ui" / "package.json").is_file() and shutil.which("bun") is not None
 
 
 def _ui_expected_version() -> str | None:
@@ -428,34 +428,34 @@ def _ui_installed_version(exe: str) -> str | None:
 
 def _status_ui(layer: Layer) -> dict:
     exe = _ui_installed()
-    items = [{"id": "binary", "title": ".local/bin/ops-ui (or $OPS_UI_BIN / PATH)", "ok": bool(exe)}]
+    items = [{"id": "binary", "title": ".local/bin/plainkeep-ui (or $PLAINKEEP_UI_BIN / PATH)", "ok": bool(exe)}]
     if exe:
         # Offline update detection: the engine ships the version it expects (bin/ui/version.txt,
         # bumped by `script/update`); the binary self-reports via `--version`. A mismatch makes the
-        # layer `partial` — attemptable — so the ordinary `ops setup ui --yes` performs the update
+        # layer `partial` — attemptable — so the ordinary `plainkeep setup ui --yes` performs the update
         # (pinned to the expected release). No network in status; no extra flags to learn.
         expected = _ui_expected_version()
         if expected:
             installed = _ui_installed_version(exe)
             if installed != expected:
-                items.append({"id": "version", "title": f"ops-ui {expected}", "ok": False})
+                items.append({"id": "version", "title": f"plainkeep-ui {expected}", "ok": False})
                 return _row(layer, "partial",
                             f"update available: installed {installed or 'unknown'} → {expected}",
-                            items, "ops setup ui --yes")
-            items.append({"id": "version", "title": f"ops-ui {expected}", "ok": True})
-        return _row(layer, "ready", f"ops ui launches {exe}", items)
+                            items, "plainkeep setup ui --yes")
+            items.append({"id": "version", "title": f"plainkeep-ui {expected}", "ok": True})
+        return _row(layer, "ready", f"plainkeep ui launches {exe}", items)
     asset = _ui_asset()
     can_download = _gh_present() and asset is not None and _ui_repo() is not None
     if can_download or _ui_source_buildable():
         return _row(layer, "absent", "the terminal UI binary is not installed", items,
-                    "ops setup ui --yes")
+                    "plainkeep setup ui --yes")
     if asset is None:
         return _row(layer, "not_applicable",
-                    f"no prebuilt ops-ui for this platform ({_platform_system()}/{_platform_machine()}), "
+                    f"no prebuilt plainkeep-ui for this platform ({_platform_system()}/{_platform_machine()}), "
                     "and no ui/ source + bun to build from", items, "")
     return _row(layer, "blocked",
-                "the GitHub CLI is required to download the ops-ui release binary", items,
-                "install the GitHub CLI: brew install gh (then `ops setup ui --yes`)")
+                "the GitHub CLI is required to download the plainkeep-ui release binary", items,
+                "install the GitHub CLI: brew install gh (then `plainkeep setup ui --yes`)")
 
 
 def _ui_verify_and_install(asset_path, checksums_path, target) -> None:
@@ -482,7 +482,7 @@ def _ui_verify_and_install(asset_path, checksums_path, target) -> None:
 
 
 def _install_ui(res: dict, *, fake: bool) -> None:
-    """Provision the ops-ui binary into $OPS_HOME/.local/bin (where the bin/ui shim looks first).
+    """Provision the plainkeep-ui binary into $PLAINKEEP_HOME/.local/bin (where the bin/ui shim looks first).
     Primary: `gh release download` the prebuilt asset + checksums.txt from the template repo (gh is
     already authenticated for anyone who cloned a private template) and verify the sha256. Fallback
     (contributor checkout): compile ui/ from source with bun. Steps are recorded in res['ran'];
@@ -508,7 +508,7 @@ def _install_ui(res: dict, *, fake: bool) -> None:
         res["ran"].append(f"verified sha256 + installed {target}")
         return
     if _ui_source_buildable():
-        src = paths.OPS_HOME / "ui"
+        src = paths.PLAINKEEP_HOME / "ui"
         if not _fake(fake):
             bindir.mkdir(parents=True, exist_ok=True)
         res["ran"].append(_run(["bun", "install", "--cwd", str(src)], fake=fake))
@@ -516,7 +516,7 @@ def _install_ui(res: dict, *, fake: bool) -> None:
                                 "--outfile", str(target)], fake=fake))
         return
     raise FileNotFoundError(
-        "no way to install ops-ui: need the GitHub CLI (gh) for the release download, "
+        "no way to install plainkeep-ui: need the GitHub CLI (gh) for the release download, "
         "or ui/ source + bun to build from")
 
 
@@ -554,13 +554,13 @@ def _confirm(layer: Layer, yes: bool, res: dict) -> bool:
 def advance(layer_id, *, yes: bool, fake: bool) -> dict:
     layer = _layer(layer_id)
     res = _result()
-    # Test-only fault injection (`OPS_SETUP_FORCE_FAIL=<layer_id>`): raise a controlled action failure
+    # Test-only fault injection (`PLAINKEEP_SETUP_FORCE_FAIL=<layer_id>`): raise a controlled action failure
     # for the targeted layer BEFORE any skip/gate logic, so the CLI's error-envelope path
     # (`_action_failed` → exit 1, no traceback) is exercised deterministically on any host — without
     # depending on a real missing binary (which has side effects where the binary IS present). Never
     # set in normal use.
-    if os.environ.get("OPS_SETUP_FORCE_FAIL", "") == layer_id:
-        raise subprocess.CalledProcessError(1, [f"ops setup {layer_id}", "(OPS_SETUP_FORCE_FAIL)"])
+    if os.environ.get("PLAINKEEP_SETUP_FORCE_FAIL", "") == layer_id:
+        raise subprocess.CalledProcessError(1, [f"plainkeep setup {layer_id}", "(PLAINKEEP_SETUP_FORCE_FAIL)"])
     before = status(layer.id)[0]
     if before["status"] == "ready":
         res["skipped"].append(layer.id)
@@ -589,9 +589,9 @@ def advance(layer_id, *, yes: bool, fake: bool) -> dict:
             res["ran"].append(_run_verb("doctor", "--init", fake=fake))
         elif layer.id == "search":
             # Venv-correct, isolated search layer (Task 10 / ADR-009 / FIX 2):
-            # (1) ensure $OPS_HOME/.venv (create/repair if missing or broken), (2) install ONLY the
+            # (1) ensure $PLAINKEEP_HOME/.venv (create/repair if missing or broken), (2) install ONLY the
             # search deps into it (never the whole requirements.txt), (3) pull the embed model,
-            # (4) re-enter `ops index` — the dispatcher runs it on the .venv python, so lancedb/
+            # (4) re-enter `plainkeep index` — the dispatcher runs it on the .venv python, so lancedb/
             # fastembed import for the build.
             _ensure_venv(res, fake=fake)
             res["ran"].append(_venv_pip(*_search_pip_args(), fake=fake))
@@ -599,7 +599,7 @@ def advance(layer_id, *, yes: bool, fake: bool) -> dict:
             res["ran"].append(_run_verb("index", fake=fake))
         elif layer.id == "models":
             # The .venv is the CANONICAL home for ALL optional deps (FIX 2): the file-processing
-            # packages install into the SAME venv the dispatcher prefers, so `ops files`/`enrich`/
+            # packages install into the SAME venv the dispatcher prefers, so `plainkeep files`/`enrich`/
             # `doctor` see Pillow/trafilatura/mlx-vlm consistently instead of the old silent capability
             # regression (installed into bare python, then invisible once .venv exists).
             res["ran"].append(_run_verb("models", "pull", "--all", "--yes", fake=fake))
@@ -611,8 +611,8 @@ def advance(layer_id, *, yes: bool, fake: bool) -> dict:
         elif layer.id == "automation":
             res["ran"].append(_run_verb("job", "apply", fake=fake))
         elif layer.id == "ui":
-            # ADR-011: download the compiled ops-ui release binary (sha256-verified) into
-            # $OPS_HOME/.local/bin — or compile from ui/ source in a contributor checkout.
+            # ADR-011: download the compiled plainkeep-ui release binary (sha256-verified) into
+            # $PLAINKEEP_HOME/.local/bin — or compile from ui/ source in a contributor checkout.
             _install_ui(res, fake=fake)
     except BaseException as exc:
         exc.ops_partial_ran = list(res["ran"])

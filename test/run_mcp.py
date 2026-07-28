@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""run_mcp.py — drives `ops mcp` (proposal Part 2.4) as a subprocess over stdin/stdout pipes: the
-JSON-RPC/MCP handshake (initialize · tools/list · tools/call), tool generation from the ops surface,
+"""run_mcp.py — drives `plainkeep mcp` (proposal Part 2.4) as a subprocess over stdin/stdout pipes: the
+JSON-RPC/MCP handshake (initialize · tools/list · tools/call), tool generation from the plainkeep surface,
 subprocess re-entry through the dispatcher, and the exit-3 → structured needs-`--yes` mapping.
 
 Fully offline: the working tree is copied into a throwaway vault (so the dispatcher finds bin/ under
-the test OPS_HOME, including this un-committed verb) and seeded + indexed, so `tools/call search`
-re-enters through the real `ops` and returns real rows."""
+the test PLAINKEEP_HOME, including this un-committed verb) and seeded + indexed, so `tools/call search`
+re-enters through the real `plainkeep` and returns real rows."""
 from __future__ import annotations
 import json
 import os
@@ -39,14 +39,14 @@ def drive(ops, env, messages) -> dict:
 
 def main() -> int:
     with tempfile.TemporaryDirectory() as td:
-        vault = Path(td) / "ops"
+        vault = Path(td) / "plainkeep"
         shutil.copytree(REPO, vault,
                         ignore=shutil.ignore_patterns(".git", ".index", ".logs", "__pycache__", "*.pyc"))
-        ops = vault / "ops"
+        ops = vault / "plainkeep"
         (vault / "wiki" / "notes" / "widget.md").write_text(
             "---\ntype: note\ntitle: Widget design\nstatus: active\ntags: [demo]\n---\n"
             "# Widget design\n\nThe widget subsystem is the heart of the demo.\n", encoding="utf-8")
-        env = {**os.environ, "OPS_HOME": str(vault)}
+        env = {**os.environ, "PLAINKEEP_HOME": str(vault)}
         subprocess.run([str(ops), "index"], capture_output=True, text=True, env=env)
 
         resp = drive(ops, env, [
@@ -63,14 +63,14 @@ def main() -> int:
 
     # initialize handshake
     init = resp.get(1, {}).get("result", {})
-    check("initialize returns serverInfo 'ops'", init.get("serverInfo", {}).get("name") == "ops")
+    check("initialize returns serverInfo 'plainkeep'", init.get("serverInfo", {}).get("name") == "plainkeep")
     check("initialize echoes protocolVersion", init.get("protocolVersion") == "2024-11-05")
     check("initialize advertises tools capability", "tools" in init.get("capabilities", {}))
 
     # notification produced no response line
     check("notifications/initialized draws no reply", None not in resp)
 
-    # tools/list is generated from the ops surface
+    # tools/list is generated from the plainkeep surface
     tools = {t["name"]: t for t in resp.get(2, {}).get("result", {}).get("tools", [])}
     check("tools/list includes search + capture + task", {"search", "capture", "task"} <= set(tools))
     check("hidden verbs (mcp, __complete) are NOT exposed", "mcp" not in tools and "__complete" not in tools)
@@ -95,19 +95,19 @@ def main() -> int:
     payload = json.loads(r4.get("content", [{}])[0].get("text", "{}"))
     check("confirm call returns ops_confirm_needed", payload.get("ops_confirm_needed") is True, str(payload)[:120])
     check("confirm call gives the exact --yes re-run",
-          payload.get("rerun") == "ops plugin add local/x --yes", payload.get("rerun", ""))
+          payload.get("rerun") == "plainkeep plugin add local/x --yes", payload.get("rerun", ""))
 
     # unknown method → JSON-RPC method-not-found, gracefully
     check("unknown method → -32601", resp.get(5, {}).get("error", {}).get("code") == -32601)
 
     # --setup prints the install line
-    setup = subprocess.run([str(REPO / "ops"), "mcp", "--setup"], capture_output=True, text=True,
-                           env={**os.environ, "OPS_HOME": str(REPO)})
-    check("--setup prints the `claude mcp add ops` line",
-          "claude mcp add ops --" in setup.stdout and setup.stdout.rstrip().endswith("ops mcp"),
+    setup = subprocess.run([str(REPO / "plainkeep"), "mcp", "--setup"], capture_output=True, text=True,
+                           env={**os.environ, "PLAINKEEP_HOME": str(REPO)})
+    check("--setup prints the `claude mcp add plainkeep` line",
+          "claude mcp add plainkeep --" in setup.stdout and setup.stdout.rstrip().endswith("plainkeep mcp"),
           setup.stdout.strip())
 
-    print(f"{BOLD}ops mcp — stateless stdio MCP server (Part 2.4) — {len(results)} checks{RESET}\n")
+    print(f"{BOLD}plainkeep mcp — stateless stdio MCP server (Part 2.4) — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
     for name, ok, detail in results:
         mark = f"{GREEN}PASS{RESET}" if ok else f"{RED}FAIL{RESET}"

@@ -1,7 +1,7 @@
 {
   "verb": "enrich",
   "summary": "generate {description, keywords} for a note's derived text, written to its frontmatter",
-  "usage": "ops enrich <slug> [--reenrich] | --all [--reenrich]",
+  "usage": "plainkeep enrich <slug> [--reenrich] | --all [--reenrich]",
   "risk": "safe_write",
   "args": [
     {
@@ -25,7 +25,7 @@
     "wiki/ (description:/keywords:/enrich_key: frontmatter)",
     "journal/"
   ],
-  "hints": "Generate a description + keywords for one note (source: its .extract.md if it has one, else its own body) and write them to the note's frontmatter — never to the .extract.md, which --reextract rewrites. Idempotent via an enrich_key: hash of (model, text); a plain re-run on unchanged text is a no-op, --reenrich forces. --all sweeps every note lacking a current key, sequentially, under one warm model load. Auto-wired (best-effort) into `files extract` and `bookmark` unless OPS_ENRICH=off. Common mistake: expecting meta on the .extract.md — it lives on the shadow/primary note.",
+  "hints": "Generate a description + keywords for one note (source: its .extract.md if it has one, else its own body) and write them to the note's frontmatter — never to the .extract.md, which --reextract rewrites. Idempotent via an enrich_key: hash of (model, text); a plain re-run on unchanged text is a no-op, --reenrich forces. --all sweeps every note lacking a current key, sequentially, under one warm model load. Auto-wired (best-effort) into `files extract` and `bookmark` unless PLAINKEEP_ENRICH=off. Common mistake: expecting meta on the .extract.md — it lives on the shadow/primary note.",
   "output": {
     "mode": "rows",
     "fields": {

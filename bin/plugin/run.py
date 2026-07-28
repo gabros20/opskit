@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops plugin add <owner/repo|path>[@tag] | list | trust <name> | update <name> | remove <name>
+plainkeep plugin add <owner/repo|path>[@tag] | list | trust <name> | update <name> | remove <name>
   — the plugin distribution surface (proposal Part 2.2). A pack is a directory of verb folders
   (run.py + cmd.json, the exact engine shape) plus a `plugin.json` manifest; it installs under
   `plugins/<name>/` (user-owned, survives `script/update`) and is discovered by the resolver like any
@@ -8,7 +8,7 @@ ops plugin add <owner/repo|path>[@tag] | list | trust <name> | update <name> | r
 
 THE TRUST MODEL (non-negotiable). A pack's self-declared risk NEVER takes effect at install: `add`
 records the pack in `plugins/plugins.lock.json` as UNTRUSTED, and the guardrail caps every verb from
-an untrusted pack at `confirm` (needs --yes each run). `ops plugin trust <name> --yes` records the
+an untrusted pack at `confirm` (needs --yes each run). `plainkeep plugin trust <name> --yes` records the
 accepted ceiling; only then does the pack's declared per-verb risk stand. Even a trusted pack keeps
 the transmit-block + path-wall (classify), and a declared verb that collides with an engine name is
 refused at install — the engine namespace is reserved.
@@ -31,7 +31,7 @@ from lib import manifest, output, paths, resolver  # noqa: E402
 GREEN, RED, YEL, DIM, CYAN, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[36m", "\033[0m"
 RISK_CLASSES = ("read", "safe_write", "confirm", "deny")
 RISK_ORDER = {"read": 0, "safe_write": 1, "confirm": 2, "deny": 3}
-LOCK = paths.OPS_HOME / "plugins" / "plugins.lock.json"
+LOCK = paths.PLAINKEEP_HOME / "plugins" / "plugins.lock.json"
 NAME_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
 REPO_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
 
@@ -121,12 +121,12 @@ def _max_risk(verbs: list[dict]) -> str:
 
 def _declared_surface(data: dict) -> list[str]:
     out = [f"  pack {CYAN}{data['name']}{RESET} v{data['version']}  (api {data.get('api')}, "
-           f"needs ops ≥ {data.get('min_ops_version')})"]
+           f"needs plainkeep ≥ {data.get('min_ops_version')})"]
     for v in data["verbs"]:
         rw = ""
         if v.get("writes"):
             rw = f"  writes: {', '.join(v['writes'])}"
-        out.append(f"    ops {v['verb']:<14} [{v.get('risk')}]{rw}")
+        out.append(f"    plainkeep {v['verb']:<14} [{v.get('risk')}]{rw}")
     return out
 
 
@@ -138,7 +138,7 @@ def _stage(source: str, tag: str | None):
     if local.exists() and local.is_dir():
         return local.resolve(), "local", True, None
     if REPO_RE.match(source):
-        tmp = Path(tempfile.mkdtemp(prefix="ops-plugin-"))
+        tmp = Path(tempfile.mkdtemp(prefix="plainkeep-plugin-"))
         url = f"https://github.com/{source}.git"
         cmd = ["git", "clone", "--depth", "1"]
         if tag:
@@ -172,11 +172,11 @@ def _resolve_and_validate(source: str, tag: str | None):
     errs = validate_manifest(data, staging)
     if errs:
         output.fail(output.EXIT_USAGE, "invalid plugin.json:\n  - " + "\n  - ".join(errs), verb="plugin")
-    cur = _semver(manifest._ops_version()) or (0, 0, 0)
+    cur = _semver(manifest._engine_version()) or (0, 0, 0)
     if _semver(data["min_ops_version"]) > cur:
         output.fail(output.EXIT_UNEXPECTED,
-                    f"pack needs ops ≥ {data['min_ops_version']} but this engine is "
-                    f"{manifest._ops_version()}", verb="plugin")
+                    f"pack needs plainkeep ≥ {data['min_ops_version']} but this engine is "
+                    f"{manifest._engine_version()}", verb="plugin")
     collisions = [v["verb"] for v in data["verbs"] if resolver.is_engine_verb(v["verb"])]
     if collisions:
         output.fail(output.EXIT_USAGE,
@@ -190,25 +190,25 @@ def _resolve_and_validate(source: str, tag: str | None):
 def _needs_yes(argv, action: str) -> None:
     if "--yes" not in argv and "-y" not in argv:
         output.fail(output.EXIT_CONFIRM,
-                    f"ops plugin {action} is confirm-class (installs/changes external code)",
-                    hint=f"re-run: ops plugin {action} ... --yes", verb="plugin")
+                    f"plainkeep plugin {action} is confirm-class (installs/changes external code)",
+                    hint=f"re-run: plainkeep plugin {action} ... --yes", verb="plugin")
 
 
 def cmd_add(argv):
     _needs_yes(argv, "add")
     positional = [a for a in argv if not a.startswith("-")]
     if not positional:
-        output.fail(output.EXIT_USAGE, "usage: ops plugin add <owner/repo|path>[@tag] --yes", verb="plugin")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep plugin add <owner/repo|path>[@tag] --yes", verb="plugin")
     spec = positional[0]
     source, tag = (spec.split("@", 1) + [None])[:2] if "@" in spec else (spec, None)
 
     data, staging, commit, is_local = _resolve_and_validate(source, tag)
     name = data["name"]
-    dest = paths.OPS_HOME / "plugins" / name
+    dest = paths.PLAINKEEP_HOME / "plugins" / name
     if dest.exists():
         output.fail(output.EXIT_USAGE,
-                    f"pack '{name}' is already installed — `ops plugin update {name} --yes` or "
-                    f"`ops plugin remove {name} --yes` first", verb="plugin")
+                    f"pack '{name}' is already installed — `plainkeep plugin update {name} --yes` or "
+                    f"`plainkeep plugin remove {name} --yes` first", verb="plugin")
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(staging, dest, ignore=shutil.ignore_patterns(".git"))
     if not is_local:  # clone tempdir is disposable once copied
@@ -229,7 +229,7 @@ def cmd_add(argv):
         print(f"{GREEN}installed{RESET} pack '{name}' -> plugins/{name}/  (commit {commit})")
         print("\n".join(_declared_surface(data)))
         print(f"\n{YEL}untrusted{RESET} — every verb is capped at confirm until you run:\n"
-              f"  ops plugin trust {name} --yes")
+              f"  plainkeep plugin trust {name} --yes")
 
     return output.emit({"name": name, "version": data["version"], "commit": commit,
                         "verbs": [v["verb"] for v in data["verbs"]], "trusted": False,
@@ -247,12 +247,12 @@ def cmd_list(argv):
 
     def render(rs):
         if not rs:
-            return "no plugins installed (add one: `ops plugin add <path> --yes`)."
+            return "no plugins installed (add one: `plainkeep plugin add <path> --yes`)."
         out = [f"{len(rs)} plugin pack(s):"]
         for r in rs:
             state = f"{GREEN}trusted{RESET}" if r["trusted"] else f"{YEL}untrusted{RESET}"
             out.append(f"  {r['name']:<18} v{r['version']:<8} {state}  "
-                       f"{DIM}{', '.join('ops '+v for v in r['verbs'])}{RESET}")
+                       f"{DIM}{', '.join('plainkeep '+v for v in r['verbs'])}{RESET}")
         return "\n".join(out)
 
     return output.emit_rows(rows, "plugin", human=render)
@@ -262,12 +262,12 @@ def cmd_trust(argv):
     _needs_yes(argv, "trust")
     names = [a for a in argv if not a.startswith("-")]
     if not names:
-        output.fail(output.EXIT_USAGE, "usage: ops plugin trust <name> --yes", verb="plugin")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep plugin trust <name> --yes", verb="plugin")
     name = names[0]
     lock = _load_lock()
     entry = lock.get("plugins", {}).get(name)
     if entry is None:
-        output.fail(output.EXIT_NOT_FOUND, f"no installed pack '{name}' (see `ops plugin list`)", verb="plugin")
+        output.fail(output.EXIT_NOT_FOUND, f"no installed pack '{name}' (see `plainkeep plugin list`)", verb="plugin")
     ceiling = _max_risk(entry.get("verbs", []))
     entry["trusted"] = True
     entry["accepted_ceiling"] = ceiling
@@ -281,18 +281,18 @@ def cmd_update(argv):
     _needs_yes(argv, "update")
     names = [a for a in argv if not a.startswith("-")]
     if not names:
-        output.fail(output.EXIT_USAGE, "usage: ops plugin update <name> --yes", verb="plugin")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep plugin update <name> --yes", verb="plugin")
     name = names[0]
     lock = _load_lock()
     entry = lock.get("plugins", {}).get(name)
     if entry is None:
-        output.fail(output.EXIT_NOT_FOUND, f"no installed pack '{name}' (see `ops plugin list`)", verb="plugin")
+        output.fail(output.EXIT_NOT_FOUND, f"no installed pack '{name}' (see `plainkeep plugin list`)", verb="plugin")
     source, tag = entry.get("source"), entry.get("ref")
     data, staging, commit, is_local = _resolve_and_validate(source, tag)  # re-resolves the pin explicitly
     if data["name"] != name:
         output.fail(output.EXIT_USAGE,
                     f"source now declares name '{data['name']}', not '{name}' — refuse to update", verb="plugin")
-    dest = paths.OPS_HOME / "plugins" / name
+    dest = paths.PLAINKEEP_HOME / "plugins" / name
     shutil.rmtree(dest, ignore_errors=True)
     shutil.copytree(staging, dest, ignore=shutil.ignore_patterns(".git"))
     if not is_local:
@@ -316,18 +316,18 @@ def cmd_update(argv):
     return output.emit({"name": name, "version": data["version"], "commit": commit,
                         "trusted": bool(entry["trusted"]), "retrust_required": retrust}, "plugin",
                        human=lambda _: f"{GREEN}updated{RESET} '{name}' to v{data['version']} (commit {commit})"
-                       + (f"\n{YEL}risk surface grew — re-run `ops plugin trust {name} --yes`{RESET}" if retrust else ""))
+                       + (f"\n{YEL}risk surface grew — re-run `plainkeep plugin trust {name} --yes`{RESET}" if retrust else ""))
 
 
 def cmd_remove(argv):
     _needs_yes(argv, "remove")
     names = [a for a in argv if not a.startswith("-")]
     if not names:
-        output.fail(output.EXIT_USAGE, "usage: ops plugin remove <name> --yes", verb="plugin")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep plugin remove <name> --yes", verb="plugin")
     name = names[0]
     lock = _load_lock()
     entry = lock.get("plugins", {}).get(name)
-    dest = paths.OPS_HOME / "plugins" / name
+    dest = paths.PLAINKEEP_HOME / "plugins" / name
     if entry is None and not dest.exists():
         output.fail(output.EXIT_NOT_FOUND, f"no installed pack '{name}'", verb="plugin")
     shutil.rmtree(dest, ignore_errors=True)
@@ -353,7 +353,7 @@ def main(argv):
     if action == "remove":
         return cmd_remove(rest)
     output.fail(output.EXIT_USAGE,
-                "usage: ops plugin add <owner/repo|path>[@tag] --yes | list | trust <name> --yes | "
+                "usage: plainkeep plugin add <owner/repo|path>[@tag] --yes | list | trust <name> --yes | "
                 "update <name> --yes | remove <name> --yes", verb="plugin")
 
 

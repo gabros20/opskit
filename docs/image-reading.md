@@ -1,27 +1,27 @@
 # Reading images — metadata, OCR, and VLM description
 
-This guide shows how to set up the model backends behind `ops files extract` on images, host by host.
+This guide shows how to set up the model backends behind `plainkeep files extract` on images, host by host.
 It also covers what you still get with nothing installed.
 
 For the full design, see `docs/design/proposals/2026-07-06-image-reading.md`.
 
 ## What it does
 
-`ops files ingest <img>` and `ops files extract <slug>` read an image in up to three layers.
+`plainkeep files ingest <img>` and `plainkeep files extract <slug>` read an image in up to three layers.
 
 Each layer is optional. Each has its own dependency and its own fallback. None ever crash the run.
 
 | Layer | Trigger | What it does |
 |---|---|---|
-| 1 — Metadata | Always on (`ops files ingest`) | Format, dimensions, EXIF capture date, camera. Written into the shadow note's frontmatter. GPS/location EXIF is dropped on purpose — the vault may be shared. |
-| 2 — OCR | `ops files extract <slug>` | Pulls text from screenshots, scans, and photographed whiteboards. Uses a quality model first, a deterministic fallback otherwise. |
-| 3 — VLM description | `ops files extract <slug> --describe` | Opt-in scene caption. Same shape as audio's `--describe`. Written into the derived `.extract.md`. |
+| 1 — Metadata | Always on (`plainkeep files ingest`) | Format, dimensions, EXIF capture date, camera. Written into the shadow note's frontmatter. GPS/location EXIF is dropped on purpose — the vault may be shared. |
+| 2 — OCR | `plainkeep files extract <slug>` | Pulls text from screenshots, scans, and photographed whiteboards. Uses a quality model first, a deterministic fallback otherwise. |
+| 3 — VLM description | `plainkeep files extract <slug> --describe` | Opt-in scene caption. Same shape as audio's `--describe`. Written into the derived `.extract.md`. |
 
 ## Install per host
 
-Install every package into **the same `python3` (and the same `ollama`) that `ops` actually runs**.
+Install every package into **the same `python3` (and the same `ollama`) that `plainkeep` actually runs**.
 
-`ops` dispatches via bare `python3` on `PATH`. A package installed in some other venv or shell is
+`plainkeep` dispatches via bare `python3` on `PATH`. A package installed in some other venv or shell is
 invisible to it. This bites agent terminals hardest, since they often don't source your interactive
 shell's env.
 
@@ -43,7 +43,7 @@ Notes:
   you intend to use with `ollama pull <model>`.
 - With neither `mlx-vlm` nor Ollama present, Layer 2 falls back to `ocrmac` (Apple Vision, Apple
   Silicon or Intel) then `tesseract` (any platform, zero model weights). This is the same fallback
-  chain `ops files extract` already used for images before this feature shipped.
+  chain `plainkeep files extract` already used for images before this feature shipped.
 - The exact commands also live in `requirements.txt` under "Image reading". Treat that file as the
   source of truth if the two ever drift.
 
@@ -51,20 +51,20 @@ Notes:
 
 | Knob | Values | Default | Effect |
 |---|---|---|---|
-| `OPS_OCR` | `auto`, `glm-ocr`, `deepseek-ocr`, `apple`, `tesseract`, `none` | `auto` | Pins or disables the Layer 2 cascade |
-| `OPS_VLM` | a model tag, or `none` | `qwen3-vl:4b` | Layer 3 primary model; `none` skips `--describe` entirely |
-| `OPS_VLM_FALLBACK` | a model tag | `moondream` | Used when the primary model isn't pulled/available |
-| `OPS_MLX` | `auto`, `1`/`0` | `auto` | Single runtime switch for **both** layers — prefer `mlx-vlm` over Ollama on Apple Silicon; `off` forces Ollama everywhere |
-| `OPS_VLM_KEEP_ALIVE` | Ollama `keep_alive` value | `0` | `0` unloads the model after each call; a duration (e.g. `5m`) keeps it warm across a batch |
+| `PLAINKEEP_OCR` | `auto`, `glm-ocr`, `deepseek-ocr`, `apple`, `tesseract`, `none` | `auto` | Pins or disables the Layer 2 cascade |
+| `PLAINKEEP_VLM` | a model tag, or `none` | `qwen3-vl:4b` | Layer 3 primary model; `none` skips `--describe` entirely |
+| `PLAINKEEP_VLM_FALLBACK` | a model tag | `moondream` | Used when the primary model isn't pulled/available |
+| `PLAINKEEP_MLX` | `auto`, `1`/`0` | `auto` | Single runtime switch for **both** layers — prefer `mlx-vlm` over Ollama on Apple Silicon; `off` forces Ollama everywhere |
+| `PLAINKEEP_VLM_KEEP_ALIVE` | Ollama `keep_alive` value | `0` | `0` unloads the model after each call; a duration (e.g. `5m`) keeps it warm across a batch |
 
 ## Verify
 
 ```bash
-ops doctor                                  # probes every optional dep and warns on mismatches
-ops files ingest screenshot.png --extract --describe
+plainkeep doctor                                  # probes every optional dep and warns on mismatches
+plainkeep files ingest screenshot.png --extract --describe
 ```
 
-`ops doctor` prints one line per probe:
+`plainkeep doctor` prints one line per probe:
 
 - `optional: PIL present (image metadata (Pillow))` / `optional: PIL not installed (...)`
 - `optional: mlx_vlm present (Apple-Silicon OCR/VLM runtime)` / not installed
@@ -72,10 +72,10 @@ ops files ingest screenshot.png --extract --describe
 - `optional: ollama present (OCR/VLM runtime)` / not on PATH
 - `optional: tesseract present (OCR fallback)` / not on PATH
 
-If `OPS_VLM` is set but neither `mlx-vlm` nor `ollama` is reachable, `ops doctor` calls it out:
+If `PLAINKEEP_VLM` is set but neither `mlx-vlm` nor `ollama` is reachable, `plainkeep doctor` calls it out:
 
 ```
-OPS_VLM=<model> but neither mlx-vlm nor ollama is available — ops files extract
+PLAINKEEP_VLM=<model> but neither mlx-vlm nor ollama is available — plainkeep files extract
 --describe will skip Layer 3 entirely
 ```
 
@@ -100,4 +100,4 @@ one-line install hint and moves on.
 | No `mlx-vlm`, no Ollama | Layer 2 falls to `ocrmac`, then `tesseract`; `extract` still produces text |
 | No `mlx-vlm`, no Ollama, no `ocrmac`, no `tesseract` | Layer 2 no-ops with an install hint; no OCR text |
 | `--describe` with no VLM backend reachable | Layer 3 is skipped with a warning; the OCR result (if any) is still written |
-| `OPS_OCR=none` / `OPS_VLM=none` | The corresponding layer is explicitly disabled, no probing attempted |
+| `PLAINKEEP_OCR=none` / `PLAINKEEP_VLM=none` | The corresponding layer is explicitly disabled, no probing attempted |

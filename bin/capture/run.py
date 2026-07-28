@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ops capture "<text>" [--dry-run] [--json] — zero-decision capture of a thought into inbox/
+"""plainkeep capture "<text>" [--dry-run] [--json] — zero-decision capture of a thought into inbox/
 (also reads stdin)."""
 import sys
 from pathlib import Path
@@ -16,10 +16,10 @@ def main(argv):
     if not text and not sys.stdin.isatty():
         text = sys.stdin.read().strip()
     if not text:
-        output.fail(output.EXIT_USAGE, 'usage: ops capture "<text>"   (or pipe text via stdin)',
+        output.fail(output.EXIT_USAGE, 'usage: plainkeep capture "<text>"   (or pipe text via stdin)',
                     verb="capture")
     f = paths.INBOX / f"cap-{paths.now_stamp()}.md"
-    rel = f.relative_to(paths.OPS_HOME)
+    rel = f.relative_to(paths.PLAINKEEP_HOME)
     if dry:
         data = {"dry_run": True, "would_write": str(rel), "text": text}
         return output.emit(data, "capture",
@@ -30,7 +30,7 @@ def main(argv):
     paths.append_journal(f"captured: {text[:70]}{'…' if len(text) > 70 else ''}")
     data = {"path": str(rel), "text": text}
     return output.emit(data, "capture",
-                       human=lambda _: f"captured -> {rel}  (triage it with `ops triage`)")
+                       human=lambda _: f"captured -> {rel}  (triage it with `plainkeep triage`)")
 
 
 if __name__ == "__main__":

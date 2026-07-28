@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 run_verbs.py — exercises the daily-driver verbs (capture, task, status, help) end-to-end through
-their real run.py scripts, in a temp OPS_HOME so the repo isn't polluted. Stdlib only.
+their real run.py scripts, in a temp PLAINKEEP_HOME so the repo isn't polluted. Stdlib only.
 """
 from __future__ import annotations
 import json
@@ -21,7 +21,7 @@ def check(name, cond, detail=""):
 
 
 def run(home: Path, verb: str, *args):
-    env = {**os.environ, "OPS_HOME": str(home)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home)}
     return subprocess.run([sys.executable, str(REPO / "bin" / verb / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 
@@ -39,7 +39,7 @@ def main() -> int:
               "\n".join(p.read_text() for p in (home / "journal").rglob("*.md")))
 
         # capture via stdin
-        env = {**os.environ, "OPS_HOME": str(home)}
+        env = {**os.environ, "PLAINKEEP_HOME": str(home)}
         r = subprocess.run([sys.executable, str(REPO / "bin/capture/run.py")], input="piped thought",
                            capture_output=True, text=True, env=env)
         check("capture reads stdin", len(list((home / "inbox").glob("cap-*.md"))) == 2, r.stderr)
@@ -70,10 +70,10 @@ def main() -> int:
         check("help lists built verbs", all(v in r.stdout for v in ("capture", "task", "status", "search")), r.stdout)
         r = run(home, "help", "capture")
         check("help <verb> shows usage", "usage:" in r.stdout and "safe_write" in r.stdout, r.stdout)
-        check("help generated ops.json", (home / "ops.json").exists())
-        if (home / "ops.json").exists():
-            m = json.loads((home / "ops.json").read_text())
-            check("ops.json has the verb manifest", any(c["verb"] == "task" for c in m["verbs"]))
+        check("help generated plainkeep.json", (home / "plainkeep.json").exists())
+        if (home / "plainkeep.json").exists():
+            m = json.loads((home / "plainkeep.json").read_text())
+            check("plainkeep.json has the verb manifest", any(c["verb"] == "task" for c in m["verbs"]))
 
     print(f"{BOLD}Daily-driver verbs (capture, task, status, help) — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)

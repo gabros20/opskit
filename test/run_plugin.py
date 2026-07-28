@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-run_plugin.py — frozen SDK + `ops plugin` (proposal Parts 2.2 + 2.3). Covers: plugin.json schema
+run_plugin.py — frozen SDK + `plainkeep plugin` (proposal Parts 2.2 + 2.3). Covers: plugin.json schema
 validation (good fixture + bad variants), the trust ceiling enforced by the guardrail PRE/POST trust,
 lockfile round-trip (add → trust → update → remove), engine-verb collision refusal, min_ops_version
 gate, and the api.py signature snapshot (fails on any silent removal/change of the public surface).
 
 Offline, stdlib only. The plugin verb is driven directly (bin/plugin/run.py) with a throwaway
-OPS_HOME so nothing lands in the real vault; the ceiling is checked through bin/lib/guardrail.py.
+PLAINKEEP_HOME so nothing lands in the real vault; the ceiling is checked through bin/lib/guardrail.py.
 """
 from __future__ import annotations
 import inspect
@@ -32,7 +32,7 @@ def check(name, cond, detail=""):
 
 
 def _env(home: Path) -> dict:
-    return {**os.environ, "OPS_HOME": str(home)}
+    return {**os.environ, "PLAINKEEP_HOME": str(home)}
 
 
 def plugin(args, home: Path):
@@ -52,7 +52,7 @@ def _mk_pack(root: Path, manifest: dict, verbs):
         d = root / v
         d.mkdir(parents=True, exist_ok=True)
         (d / "cmd.json").write_text(json.dumps(
-            {"verb": v, "summary": "x", "usage": f"ops {v}", "risk": "read"}), encoding="utf-8")
+            {"verb": v, "summary": "x", "usage": f"plainkeep {v}", "risk": "read"}), encoding="utf-8")
         (d / "run.py").write_text("def main(a):\n    return 0\n", encoding="utf-8")
 
 
@@ -132,7 +132,7 @@ def _bad_manifests():
         m = dict(base); m["name"] = "future"; m["min_ops_version"] = "9.9.9"
         _mk_pack(p, m, ["bfoo"])
         r = plugin(["add", str(p), "--yes"], home)
-        check("future min_ops_version refused (exit 1)", r.returncode == 1 and "needs ops" in r.stderr,
+        check("future min_ops_version refused (exit 1)", r.returncode == 1 and "needs plainkeep" in r.stderr,
               f"rc={r.returncode} {r.stderr}")
 
 
@@ -255,11 +255,11 @@ def _api_snapshot():
           set(live) == set(committed), f"live-only={set(live)-set(committed)} snap-only={set(committed)-set(live)}")
     drift = {n: (committed.get(n), live.get(n)) for n in committed if live.get(n) != committed.get(n)}
     check("no exported signature drifted", not drift, str(drift))
-    check("OPS_API_VERSION is 1.0", live.get("OPS_API_VERSION") == "value:str" and _api_version() == "1.0")
+    check("PLAINKEEP_API_VERSION is 1.0", live.get("PLAINKEEP_API_VERSION") == "value:str" and _api_version() == "1.0")
 
 
 def _api_version() -> str:
-    r = subprocess.run([PY, "-c", "import sys; sys.path.insert(0,'bin'); from lib import api; print(api.OPS_API_VERSION)"],
+    r = subprocess.run([PY, "-c", "import sys; sys.path.insert(0,'bin'); from lib import api; print(api.PLAINKEEP_API_VERSION)"],
                        capture_output=True, text=True, cwd=str(REPO))
     return r.stdout.strip()
 
@@ -270,9 +270,9 @@ def _api_runs_a_verb():
         home = Path(td) / "vault"; home.mkdir()
         plugin(["add", str(FIX), "--yes"], home)
         run = home / "plugins" / "greeter" / "hello" / "run.py"
-        # the stub bootstraps lib via OPS_HOME/bin, so point it at the real engine bin
+        # the stub bootstraps lib via PLAINKEEP_HOME/bin, so point it at the real engine bin
         r = subprocess.run([PY, str(run), "ada", "--json"], capture_output=True, text=True,
-                           env={**os.environ, "OPS_HOME": str(REPO)}, cwd=str(REPO))
+                           env={**os.environ, "PLAINKEEP_HOME": str(REPO)}, cwd=str(REPO))
         try:
             env_obj = json.loads(r.stdout.strip())
         except Exception:
@@ -292,7 +292,7 @@ def main() -> int:
     _api_snapshot()
     _api_runs_a_verb()
 
-    print(f"{BOLD}frozen SDK + ops plugin (Part 2.2 + 2.3) — {len(results)} checks{RESET}\n")
+    print(f"{BOLD}frozen SDK + plainkeep plugin (Part 2.2 + 2.3) — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
     for name, ok, detail in results:
         mark = f"{GREEN}PASS{RESET}" if ok else f"{RED}FAIL{RESET}"

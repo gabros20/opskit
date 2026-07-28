@@ -1,3 +1,3 @@
 # plugins/ is USER-OWNED — never listed in script/engine.txt, so it survives `script/update`.
-# `ops new verb <name>` scaffolds into plugins/local/<name>/. Packs added via `ops plugin` (P4)
+# `plainkeep new verb <name>` scaffolds into plugins/local/<name>/. Packs added via `plainkeep plugin` (P4)
 # live as sibling dirs plugins/<pack>/. Verb shape is identical to bin/: run.py + cmd.json.

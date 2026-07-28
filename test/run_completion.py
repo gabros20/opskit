@@ -20,7 +20,7 @@ def check(name, cond, detail=""):
 
 
 def run(home, verb, *args, env_extra=None, stdin=None):
-    env = {**os.environ, "OPS_HOME": str(home)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home)}
     if env_extra:
         env.update(env_extra)
     return subprocess.run([sys.executable, str(REPO / "bin" / verb / "run.py"), *args],
@@ -59,12 +59,12 @@ def main() -> int:
         verbs, r = comp(h)
         check("__complete (no args) lists verbs", "wiki" in verbs and "task" in verbs and "search" in verbs, r.stdout)
         check("__complete hides itself (__complete not a candidate)", "__complete" not in verbs, str(verbs))
-        # no drift: every visible verb in ops.json is offered
-        manifest = json.loads((REPO / "ops.json").read_text())
+        # no drift: every visible verb in plainkeep.json is offered
+        manifest = json.loads((REPO / "plainkeep.json").read_text())
         surface = {v["verb"] for v in manifest["verbs"]}
-        check("__complete covers every verb in ops.json", surface.issubset(set(verbs)),
+        check("__complete covers every verb in plainkeep.json", surface.issubset(set(verbs)),
               str(sorted(surface - set(verbs))))
-        check("ops.json itself excludes __complete", "__complete" not in surface, str(surface))
+        check("plainkeep.json itself excludes __complete", "__complete" not in surface, str(surface))
 
         subs, _ = comp(h, "wiki")
         check("__complete wiki → subcommands", {"open", "edit", "new", "backlinks"} <= set(subs), str(subs))
@@ -83,8 +83,8 @@ def main() -> int:
         unknown, _ = comp(h, "definitelynotaverb")
         check("__complete unknown verb → no candidates", unknown == [], str(unknown))
 
-        # ---- ops.json/3 (Wave 2): completion is DERIVED from actions[] — no table can drift ----
-        surface_doc = json.loads((REPO / "ops.json").read_text())
+        # ---- plainkeep.json/3 (Wave 2): completion is DERIVED from actions[] — no table can drift ----
+        surface_doc = json.loads((REPO / "plainkeep.json").read_text())
         drift = []
         for v in surface_doc["verbs"]:
             acts = v.get("actions")
@@ -114,7 +114,7 @@ def main() -> int:
         check("__complete files open → asset slugs only (not arbitrary notes)",
               "q3-report" in fopen and "alpha" not in fopen, str(fopen))
 
-        # ---- ops complete --json: the structured completion contract (Wave 2) ----
+        # ---- plainkeep complete --json: the structured completion contract (Wave 2) ----
         def cjson(*prior):
             r = run(h, "complete", *prior, "--json")
             objs = [json.loads(ln) for ln in r.stdout.splitlines() if ln.strip()]
@@ -122,33 +122,33 @@ def main() -> int:
 
         objs, r = cjson("task", "move", "T-20260101-01")
         head, rows = (objs[0] if objs else {}), objs[1:]
-        check("ops complete --json: rows header (verb=complete, count matches)",
+        check("plainkeep complete --json: rows header (verb=complete, count matches)",
               head.get("ops_json") == 1 and head.get("ok") is True and head.get("verb") == "complete"
               and head.get("count") == len(rows), r.stdout[:160])
-        check("ops complete --json: rows carry value/description/kind",
+        check("plainkeep complete --json: rows carry value/description/kind",
               bool(rows) and all({"value", "description", "kind"} <= set(row) for row in rows), str(rows[:2]))
         # move's status arg is declared `type: enum` (a closed set) → kind "enum" (inline enum wins
         # over the redundant `complete: status` hint, which yields the same values)
-        check("ops complete --json task move <id> → enum-kind status rows",
+        check("plainkeep complete --json task move <id> → enum-kind status rows",
               {row["value"] for row in rows} >= {"active", "waiting", "done"}
               and all(row["kind"] == "enum" for row in rows), str(rows))
         vobjs, _ = cjson()
-        check("ops complete --json (no words) → verb-kind rows incl. task",
+        check("plainkeep complete --json (no words) → verb-kind rows incl. task",
               len(vobjs) > 1 and all(row["kind"] == "verb" for row in vobjs[1:])
               and any(row["value"] == "task" for row in vobjs[1:]), str(vobjs[:2]))
         # human (non-json) mode still prints candidates, no envelope
         rh = run(h, "complete", "task")
-        check("ops complete (human) prints candidates, no envelope",
+        check("plainkeep complete (human) prints candidates, no envelope",
               "add" in rh.stdout and "ops_json" not in rh.stdout, rh.stdout[:120])
 
     # ---- guardrail lets __complete through the real dispatcher (risk: read) ----
-    d = subprocess.run([str(REPO / "ops"), "__complete", "wiki"], capture_output=True, text=True)
+    d = subprocess.run([str(REPO / "plainkeep"), "__complete", "wiki"], capture_output=True, text=True)
     check("dispatcher runs __complete (guardrail: read)", d.returncode == 0 and "open" in d.stdout, d.stdout + d.stderr)
 
     # ---- the built-in Markdown renderer ----
     # load bin/lib/render.py by path (test/lib/ shadows the name 'lib' on sys.path)
     import importlib.util
-    spec = importlib.util.spec_from_file_location("ops_render", REPO / "bin" / "lib" / "render.py")
+    spec = importlib.util.spec_from_file_location("plainkeep_render", REPO / "bin" / "lib" / "render.py")
     render = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(render)
     out = render.render_markdown("---\ntype: note\n---\n# Title\n\n**bold** [[link]] `code`\n")
@@ -164,10 +164,10 @@ def main() -> int:
         note(h, "notes/beta.md", "note", "Beta", "body text")
         r = run(h, "wiki", "open", "beta")
         check("wiki open (piped) is raw Markdown", "# Beta" in r.stdout and "\033[" not in r.stdout, r.stdout)
-        r = run(h, "wiki", "open", "beta", env_extra={"OPS_RENDER": "raw"})
-        check("wiki open OPS_RENDER=raw stays raw", "# Beta" in r.stdout, r.stdout)
-        r = run(h, "wiki", "open", "beta", env_extra={"OPS_RENDER": "plain"})
-        check("wiki open OPS_RENDER=plain renders ANSI even piped (fzf preview)",
+        r = run(h, "wiki", "open", "beta", env_extra={"PLAINKEEP_RENDER": "raw"})
+        check("wiki open PLAINKEEP_RENDER=raw stays raw", "# Beta" in r.stdout, r.stdout)
+        r = run(h, "wiki", "open", "beta", env_extra={"PLAINKEEP_RENDER": "plain"})
+        check("wiki open PLAINKEEP_RENDER=plain renders ANSI even piped (fzf preview)",
               "\033[" in r.stdout and "Beta" in r.stdout, r.stdout)
         r = run(h, "wiki", "open", "nope")
         check("wiki open unknown slug → not-found (4)", r.returncode == 4 and "no note" in r.stderr, r.stderr)
@@ -179,7 +179,7 @@ def main() -> int:
         r = run(h, "wiki", "edit")
         check("wiki edit (no slug) lists notes, exit 0", r.returncode == 0 and "beta" in r.stdout, r.stdout)
         # wiki edit shells out to $EDITOR on the right file
-        r = run(h, "wiki", "edit", "beta", env_extra={"OPS_EDITOR": "echo EDIT"})
+        r = run(h, "wiki", "edit", "beta", env_extra={"PLAINKEEP_EDITOR": "echo EDIT"})
         check("wiki edit opens $EDITOR on the note", r.returncode == 0
               and "EDIT" in r.stdout and str(h / "wiki" / "notes" / "beta.md") in r.stdout, r.stdout + r.stderr)
         r = run(h, "wiki", "edit", "nope")
@@ -191,12 +191,12 @@ def main() -> int:
         check("wiki open (no slug, empty wiki) is graceful", r.returncode == 0 and "no notes yet" in r.stdout, r.stdout)
 
     # ---- the shipped zsh completion file ----
-    comp_file = REPO / "script" / "completions" / "_ops"
+    comp_file = REPO / "script" / "completions" / "_plainkeep"
     check("zsh completion file exists", comp_file.exists())
     if comp_file.exists():
         txt = comp_file.read_text()
-        check("completion declares #compdef ops", txt.splitlines()[0].strip() == "#compdef ops", txt[:40])
-        check("completion delegates to `ops __complete`", "ops __complete" in txt)
+        check("completion declares #compdef plainkeep", txt.splitlines()[0].strip() == "#compdef plainkeep", txt[:40])
+        check("completion delegates to `plainkeep __complete`", "plainkeep __complete" in txt)
         if shutil.which("zsh"):
             z = subprocess.run(["zsh", "-n", str(comp_file)], capture_output=True, text=True)
             check("zsh parses the completion file", z.returncode == 0, z.stderr)

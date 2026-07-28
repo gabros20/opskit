@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 run_search_impl.py — tests the REAL stage-1 search implementation (bin/lib/indexlib.py + the
-`ops` CLI), not just the retrieval model. Offline, no LLM.
+`plainkeep` CLI), not just the retrieval model. Offline, no LLM.
 
-It materializes the wiki fixture into a temp content tree, runs `ops index`, then asserts:
+It materializes the wiki fixture into a temp content tree, runs `plainkeep index`, then asserts:
   - lexical queries return the relevant note in the top-5 (stage-1 claim: "covers most queries"),
   - incremental indexing skips unchanged files,
   - the rebuild rule works (drop the db, reindex, same results),
-  - a subprocess smoke of `./ops search` returns hits.
+  - a subprocess smoke of `./plainkeep search` returns hits.
 
 Semantic queries are intentionally NOT asserted here — keyword can't answer them by construction
 (that's the stage-2/vectors case, ADR-002).
@@ -54,8 +54,8 @@ def main() -> int:
         home = Path(td)
         content = home / "content"
         materialize(notes, content)
-        os.environ["OPS_HOME"] = str(home)
-        os.environ["OPS_CONTENT"] = str(content)
+        os.environ["PLAINKEEP_HOME"] = str(home)
+        os.environ["PLAINKEEP_CONTENT"] = str(content)
         # env is set before import, so indexlib's module-level paths resolve to the temp home
         import indexlib  # noqa: E402  (top-level; bin/lib on sys.path)
         from indexlib import index, search, DB  # noqa: E402
@@ -105,7 +105,7 @@ def main() -> int:
         idx = subprocess.run(["python3", str(REPO / "bin/index/run.py")], capture_output=True, text=True, env=env)
         srch = subprocess.run(["python3", str(REPO / "bin/search/run.py"), "exponential", "backoff"],
                               capture_output=True, text=True, env=env)
-        check("CLI ops search returns a hit", "exponential-backoff.md" in srch.stdout,
+        check("CLI plainkeep search returns a hit", "exponential-backoff.md" in srch.stdout,
               srch.stdout.strip()[:80] or srch.stderr.strip()[:80])
 
     print(f"{BOLD}Stage-1 search implementation{RESET} — {len(results)} checks\n")

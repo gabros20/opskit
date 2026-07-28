@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """run_organize.py — distill + the self-organization loop (proposal Parts 4.2 + 4.4), offline.
 
-No agent is configured (OPS_AGENT=none), so this asserts the deterministic zero-LLM paths:
-  - `ops files distill` heading-outline fallback -> author:agent/status:draft concept notes,
-  - `ops triage drafts` promotion queue (accept -> active, reject -> delete, one commit each),
-  - `ops organize scan` emits ONLY closed-catalog typed ops into inbox/organize/<date>.jsonl,
+No agent is configured (PLAINKEEP_AGENT=none), so this asserts the deterministic zero-LLM paths:
+  - `plainkeep files distill` heading-outline fallback -> author:agent/status:draft concept notes,
+  - `plainkeep triage drafts` promotion queue (accept -> active, reject -> delete, one commit each),
+  - `plainkeep organize scan` emits ONLY closed-catalog typed ops into inbox/organize/<date>.jsonl,
   - review appends accept/reject/defer status lines (audit ledger; latest status wins on replay),
   - apply replays APPROVED ops with one git commit per op, stops at the edit budget, refuses
     protected paths, skips manual (retitle/propose_merge) ops, and rejects off-catalog ops,
@@ -30,7 +30,7 @@ def check(name, cond, detail=""):
 
 
 def run(verb, ops, *args, extra=None):
-    env = {**os.environ, "OPS_HOME": str(ops), "OPS_AGENT": "none"}
+    env = {**os.environ, "PLAINKEEP_HOME": str(ops), "PLAINKEEP_AGENT": "none"}
     if extra:
         env.update(extra)
     return subprocess.run([sys.executable, str(REPO / "bin" / verb / "run.py"), *args],
@@ -133,7 +133,7 @@ def test_distill_and_promotion() -> None:
         git(ops, "add", "-A"); git(ops, "commit", "-qm", "seed")
         r = subprocess.run([sys.executable, str(REPO / "bin/triage/run.py"), "drafts"],
                            input="r\n", capture_output=True, text=True,
-                           env={**os.environ, "OPS_HOME": str(ops), "OPS_AGENT": "none"})
+                           env={**os.environ, "PLAINKEEP_HOME": str(ops), "PLAINKEEP_AGENT": "none"})
         check("triage drafts reject deletes the note", not d.exists(), r.stdout + r.stderr)
         check("reject records a git commit",
               "reject agent draft draft-x" in git(ops, "log", "--oneline").stdout, git(ops, "log", "--oneline").stdout)
@@ -344,7 +344,7 @@ def test_doctor_registry() -> None:
             (ops / d).mkdir(parents=True, exist_ok=True)
         # a clean registry: only safe_write scan scheduled
         (ops / "jobs" / "registry.json").write_text(json.dumps({
-            "jobs": {"organize_scan": {"command": "ops organize scan",
+            "jobs": {"organize_scan": {"command": "plainkeep organize scan",
                                        "schedule": {"weekly": "Sun 03:00"}, "risk": "safe_write"}}}),
             encoding="utf-8")
         r = run("doctor", ops)
@@ -353,7 +353,7 @@ def test_doctor_registry() -> None:
               "schedules only read/safe_write" in out, out)
         # a bad registry: a job self-declares confirm risk
         (ops / "jobs" / "registry.json").write_text(json.dumps({
-            "jobs": {"bad": {"command": "ops organize scan", "schedule": {"daily": "01:00"},
+            "jobs": {"bad": {"command": "plainkeep organize scan", "schedule": {"daily": "01:00"},
                              "risk": "confirm"}}}), encoding="utf-8")
         r = run("doctor", ops)
         out = r.stdout + r.stderr

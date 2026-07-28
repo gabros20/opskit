@@ -1,7 +1,7 @@
 {
   "verb": "wiki",
   "summary": "open <slug> [--obsidian] | edit | new <type> <name> | backlinks | stale | orphans | canvas <hub|#tag> | list",
-  "usage": "ops wiki <action> [args]",
+  "usage": "plainkeep wiki <action> [args]",
   "risk": "safe_write",
   "args": [
     {
@@ -17,7 +17,7 @@
     "wiki/",
     "journal/"
   ],
-  "hints": "Navigate/grow the wiki: open/edit/new/backlinks/stale/orphans/canvas/list. `open --obsidian` (or OPS_OPEN=obsidian) opens the note in Obsidian via a local obsidian:// URI. `canvas <hub|#tag>` writes a deterministic wiki/canvas/<slug>.canvas (JSON Canvas). Common mistake: a duplicate slug on `new` \u2014 slugs are unique.",
+  "hints": "Navigate/grow the wiki: open/edit/new/backlinks/stale/orphans/canvas/list. `open --obsidian` (or PLAINKEEP_OPEN=obsidian) opens the note in Obsidian via a local obsidian:// URI. `canvas <hub|#tag>` writes a deterministic wiki/canvas/<slug>.canvas (JSON Canvas). Common mistake: a duplicate slug on `new` \u2014 slugs are unique.",
   "output": {
     "mode": "rows",
     "fields": {
@@ -33,7 +33,7 @@
       "risk": "read",
       "tty": true,
       "args": [
-        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the note slug ([[wikilink]] basename)", "example": "the-ops-loop" },
+        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the note slug ([[wikilink]] basename)", "example": "the-plainkeep-loop" },
         { "name": "--obsidian", "type": "flag", "required": false, "help": "open in Obsidian via an obsidian:// URI instead of the terminal" }
       ]
     },
@@ -43,7 +43,7 @@
       "risk": "safe_write",
       "tty": true,
       "args": [
-        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the note slug to edit", "example": "the-ops-loop" }
+        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the note slug to edit", "example": "the-plainkeep-loop" }
       ]
     },
     {
@@ -61,7 +61,7 @@
       "summary": "notes that link to this one",
       "risk": "read",
       "args": [
-        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the target note slug", "example": "the-ops-loop" }
+        { "name": "slug", "type": "slug", "required": true, "complete": "note-slug", "help": "the target note slug", "example": "the-plainkeep-loop" }
       ]
     },
     {
@@ -84,7 +84,7 @@
       "risk": "safe_write",
       "dry_run": true,
       "args": [
-        { "name": "target", "type": "string", "required": true, "complete": "note-slug", "help": "a hub note slug, or a #tag (all tagged notes)", "example": "the-ops-loop" },
+        { "name": "target", "type": "string", "required": true, "complete": "note-slug", "help": "a hub note slug, or a #tag (all tagged notes)", "example": "the-plainkeep-loop" },
         { "name": "--depth", "type": "int", "required": false, "default": 1, "help": "hops out from the hub (hub mode only)" },
         { "name": "--stdout", "type": "flag", "required": false, "help": "print the canvas JSON instead of writing wiki/canvas/<slug>.canvas" }
       ]

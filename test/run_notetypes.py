@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""run_notetypes.py — issue #1 gaps D+F: data-driven note types/templates (lib/notetype, `ops wiki
-new`) and the `ops bookmark` verb that rides on them. Offline (bookmark fetch uses a local fixture)."""
+"""run_notetypes.py — issue #1 gaps D+F: data-driven note types/templates (lib/notetype, `plainkeep wiki
+new`) and the `plainkeep bookmark` verb that rides on them. Offline (bookmark fetch uses a local fixture)."""
 from __future__ import annotations
 import importlib.util
 import os
@@ -35,7 +35,7 @@ def load(mod, rel):
 
 
 def run(home, verb, *args, env_extra=None):
-    env = {**os.environ, "OPS_HOME": str(home)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home)}
     if env_extra:
         env.update(env_extra)
     return subprocess.run([sys.executable, str(REPO / "bin" / verb / "run.py"), *args],
@@ -61,7 +61,7 @@ def main() -> int:
     check("bookmark render carries the url", "url: https://a.b" in notetype.render("bookmark", title="T", url="https://a.b"))
     check("unfilled placeholders are dropped", "{{" not in notetype.render("note", title="T"))
 
-    # ---- D: `ops wiki new` is data-driven ----
+    # ---- D: `plainkeep wiki new` is data-driven ----
     with tempfile.TemporaryDirectory() as td:
         h = Path(td)
         r = run(h, "wiki", "new", "decision", "Pick libSQL")
@@ -94,7 +94,7 @@ def main() -> int:
         fx.write_text('<html><head><title>RRF beats naive hybrid</title>'
                       '<meta property="og:description" content="Why reciprocal rank fusion wins.">'
                       '</head><body><script>x()</script><p>RRF is simple and robust.</p></body></html>', encoding="utf-8")
-        env = {"OPS_ROOTS_HOME": str(roots), "OPS_BOOKMARK_FIXTURE": str(fx)}
+        env = {"PLAINKEEP_ROOTS_HOME": str(roots), "PLAINKEEP_BOOKMARK_FIXTURE": str(fx)}
 
         r = run(h, "bookmark", "https://example.com/rrf", "--archive", env_extra=env)
         note = h / "wiki" / "bookmarks" / "rrf-beats-naive-hybrid.md"
@@ -139,7 +139,7 @@ def main() -> int:
                 "<p>Reciprocal rank fusion combines multiple ranked lists without tuning weights.</p>"
                 "<p>It is robust because it depends only on rank position, not raw scores.</p>"
                 "</article><footer>COPYRIGHT-FOOTER-JUNK 2026</footer></body></html>", encoding="utf-8")
-            r = run(h, "bookmark", "https://example.com/fusion", env_extra={"OPS_BOOKMARK_FIXTURE": str(fx)})
+            r = run(h, "bookmark", "https://example.com/fusion", env_extra={"PLAINKEEP_BOOKMARK_FIXTURE": str(fx)})
             body = read(h / "wiki" / "bookmarks" / "ranking-fusion.md") if (h / "wiki" / "bookmarks" / "ranking-fusion.md").exists() else ""
             check("trafilatura extracts the article body", "Reciprocal rank fusion combines" in body, r.stdout + body[:120])
             check("trafilatura drops nav/footer boilerplate",

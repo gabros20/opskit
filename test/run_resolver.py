@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 run_resolver.py — multi-root verb resolution (proposal Part 2.1 + 0.2). Covers: strict precedence
-(engine bin/ RESERVED > plugins/<pack>/ > $OPS_PATH), plugin-verb dispatch end-to-end through ./ops,
-guardrail gating of a plugin verb (identical risk classes), ops.json source tag + PLUGINS group +
-shadowed-verb warning, and `ops new verb` scaffolding into plugins/local/ (never bin/). Offline,
+(engine bin/ RESERVED > plugins/<pack>/ > $PLAINKEEP_PATH), plugin-verb dispatch end-to-end through ./plainkeep,
+guardrail gating of a plugin verb (identical risk classes), plainkeep.json source tag + PLUGINS group +
+shadowed-verb warning, and `plainkeep new verb` scaffolding into plugins/local/ (never bin/). Offline,
 stdlib only; no real-repo pollution except a throwaway pack cleaned up in finally.
 """
 from __future__ import annotations
@@ -28,18 +28,18 @@ def check(name, cond, detail=""):
 def _mk_verb(d: Path, verb: str, risk: str = "read", run: str | None = None):
     d.mkdir(parents=True, exist_ok=True)
     (d / "cmd.json").write_text(json.dumps({
-        "verb": verb, "summary": f"test verb {verb}", "usage": f"ops {verb}",
+        "verb": verb, "summary": f"test verb {verb}", "usage": f"plainkeep {verb}",
         "risk": risk, "args": [], "reads": [], "writes": [],
     }), encoding="utf-8")
     if run is not None:
         (d / "run.py").write_text(run, encoding="utf-8")
 
 
-# A runnable plugin verb that re-enters lib via OPS_HOME (dispatcher-exported).
+# A runnable plugin verb that re-enters lib via PLAINKEEP_HOME (dispatcher-exported).
 _GREET = (
     "import os, sys\n"
     "from pathlib import Path\n"
-    "sys.path.insert(0, str(Path(os.environ['OPS_HOME']) / 'bin'))\n"
+    "sys.path.insert(0, str(Path(os.environ['PLAINKEEP_HOME']) / 'bin'))\n"
     "from lib import output\n"
     "def main(argv):\n"
     "    _, argv = output.parse_argv(argv)\n"
@@ -61,32 +61,32 @@ def _load_resolver():
     """Load bin/lib/resolver.py by path — the test dir shadows the `lib` namespace package, and the
     resolver has no `lib` imports, so a direct file load is both correct and isolated."""
     import importlib.util
-    spec = importlib.util.spec_from_file_location("ops_resolver", REPO / "bin" / "lib" / "resolver.py")
+    spec = importlib.util.spec_from_file_location("plainkeep_resolver", REPO / "bin" / "lib" / "resolver.py")
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
 
 
 def _resolver_precedence():
-    """In-process precedence: resolver reads OPS_HOME/OPS_PATH per call, ENGINE_BIN is the real bin/."""
+    """In-process precedence: resolver reads PLAINKEEP_HOME/PLAINKEEP_PATH per call, ENGINE_BIN is the real bin/."""
     resolver = _load_resolver()
     with tempfile.TemporaryDirectory() as td:
         home, extern = Path(td) / "vault", Path(td) / "extern"
         # shadow the real engine `search`, plus a plugin-only verb, in pack packA
         _mk_verb(home / "plugins" / "packA" / "search", "search")
         _mk_verb(home / "plugins" / "packA" / "pfoo", "pfoo")
-        # $OPS_PATH root also defines search + pfoo (both should LOSE) and a unique pbar
+        # $PLAINKEEP_PATH root also defines search + pfoo (both should LOSE) and a unique pbar
         _mk_verb(extern / "search", "search")
         _mk_verb(extern / "pfoo", "pfoo")
         _mk_verb(extern / "pbar", "pbar")
-        env0 = os.environ.get("OPS_HOME"), os.environ.get("OPS_PATH")
-        os.environ["OPS_HOME"] = str(home)
-        os.environ["OPS_PATH"] = str(extern)
+        env0 = os.environ.get("PLAINKEEP_HOME"), os.environ.get("PLAINKEEP_PATH")
+        os.environ["PLAINKEEP_HOME"] = str(home)
+        os.environ["PLAINKEEP_PATH"] = str(extern)
         try:
-            check("engine bin/ wins over plugin + OPS_PATH (reserved)",
+            check("engine bin/ wins over plugin + PLAINKEEP_PATH (reserved)",
                   resolver.source_of("search") == "engine", str(resolver.resolve("search")))
-            check("plugin pack wins over OPS_PATH", resolver.source_of("pfoo") == "plugin:packA")
-            check("OPS_PATH root resolves last", resolver.source_of("pbar") == "plugin:extern")
+            check("plugin pack wins over PLAINKEEP_PATH", resolver.source_of("pfoo") == "plugin:packA")
+            check("PLAINKEEP_PATH root resolves last", resolver.source_of("pbar") == "plugin:extern")
             check("unknown verb resolves to None", resolver.resolve("nope-verb") is None)
             check("is_engine_verb true for a real engine verb", resolver.is_engine_verb("search"))
             check("is_engine_verb false for a plugin-only verb", not resolver.is_engine_verb("pbar"))
@@ -95,7 +95,7 @@ def _resolver_precedence():
             check("known_verbs unions every root", {"search", "pfoo", "pbar"} <= kv)
             check("plugin_names lists contributing packs", set(resolver.plugin_names()) == {"packA", "extern"})
         finally:
-            for k, v in zip(("OPS_HOME", "OPS_PATH"), env0):
+            for k, v in zip(("PLAINKEEP_HOME", "PLAINKEEP_PATH"), env0):
                 if v is None:
                     os.environ.pop(k, None)
                 else:
@@ -103,18 +103,18 @@ def _resolver_precedence():
 
 
 def _dispatch_and_gate():
-    """End-to-end through ./ops with a throwaway pack in the real repo (so $OPS/bin/lib exists)."""
+    """End-to-end through ./plainkeep with a throwaway pack in the real repo (so $PLAINKEEP_HOME/bin/lib exists)."""
     pack = REPO / "plugins" / "_restest"
     try:
         _mk_verb(pack / "greetplug", "greetplug", risk="read", run=_GREET)
         _mk_verb(pack / "needsyes", "needsyes", risk="confirm", run=_NEEDS)
-        env = {**os.environ, "OPS_HOME": str(REPO)}
+        env = {**os.environ, "PLAINKEEP_HOME": str(REPO)}
 
         def ops(*args):
-            return subprocess.run([str(REPO / "ops"), *args], capture_output=True, text=True, env=env)
+            return subprocess.run([str(REPO / "plainkeep"), *args], capture_output=True, text=True, env=env)
 
         r = ops("greetplug")
-        check("plugin verb dispatches through ./ops (exit 0)", r.returncode == 0, r.stdout + r.stderr)
+        check("plugin verb dispatches through ./plainkeep (exit 0)", r.returncode == 0, r.stdout + r.stderr)
         check("plugin verb actually ran", "GREETPLUG_OK" in r.stdout, r.stdout)
 
         r = ops("greetplug", "--json")
@@ -137,19 +137,19 @@ def _dispatch_and_gate():
 
 
 def _manifest_surface():
-    """ops.json source tags + capabilities.plugins + render() PLUGINS group + shadowed warning."""
+    """plainkeep.json source tags + capabilities.plugins + render() PLUGINS group + shadowed warning."""
     with tempfile.TemporaryDirectory() as td:
         home = Path(td) / "vault"
         _mk_verb(home / "plugins" / "showpack" / "plug1", "plug1")
         _mk_verb(home / "plugins" / "showpack" / "wiki", "wiki")   # shadows the engine `wiki` → ignored
-        env = {**os.environ, "OPS_HOME": str(home)}
+        env = {**os.environ, "PLAINKEEP_HOME": str(home)}
         subprocess.run([PY, "-c", "import sys; sys.path.insert(0,'bin'); from lib import manifest; manifest.write_manifest()"],
                        cwd=REPO, env=env, capture_output=True, text=True)
-        doc = json.loads((home / "ops.json").read_text())
+        doc = json.loads((home / "plainkeep.json").read_text())
         verbs = {v["verb"]: v for v in doc["verbs"]}
-        check("ops.json tags a plugin verb with source plugin:<pack>",
+        check("plainkeep.json tags a plugin verb with source plugin:<pack>",
               verbs.get("plug1", {}).get("source") == "plugin:showpack", str(verbs.get("plug1")))
-        check("ops.json keeps engine source for engine verbs", verbs.get("wiki", {}).get("source") == "engine")
+        check("plainkeep.json keeps engine source for engine verbs", verbs.get("wiki", {}).get("source") == "engine")
         check("shadowing plugin verb is NOT listed under the engine source's pack",
               verbs.get("wiki", {}).get("source") != "plugin:showpack")
         check("capabilities.plugins lists the pack", "showpack" in doc.get("capabilities", {}).get("plugins", []))
@@ -157,28 +157,28 @@ def _manifest_surface():
         render = subprocess.run(
             [PY, "-c", "import sys; sys.path.insert(0,'bin'); from lib import manifest; print(manifest.render())"],
             cwd=REPO, env=env, capture_output=True, text=True).stdout
-        check("ops help renders a PLUGINS group", "PLUGINS" in render and "plug1" in render, render[-400:])
-        check("ops help warns about the shadowed reserved verb",
+        check("plainkeep help renders a PLUGINS group", "PLUGINS" in render and "plug1" in render, render[-400:])
+        check("plainkeep help warns about the shadowed reserved verb",
               "IGNORED" in render and "wiki" in render, render[-400:])
 
 
 def _new_verb_scaffold():
-    """`ops new verb` lands in plugins/local/ under the vault, never bin/, and says it survives update."""
+    """`plainkeep new verb` lands in plugins/local/ under the vault, never bin/, and says it survives update."""
     with tempfile.TemporaryDirectory() as td:
-        ops_home, roots = Path(td) / "ops", Path(td) / "home"
+        ops_home, roots = Path(td) / "plainkeep", Path(td) / "home"
         (ops_home / "wiki").mkdir(parents=True)
         (ops_home / "journal").mkdir()
         shutil.copytree(REPO / "templates", ops_home / "templates")
-        env = {**os.environ, "OPS_HOME": str(ops_home), "OPS_ROOTS_HOME": str(roots)}
+        env = {**os.environ, "PLAINKEEP_HOME": str(ops_home), "PLAINKEEP_ROOTS_HOME": str(roots)}
         r = subprocess.run([PY, str(REPO / "bin" / "new" / "run.py"), "verb", "myverb", "--risk", "read"],
                            capture_output=True, text=True, env=env)
         d = ops_home / "plugins" / "local" / "myverb"
         check("new verb scaffolds into plugins/local/<name>/",
               (d / "run.py").exists() and (d / "cmd.json").exists(), r.stdout + r.stderr)
         check("new verb prints the survives-update note", "script/update" in (r.stdout + r.stderr), r.stdout)
-        # the scaffolded stub bootstraps lib via OPS_HOME, so it must run through the dispatcher pattern
+        # the scaffolded stub bootstraps lib via PLAINKEEP_HOME, so it must run through the dispatcher pattern
         stub = (d / "run.py").read_text() if (d / "run.py").exists() else ""
-        check("scaffolded stub bootstraps lib via OPS_HOME (not parents[1])", "OPS_HOME" in stub, stub[:120])
+        check("scaffolded stub bootstraps lib via PLAINKEEP_HOME (not parents[1])", "PLAINKEEP_HOME" in stub, stub[:120])
 
 
 def main() -> int:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ops task list|add "<title>"|show <id>|move <id> <status>|done <id> [--dry-run] [--json] —
+"""plainkeep task list|add "<title>"|show <id>|move <id> <status>|done <id> [--dry-run] [--json] —
 the task system (§7)."""
 import re
 import sys
@@ -34,7 +34,7 @@ def cmd_list():
 
     def render(rs):
         if not rs:
-            return "no active or waiting tasks. add one: ops task add \"<title>\""
+            return "no active or waiting tasks. add one: plainkeep task add \"<title>\""
         out, cur = [], None
         for r in rs:
             if r["status"] != cur:
@@ -56,7 +56,7 @@ def main(argv):
     elif action == "add":
         title = " ".join(argv[1:]).strip()
         if not title:
-            output.fail(output.EXIT_USAGE, 'usage: ops task add "<title>"', verb="task")
+            output.fail(output.EXIT_USAGE, 'usage: plainkeep task add "<title>"', verb="task")
         if dry:
             tid = filing.next_task_id()
             data = {"dry_run": True, "would_add": tid, "title": title[:70]}
@@ -64,23 +64,23 @@ def main(argv):
                                human=lambda _: f"would add {tid}: {title[:70]}  (dry run — nothing written)")
         f = filing.create_task(title, source="manual")
         paths.append_journal(f"task added {f.stem}: {title[:60]}")
-        data = {"id": f.stem, "path": str(f.relative_to(paths.OPS_HOME)), "title": title[:70]}
+        data = {"id": f.stem, "path": str(f.relative_to(paths.PLAINKEEP_HOME)), "title": title[:70]}
         return output.emit(data, "task",
-                           human=lambda _: f"added {f.stem} -> {f.relative_to(paths.OPS_HOME)}")
+                           human=lambda _: f"added {f.stem} -> {f.relative_to(paths.PLAINKEEP_HOME)}")
     elif action == "show":
         f, st = _find(argv[1]) if len(argv) > 1 else (None, None)
         if not f:
             output.fail(output.EXIT_NOT_FOUND,
                         f"task not found: {argv[1] if len(argv) > 1 else ''}", verb="task")
         content = f.read_text(encoding="utf-8")
-        data = {"id": f.stem, "status": st, "path": str(f.relative_to(paths.OPS_HOME)), "content": content}
+        data = {"id": f.stem, "status": st, "path": str(f.relative_to(paths.PLAINKEEP_HOME)), "content": content}
         return output.emit(data, "task", human=lambda _: print(content))
     elif action in ("move", "done"):
         if action == "done":
             tid, status = (argv[1] if len(argv) > 1 else ""), "done"
         else:
             if len(argv) < 3:
-                output.fail(output.EXIT_USAGE, "usage: ops task move <id> <status>", verb="task")
+                output.fail(output.EXIT_USAGE, "usage: plainkeep task move <id> <status>", verb="task")
             tid, status = argv[1], argv[2]
         if status not in STATUSES:
             output.fail(output.EXIT_USAGE, f"status must be one of {STATUSES}", verb="task")
@@ -101,7 +101,7 @@ def main(argv):
         return output.emit(data, "task", human=lambda _: f"{tid}: {cur} -> {status}")
     else:
         output.fail(output.EXIT_USAGE,
-                    "usage: ops task list|add \"<title>\"|show <id>|move <id> <status>|done <id>",
+                    "usage: plainkeep task list|add \"<title>\"|show <id>|move <id> <status>|done <id>",
                     verb="task")
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""run_new.py — exercises `ops new project` and `ops new client` against temp ~/ops + sibling roots
-(OPS_HOME + OPS_ROOTS_HOME), asserting wiki hubs, the ~/work repo scaffold, and slug uniqueness."""
+"""run_new.py — exercises `plainkeep new project` and `plainkeep new client` against temp ~/plainkeep + sibling roots
+(PLAINKEEP_HOME + PLAINKEEP_ROOTS_HOME), asserting wiki hubs, the ~/work repo scaffold, and slug uniqueness."""
 from __future__ import annotations
 import json
 import os
@@ -20,7 +20,7 @@ def check(name, cond, detail=""):
 
 
 def run(opshome, roots, *args):
-    env = {**os.environ, "OPS_HOME": str(opshome), "OPS_ROOTS_HOME": str(roots)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(opshome), "PLAINKEEP_ROOTS_HOME": str(roots)}
     return subprocess.run([sys.executable, str(REPO / "bin" / "new" / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 
@@ -42,7 +42,7 @@ def main() -> int:
         check("template placeholders filled", "Acme Webapp" in (repo / "README.md").read_text()
               and "{{name}}" not in (repo / "README.md").read_text())
         check("repo lands under the routing kind", repo.parent.name == "products")
-        check("sibling repo is NOT inside ~/ops", not (ops / "work").exists())
+        check("sibling repo is NOT inside ~/plainkeep", not (ops / "work").exists())
 
         # client
         r = run(ops, roots, "client", "Globex")
@@ -56,7 +56,7 @@ def main() -> int:
         check("new refuses a duplicate slug", r.returncode == 1 and "already exists" in (r.stdout + r.stderr), r.stderr)
 
         # ---- new verb: the scaffolder (issue #1 gap E). Retargeted (Part 0.2) — user verbs land in
-        # plugins/local/<name>/ under the vault (OPS_HOME), NEVER in bin/ (the update boundary). ----
+        # plugins/local/<name>/ under the vault (PLAINKEEP_HOME), NEVER in bin/ (the update boundary). ----
         r = run(ops, roots, "verb", "zzscaffoldtest", "--summary", "temp test verb", "--risk", "read")
         d = ops / "plugins" / "local" / "zzscaffoldtest"
         check("new verb scaffolds plugins/local/<name>/{run.py,cmd.json}",
@@ -69,9 +69,9 @@ def main() -> int:
         if (d / "run.py").exists():
             stub = (d / "run.py").read_text()
             check("scaffolded run.py has placeholders filled", "{{" not in stub and "zzscaffoldtest" in stub, stub[:80])
-        opsjson = json.loads((ops / "ops.json").read_text()) if (ops / "ops.json").exists() else {"verbs": []}
+        opsjson = json.loads((ops / "plainkeep.json").read_text()) if (ops / "plainkeep.json").exists() else {"verbs": []}
         entry = next((v for v in opsjson["verbs"] if v["verb"] == "zzscaffoldtest"), None)
-        check("new verb regenerates the manifest (ops.json)", entry is not None, "")
+        check("new verb regenerates the manifest (plainkeep.json)", entry is not None, "")
         check("scaffolded verb is tagged source plugin:local",
               entry is not None and entry.get("source") == "plugin:local", str(entry))
         run(ops, roots, "verb", "zzscaffoldtwo")   # no --risk → must default to confirm (§5)

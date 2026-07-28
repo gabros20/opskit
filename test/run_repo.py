@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""run_repo.py — exercises `ops repo` health/adopt/nuke-modules/clone against temp roots."""
+"""run_repo.py — exercises `plainkeep repo` health/adopt/nuke-modules/clone against temp roots."""
 from __future__ import annotations
 import os
 import subprocess
@@ -31,7 +31,7 @@ def mkrepo(path):
 
 
 def run(ops, roots, *args):
-    env = {**os.environ, "OPS_HOME": str(ops), "OPS_ROOTS_HOME": str(roots)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(ops), "PLAINKEEP_ROOTS_HOME": str(roots)}
     return subprocess.run([sys.executable, str(REPO / "bin" / "repo" / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 

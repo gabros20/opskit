@@ -1,10 +1,10 @@
-# Architecture — why ops is shaped the way it is
+# Architecture — why plainkeep is shaped the way it is
 
-This doc explains the reasoning behind ops: the problem it solves, the principles it commits to, how
-those principles are enforced, and what each layer traded away. It is for anyone extending ops or
+This doc explains the reasoning behind plainkeep: the problem it solves, the principles it commits to, how
+those principles are enforced, and what each layer traded away. It is for anyone extending plainkeep or
 deciding whether its shape fits their own tools.
 
-For *how to do things*, see the [operating manual](../skills/operate-ops/SKILL.md). For exact shapes,
+For *how to do things*, see the [operating manual](../skills/operate-plainkeep/SKILL.md). For exact shapes,
 see the [machine contract](machine-contract.md). For the history of each decision, see the
 [ADR log](DECISIONS.md).
 
@@ -18,19 +18,19 @@ Personal knowledge tools die two deaths.
   does.
 - **Entropy.** A folder of files with no system decays into a junk drawer.
 
-ops bets that both are solved by the same move. Make **plaintext Markdown in one git repo** the only
+plainkeep bets that both are solved by the same move. Make **plaintext Markdown in one git repo** the only
 source of truth. Then put **one command surface** in front of it that knows where everything goes.
 
 Six principles fall out of that bet. Every later decision traces back to one of them.
 
-1. **Plaintext is the truth.** Anything else is a disposable cache: SQLite, LanceDB, `ops.json`,
-   extracts. All of it is rebuildable with `rm -rf .index && ops index`.
+1. **Plaintext is the truth.** Anything else is a disposable cache: SQLite, LanceDB, `plainkeep.json`,
+   extracts. All of it is rebuildable with `rm -rf .index && plainkeep index`.
 2. **Git is the spine.** Every change is a revertible diff. History is the undo button and the audit
    log. This holds at scale: 500k text notes is about 2.5 GB of well-compressed text (ADR-006).
-3. **One door.** `ops <verb>` is the only way anything mutates the vault. The verb owns *where* and
+3. **One door.** `plainkeep <verb>` is the only way anything mutates the vault. The verb owns *where* and
    *how*; the caller supplies content and judgment. This is the "Iron Law".
 4. **Agent-agnostic.** A model decides *what*; the system guarantees *where* and *how*. Any agent that
-   can read a file and run a command can drive ops, through the same door, behind the same wall.
+   can read a file and run a command can drive plainkeep, through the same door, behind the same wall.
 5. **Nothing transmits without a human.** Drafts, nags, and confirm-gates instead of sends.
 6. **Reversible, zero-install, no server.** The stdlib-only path always works. Heavy deps are optional
    and auto-detected. There is no daemon, no HTTP server, and no resident state, ever.
@@ -38,10 +38,10 @@ Six principles fall out of that bet. Every later decision traces back to one of 
 ## The shape: four roots, one repo of truth
 
 ```
-~/ops        THE SYSTEM   knowledge (wiki/), tasks/, journal/, the verbs (bin/), plugins/   [git: your repo]
+~/plainkeep  THE SYSTEM   knowledge (wiki/), tasks/, journal/, the verbs (bin/), plugins/   [git: your repo]
 ~/work       CODE         one git repo per project: products/ labs/ tools/ clients/         [git: each its own]
 ~/files      BINARIES     client docs, PDFs, datasets — referenced by wiki "shadow notes"   [restic, not git]
-~/dotfiles   THE MACHINE  installs tools, puts ops on PATH                                  [git: separate]
+~/dotfiles   THE MACHINE  installs tools, puts plainkeep on PATH                            [git: separate]
 ```
 
 Separation **by location** is what makes the rest enforceable.
@@ -60,8 +60,8 @@ plugin, agent.
 ```
  terminal ─┐
  Raycast  ─┤
- launchd  ─┼──▶  ops <verb> [--json]  ──▶  guardrail.gate()  ──▶  bin|plugins/<verb>/run.py  ──▶  git diff
- ops mcp  ─┤         (dispatcher)           risk class,             writes only via verbs        (revertible)
+ launchd  ─┼──▶  plainkeep <verb> [--json]  ──▶  guardrail.gate()  ──▶  bin|plugins/<verb>/run.py  ──▶  git diff
+ plainkeep mcp  ─┤   (dispatcher)           risk class,             writes only via verbs        (revertible)
  plugins  ─┘                                --yes, dry-run,
                                             path-wall, logs
 ```
@@ -69,7 +69,7 @@ plugin, agent.
 Two rules keep the chokepoint honest. They are the two most load-bearing lines in the codebase.
 
 - **Nothing imports around it.** Frontends and the MCP server never import verb code "to save a
-  subprocess". Every call re-enters through `ops <verb>`, so the guardrail and `.logs/` see
+  subprocess". Every call re-enters through `plainkeep <verb>`, so the guardrail and `.logs/` see
   everything. The MCP server is a stateless stdio child spawned per session, precisely so there is no
   second, resident door.
 - **Refusals teach.** The exit-code protocol tells a blocked caller its correct next call from the
@@ -89,12 +89,12 @@ The risk classes are `read`, `safe_write`, `draft_only`, `confirm`, and `deny`. 
 This is v4's central addition. Instead of "the agent reads the manual and hopes," the surface is
 self-describing.
 
-Every verb speaks one frozen `--json` envelope. The generated `ops.json` v2 carries the whole surface:
+Every verb speaks one frozen `--json` envelope. The generated `plainkeep.json` v2 carries the whole surface:
 args, output schemas, risk classes, usage hints, and detected capabilities.
 
 The consequences compound.
 
-- `ops mcp` is near-zero marginal surface. Its tool list is *generated* from `ops.json`, so every new
+- `plainkeep mcp` is near-zero marginal surface. Its tool list is *generated* from `plainkeep.json`, so every new
   verb and every installed plugin becomes an MCP tool automatically.
 - A contract test round-trips every verb against its declared schema, so drift breaks CI, not
   consumers. That is the lesson of every ad-hoc `--json` flag that quietly changed shape.
@@ -106,43 +106,43 @@ The consequences compound.
 The extension mechanism was designed backwards from two failure modes: user code overwritten by
 updates, and third-party code silently escalating.
 
-- **Multi-root resolution** (`bin/` → `plugins/` → `$OPS_PATH`) with `bin/` reserved. Engine updates
+- **Multi-root resolution** (`bin/` → `plugins/` → `$PLAINKEEP_PATH`) with `bin/` reserved. Engine updates
   can never collide with user verbs, and user verbs can never shadow engine ones.
-- **A frozen SDK** (`lib/api.py`, `OPS_API_VERSION`) instead of "import whatever". The blessed subset
+- **A frozen SDK** (`lib/api.py`, `PLAINKEEP_API_VERSION`) instead of "import whatever". The blessed subset
   includes `classify`, the seam that makes a plugin inherit the path-wall rather than skip it.
 - **A trust ceiling** instead of install-time permissions. Declared risks activate only after an
-  explicit `ops plugin trust`, updates re-pin explicitly, and there is no registry to compromise: the
+  explicit `plainkeep plugin trust`, updates re-pin explicitly, and there is no registry to compromise: the
   git repo is the plugin. See [plugins.md](plugins.md).
 
 ## Frontends: rent before build
 
-The vault is plaintext, so the richest frontends are ones ops doesn't have to write.
+The vault is plaintext, so the richest frontends are ones plainkeep doesn't have to write.
 
 **Obsidian is "Frontend Zero"**: read, edit, graph, and mobile for the cost of a config pack. It runs
-under a strict treaty. URIs *open*, verbs *write*, and ops tolerates Obsidian's frontmatter
+under a strict treaty. URIs *open*, verbs *write*, and plainkeep tolerates Obsidian's frontmatter
 normalization on read rather than rewriting user files to fight it. Plaintext view formats such as
-Bases and JSON Canvas let ops *generate* what Obsidian *renders*, with no server and no plugin API
+Bases and JSON Canvas let plainkeep *generate* what Obsidian *renders*, with no server and no plugin API
 dependency.
 
-The first **built** tier is deliberately thin: Raycast script commands that shell to `ops`. It proves
+The first **built** tier is deliberately thin: Raycast script commands that shell to `plainkeep`. It proves
 the `--json` surface before anything heavier earns its keep. Mobile is documentation, not an app,
 because git is the only sync transport.
 
-The second built tier is **`ops ui`**, the human terminal UI (ADR-011). See
+The second built tier is **`plainkeep ui`**, the human terminal UI (ADR-011). See
 [terminal-ui.md](terminal-ui.md) for how to use it.
 
 Its TypeScript source lives in this template's `ui/` directory, but a vault never sees that source.
-`ui/` is not in `script/engine.txt`. What `ops setup ui --yes` installs is a **self-contained
+`ui/` is not in `script/engine.txt`. What `plainkeep setup ui --yes` installs is a **self-contained
 compiled binary**: built with Bun, shipped on the template repo's GitHub releases, sha256-verified,
-and placed in `$OPS_HOME/.local/bin/` where the tiny stdlib `bin/ui/` shim looks first.
+and placed in `$PLAINKEEP_HOME/.local/bin/` where the tiny stdlib `bin/ui/` shim looks first.
 
-`ops ui` is the human *face* of the same one door. It reads `ops.json` (the `actions[]` grammar) to
+`plainkeep ui` is the human *face* of the same one door. It reads `plainkeep.json` (the `actions[]` grammar) to
 generate menus and forms, so nothing has to be memorized. Every action it takes re-enters
-`ops <verb> --json` as a subprocess, so the guardrail and `.logs/` see it exactly as they see an
+`plainkeep <verb> --json` as a subprocess, so the guardrail and `.logs/` see it exactly as they see an
 agent.
 
-Two faces, one door: humans drive `ops ui`, agents drive `ops <verb> --flags`. The enriched
-`ops.json/3` contract (grammar single-sourced, completion derived from it) is what makes the generated
+Two faces, one door: humans drive `plainkeep ui`, agents drive `plainkeep <verb> --flags`. The enriched
+`plainkeep.json/3` contract (grammar single-sourced, completion derived from it) is what makes the generated
 human UI possible without a second copy of the surface.
 
 The compiled-binary distribution keeps the engine's stdlib-only floor intact. No Node, Bun, or
@@ -163,7 +163,7 @@ Turning artifacts into knowledge involves models, and models hallucinate. The pi
   and protected paths. The scan is schedulable; apply never is.
 
 Three note planes (human, derived, agent) are a *checked* convention. `doctor` flags violations and
-`ops search --author human` filters. This exists because the number-one reported failure mode of
+`plainkeep search --author human` filters. This exists because the number-one reported failure mode of
 agent-adjacent PKM is agent output being re-read as human truth.
 
 ## Retrieval: staged, local, disposable
@@ -186,12 +186,12 @@ The design's sharpest trick: the scheduled cloud push runs from launchd, invokin
 with an append-only key**, outside the verb surface entirely. The human consents once at `init`.
 Thereafter even a fully compromised agent or laptop can only *add* to backup history, never erase it.
 
-`ops share` keeps the same consent discipline for sharing. It publishes to your own worker under a
+`plainkeep share` keeps the same consent discipline for sharing. It publishes to your own worker under a
 long, unguessable capability URL, where secrecy is the link plus a TTL. ADR-008 traded zero-knowledge
 for a link any agent can fetch: HTML in a browser, raw markdown at `<url>.md`. The verb's output is a
 *draft link* the human sends. See [backup-and-share.md](backup-and-share.md).
 
-## What ops deliberately refuses to become
+## What plainkeep deliberately refuses to become
 
 The refusals are as load-bearing as the features. The full list lives in the
 [v4 proposal's anti-roadmap](design/proposals/2026-07-01-v4-platform-roadmap.md#the-anti-roadmap):

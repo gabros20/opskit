@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """run_enrich.py — offline suite for the search-enrichment engine (bin/lib/enrichlib.py). NEVER
-contacts Ollama: OPS_ENRICH_FAKE short-circuits enrich(), and every guard/off path is asserted to
+contacts Ollama: PLAINKEEP_ENRICH_FAKE short-circuits enrich(), and every guard/off path is asserted to
 never reach `_call_model` (monkeypatched to raise if invoked)."""
 from __future__ import annotations
 import importlib.util
@@ -19,9 +19,9 @@ def check(name, cond, detail=""):
 
 def _load_enrichlib():
     """Load bin/lib/enrichlib.py by file path (bin/lib namespace loses to test/lib on sys.path)."""
-    spec = importlib.util.spec_from_file_location("ops_enrichlib", REPO / "bin" / "lib" / "enrichlib.py")
+    spec = importlib.util.spec_from_file_location("plainkeep_enrichlib", REPO / "bin" / "lib" / "enrichlib.py")
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["ops_enrichlib"] = mod
+    sys.modules["plainkeep_enrichlib"] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -32,7 +32,7 @@ def _boom(*a, **kw):
 
 def main() -> int:
     el = _load_enrichlib()
-    for k in ("OPS_ENRICH_FAKE", "OPS_ENRICH", "OPS_ENRICH_MODEL", "OPS_ENRICH_KEEP_ALIVE"):
+    for k in ("PLAINKEEP_ENRICH_FAKE", "PLAINKEEP_ENRICH", "PLAINKEEP_ENRICH_MODEL", "PLAINKEEP_ENRICH_KEEP_ALIVE"):
         os.environ.pop(k, None)
 
     # every check below runs with _call_model rigged to raise — a passing suite with no exception
@@ -40,14 +40,14 @@ def main() -> int:
     orig_call = el._call_model
     el._call_model = _boom
     try:
-        # ---------- OPS_ENRICH_FAKE: deterministic no-model seam ----------
-        os.environ["OPS_ENRICH_FAKE"] = "1"
+        # ---------- PLAINKEEP_ENRICH_FAKE: deterministic no-model seam ----------
+        os.environ["PLAINKEEP_ENRICH_FAKE"] = "1"
         r = el.enrich("some text")
         check("fake: backend", r["backend"] == "fake", str(r))
         check("fake: canned description", r["description"] == "[fake] some text", str(r))
         check("fake: canned keywords", r["keywords"] == ["fake", "enrich"], str(r))
         check("fake: non-empty key", bool(r.get("key")), str(r))
-        os.environ.pop("OPS_ENRICH_FAKE")
+        os.environ.pop("PLAINKEEP_ENRICH_FAKE")
 
         # ---------- guards: empty / sentinel / too-short text never reaches the model ----------
         r = el.enrich("")
@@ -61,13 +61,13 @@ def main() -> int:
         r = el.enrich("short text")  # 10 chars, well under MIN_CHARS
         check("guard: 10-char text → model skipped", r["backend"] in ("none", "floor"), str(r))
 
-        # ---------- OPS_ENRICH=off: no model regardless of text length ----------
-        os.environ["OPS_ENRICH"] = "off"
+        # ---------- PLAINKEEP_ENRICH=off: no model regardless of text length ----------
+        os.environ["PLAINKEEP_ENRICH"] = "off"
         long_text = "The quick brown fox jumps over the lazy dog. " * 10
         r = el.enrich(long_text)
         check("off: backend none/floor", r["backend"] in ("none", "floor"), str(r))
         check("off: description empty", r["description"] == "", str(r))
-        os.environ.pop("OPS_ENRICH")
+        os.environ.pop("PLAINKEEP_ENRICH")
 
         # ---------- keyword_floor: stdlib frequency+stopword extractor ----------
         kws = el.keyword_floor("the quick brown fox jumps over the lazy dog near the quick river")

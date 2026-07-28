@@ -9,7 +9,7 @@ Three retrievers over the same corpus:
   3. semantic_proxy — character-trigram cosine. A CONSERVATIVE stand-in for embeddings: it
                       catches morphological/substring closeness but NOT true synonymy, so where
                       it beats keyword it marks a floor on what real vectors could recover.
-                      (Plug a real embedder via OPS_EMBED_CMD later to tighten the estimate.)
+                      (Plug a real embedder via PLAINKEEP_EMBED_CMD later to tighten the estimate.)
 
 Auto-bucketing: a query is 'lexical' if it shares ≥1 stemmed content token with its relevant
 note, else 'semantic'. Keyword search structurally cannot win the semantic bucket; that bucket's
@@ -27,7 +27,7 @@ from collections import Counter
 
 # --- real local embedder (philosophy-compatible: offline, no server-of-record, file-cacheable) ---
 def ollama_embed(text: str, model: str | None = None, host: str = "http://localhost:11434") -> list[float]:
-    model = model or os.environ.get("OPS_EMBED_MODEL", "mxbai-embed-large")
+    model = model or os.environ.get("PLAINKEEP_EMBED_MODEL", "mxbai-embed-large")
     req = urllib.request.Request(
         host + "/api/embeddings",
         data=json.dumps({"model": model, "prompt": text}).encode(),
@@ -38,23 +38,23 @@ def ollama_embed(text: str, model: str | None = None, host: str = "http://localh
 
 
 def cmd_embed(text: str) -> list[float]:
-    """Generic escape hatch: OPS_EMBED_CMD reads text on stdin, prints a JSON float array."""
-    cmd = os.environ["OPS_EMBED_CMD"]
+    """Generic escape hatch: PLAINKEEP_EMBED_CMD reads text on stdin, prints a JSON float array."""
+    cmd = os.environ["PLAINKEEP_EMBED_CMD"]
     out = subprocess.run(cmd, shell=True, input=text, capture_output=True, text=True, timeout=120)
     return json.loads(out.stdout)
 
 
 def get_embedder():
     """Return (name, fn) for the best available real embedder, or (None, None)."""
-    if os.environ.get("OPS_EMBED_CMD"):
+    if os.environ.get("PLAINKEEP_EMBED_CMD"):
         try:
             cmd_embed("ping")
-            return ("OPS_EMBED_CMD", cmd_embed)
+            return ("PLAINKEEP_EMBED_CMD", cmd_embed)
         except Exception:
             pass
     try:
         ollama_embed("ping")
-        return (f"ollama:{os.environ.get('OPS_EMBED_MODEL', 'mxbai-embed-large')}", ollama_embed)
+        return (f"ollama:{os.environ.get('PLAINKEEP_EMBED_MODEL', 'mxbai-embed-large')}", ollama_embed)
     except Exception:
         return (None, None)
 

@@ -1,7 +1,7 @@
 {
   "verb": "invoice",
   "summary": "DRAFT an invoice for a client (reads tax-formula.md; computes VAT; never sends)",
-  "usage": "ops invoice <client> --amount <net> [--desc \"<text>\"]",
+  "usage": "plainkeep invoice <client> --amount <net> [--desc \"<text>\"]",
   "risk": "draft_only",
   "args": [
     {

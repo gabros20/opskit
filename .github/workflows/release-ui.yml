@@ -1,9 +1,9 @@
 name: release-ui
 
-# Ships the ops-ui terminal binary (ADR-011). Push a `ui-v*` tag and this cross-compiles ui/ into
-# self-contained binaries (no Node/Bun needed on the user's machine) + a checksums.txt, attached to
-# a GitHub release. Vaults install the matching asset via `ops setup ui --yes`, which downloads with
-# the authenticated gh CLI (the template repo may be private) and verifies the sha256.
+# Ships the plainkeep-ui terminal binary (ADR-011). Push a `ui-v*` tag and this cross-compiles ui/
+# into self-contained binaries (no Node/Bun needed on the user's machine) + a checksums.txt, attached
+# to a GitHub release. Vaults install the matching asset via `plainkeep setup ui --yes`, which
+# downloads with the authenticated gh CLI (the template repo may be private) and verifies the sha256.
 #
 # Release ritual (from a clean, green main):
 #   git tag ui-v0.1.0 && git push origin ui-v0.1.0
@@ -46,15 +46,15 @@ jobs:
           mkdir -p ../dist-bin
           for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
             bun build --compile --minify --target="bun-${target}" src/index.ts \
-              --outfile "../dist-bin/ops-ui-${target}"
+              --outfile "../dist-bin/plainkeep-ui-${target}"
           done
       - name: checksums
         working-directory: dist-bin
-        run: shasum -a 256 ops-ui-* > checksums.txt && cat checksums.txt
+        run: shasum -a 256 plainkeep-ui-* > checksums.txt && cat checksums.txt
       - name: smoke (linux-x64 binary honors the non-TTY contract)
         run: |
           set +e
-          out="$(./dist-bin/ops-ui-linux-x64 </dev/null 2>&1)"
+          out="$(./dist-bin/plainkeep-ui-linux-x64 </dev/null 2>&1)"
           code=$?
           set -e
           echo "$out"
@@ -68,4 +68,4 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" dist-bin/* \
             --title "$GITHUB_REF_NAME" \
-            --notes "ops-ui terminal binaries (self-contained; no Node required). Install into a vault with: ops setup ui --yes"
+            --notes "plainkeep-ui terminal binaries (self-contained; no Node required). Install into a vault with: plainkeep setup ui --yes"

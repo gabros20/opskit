@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""run_archive_invoice.py — `ops archive` (git-bundle a dead repo) + `ops invoice` (draft, never
-sends), against temp ~/ops + sibling roots."""
+"""run_archive_invoice.py — `plainkeep archive` (git-bundle a dead repo) + `plainkeep invoice` (draft, never
+sends), against temp ~/plainkeep + sibling roots."""
 from __future__ import annotations
 import os
 import shutil
@@ -31,7 +31,7 @@ def mkrepo(path):
 
 
 def run(verb, ops, roots, *args):
-    env = {**os.environ, "OPS_HOME": str(ops), "OPS_ROOTS_HOME": str(roots)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(ops), "PLAINKEEP_ROOTS_HOME": str(roots)}
     return subprocess.run([sys.executable, str(REPO / "bin" / verb / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 

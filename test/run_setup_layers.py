@@ -21,7 +21,7 @@ def check(name, cond, detail=""):
 
 
 def reload_setuplib(home: Path):
-    os.environ["OPS_HOME"] = str(home)
+    os.environ["PLAINKEEP_HOME"] = str(home)
     from lib import paths  # noqa: E402
     importlib.reload(paths)
     from lib import setuplib  # noqa: E402
@@ -29,7 +29,7 @@ def reload_setuplib(home: Path):
 
 
 def make_home(tmp: Path) -> Path:
-    home = tmp / "ops"
+    home = tmp / "plainkeep"
     home.mkdir(parents=True)
     return home
 
@@ -60,16 +60,16 @@ def run_setup(args, home: Path, *, fake: bool = True, assume_ollama: bool = True
     # pass only on a Mac that happens to have ollama. Pass assume_ollama=False to test the blocked path.
     env = {
         **os.environ,
-        "OPS_HOME": str(home),
+        "PLAINKEEP_HOME": str(home),
         "PYTHONPATH": str(REPO / "bin"),
-        "OPS_EMBED_MODEL": "ops-setup-test-embed-model",
+        "PLAINKEEP_EMBED_MODEL": "plainkeep-setup-test-embed-model",
     }
     if fake:
-        env["OPS_SETUP_FAKE"] = "1"
+        env["PLAINKEEP_SETUP_FAKE"] = "1"
     else:
-        env.pop("OPS_SETUP_FAKE", None)
+        env.pop("PLAINKEEP_SETUP_FAKE", None)
     if assume_ollama:
-        env["OPS_ASSUME_OLLAMA"] = "1"
+        env["PLAINKEEP_ASSUME_OLLAMA"] = "1"
     if extra_env:
         env.update(extra_env)
     return subprocess.run([sys.executable, str(REPO / "bin" / "setup" / "run.py"), *args],
@@ -100,7 +100,7 @@ def main() -> int:
         # Skeleton: absent -> ready and idempotent advance.
         s0 = mod.status("skeleton")[0]
         check("skeleton absent in empty vault", s0["status"] in ("partial", "absent") and s0["required"], str(s0))
-        os.environ["OPS_SETUP_FAKE"] = "1"
+        os.environ["PLAINKEEP_SETUP_FAKE"] = "1"
         a0 = mod.advance("skeleton", yes=False, fake=True)
         check("fake skeleton advance records doctor init", a0["ran"] and "doctor" in a0["ran"][0], str(a0))
         seed_skeleton(mod, home)
@@ -110,9 +110,9 @@ def main() -> int:
         check("skeleton advance is idempotent when ready", not a1["ran"] and "skeleton" in a1["skipped"], str(a1))
 
         # The Obsidian config pack is ADVISORY: its .obsidian/*.json items stay VISIBLE in the
-        # skeleton row (so `ops setup` surfaces their state) but never flip the required layer to
+        # skeleton row (so `plainkeep setup` surfaces their state) but never flip the required layer to
         # non-ready — skeleton readiness depends only on REQUIRED_DIRS. A fresh clone that hasn't
-        # seeded .obsidian/ yet must still let `ops doctor` pass.
+        # seeded .obsidian/ yet must still let `plainkeep doctor` pass.
         (home / "templates" / "obsidian").mkdir(parents=True, exist_ok=True)
         (home / "templates" / "obsidian" / "app.json").write_text("{}", encoding="utf-8")
         (home / "templates" / "obsidian" / "appearance.json").write_text("{}", encoding="utf-8")
@@ -140,7 +140,7 @@ def main() -> int:
 
         # Search: absent / partial / ready / blocked and the confirm gate. Readiness is OPERATIONAL
         # now (Task 10): deps-importable (probed via the venv/dispatcher interpreter) + model-pulled +
-        # index-built; OPS_VECTORS/OPS_RERANK are advisory. ollama is the hard external prerequisite.
+        # index-built; PLAINKEEP_VECTORS/PLAINKEEP_RERANK are advisory. ollama is the hard external prerequisite.
         # Patch the probes hermetically so the machine's real ollama/venv state never leaks in.
         def _search_probes(deps, model, index, ollama=True):
             return patch_probe(mod,
@@ -203,16 +203,16 @@ def main() -> int:
         mod.subprocess.run = boom
         try:
             fake_safe = mod.advance("search", yes=True, fake=True)
-            check("OPS_SETUP_FAKE records without subprocess execution", len(fake_safe["ran"]) == 4, str(fake_safe))
+            check("PLAINKEEP_SETUP_FAKE records without subprocess execution", len(fake_safe["ran"]) == 4, str(fake_safe))
         except AssertionError as e:
-            check("OPS_SETUP_FAKE records without subprocess execution", False, str(e))
+            check("PLAINKEEP_SETUP_FAKE records without subprocess execution", False, str(e))
         finally:
             mod.subprocess.run = real_run
             restore(mod, old)
 
         # Backups: blocked handoff, never auto-run.
         backups = mod.advance("backups", yes=True, fake=True)
-        check("backups advance is blocked handoff", backups["handoff"] == ["ops backup init"] and not backups["ran"], str(backups))
+        check("backups advance is blocked handoff", backups["handoff"] == ["plainkeep backup init"] and not backups["ran"], str(backups))
 
         # Models: fake command recording includes conditional package support but no real execution.
         # Patch ollama present (else Task 8 reports the layer `blocked` and advance would skip it).
@@ -281,13 +281,13 @@ def main() -> int:
         # with a teaching hint when neither is; not_applicable on a platform with no prebuilt asset;
         # ready once an executable binary is where the bin/ui shim looks. Fake advance previews the
         # gh download + sha256 verify without touching the network. ---
-        old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: "ops-ui-test-arm64",
+        old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: "plainkeep-ui-test-arm64",
                           _ui_repo=lambda: "owner/template", _ui_source_buildable=lambda: False,
                           _gh_present=lambda: True, _ui_expected_version=lambda: None)
         try:
             u_abs = mod.status("ui")[0]
             check("ui absent (attemptable) when downloadable but not installed",
-                  u_abs["status"] == "absent" and u_abs["next"] == "ops setup ui --yes", str(u_abs))
+                  u_abs["status"] == "absent" and u_abs["next"] == "plainkeep setup ui --yes", str(u_abs))
             u_adv = mod.advance("ui", yes=True, fake=True)
             u_joined = " | ".join(u_adv["ran"])
             check("fake ui advance previews gh release download + sha256 verify (no network)",
@@ -298,10 +298,10 @@ def main() -> int:
 
         # Update detection (offline): the engine ships bin/ui/version.txt; the binary self-reports
         # --version. A mismatch (or a pre---version binary reporting None) makes the layer `partial`
-        # ("update available") so the ordinary `ops setup ui --yes` re-downloads, PINNED to the
+        # ("update available") so the ordinary `plainkeep setup ui --yes` re-downloads, PINNED to the
         # engine's expected release tag. Matching versions stay `ready` and skip.
-        old = patch_probe(mod, _ui_installed=lambda: "/fake/ops-ui",
-                          _ui_asset=lambda: "ops-ui-test-arm64", _ui_repo=lambda: "owner/template",
+        old = patch_probe(mod, _ui_installed=lambda: "/fake/plainkeep-ui",
+                          _ui_asset=lambda: "plainkeep-ui-test-arm64", _ui_repo=lambda: "owner/template",
                           _ui_source_buildable=lambda: False, _gh_present=lambda: True,
                           _ui_expected_version=lambda: "9.9.9",
                           _ui_installed_version=lambda exe: "1.0.0")
@@ -309,14 +309,14 @@ def main() -> int:
             u_upd = mod.status("ui")[0]
             check("ui partial (update available) when installed version != engine's expected",
                   u_upd["status"] == "partial" and "update available" in u_upd["detail"]
-                  and u_upd["next"] == "ops setup ui --yes", str(u_upd))
+                  and u_upd["next"] == "plainkeep setup ui --yes", str(u_upd))
             u_uadv = mod.advance("ui", yes=True, fake=True)
             check("fake ui update advance pins the download to the expected release tag",
                   any("gh release download ui-v9.9.9" in c for c in u_uadv["ran"]), str(u_uadv["ran"]))
         finally:
             restore(mod, old)
 
-        old = patch_probe(mod, _ui_installed=lambda: "/fake/ops-ui",
+        old = patch_probe(mod, _ui_installed=lambda: "/fake/plainkeep-ui",
                           _ui_expected_version=lambda: "9.9.9",
                           _ui_installed_version=lambda exe: "9.9.9")
         try:
@@ -331,7 +331,7 @@ def main() -> int:
         finally:
             restore(mod, old)
 
-        old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: "ops-ui-test-arm64",
+        old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: "plainkeep-ui-test-arm64",
                           _ui_repo=lambda: None, _ui_source_buildable=lambda: False,
                           _gh_present=lambda: False)
         try:
@@ -357,7 +357,7 @@ def main() -> int:
 
         # Source-build fallback (contributor checkout): no gh, but ui/ + bun → still attemptable,
         # and the fake advance previews the bun compile into .local/bin.
-        old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: "ops-ui-test-arm64",
+        old = patch_probe(mod, _ui_installed=lambda: None, _ui_asset=lambda: "plainkeep-ui-test-arm64",
                           _ui_repo=lambda: None, _ui_source_buildable=lambda: True,
                           _gh_present=lambda: False)
         try:
@@ -367,17 +367,17 @@ def main() -> int:
             u_sjoined = " | ".join(u_sadv["ran"])
             check("fake ui source advance previews bun install + compile",
                   "bun install" in u_sjoined and "bun build --compile" in u_sjoined
-                  and ".local/bin/ops-ui" in u_sjoined, str(u_sadv["ran"]))
+                  and ".local/bin/plainkeep-ui" in u_sjoined, str(u_sadv["ran"]))
         finally:
             restore(mod, old)
 
-        # Ready once an executable binary sits where the shim looks first (.local/bin/ops-ui).
-        ui_bin = home / ".local" / "bin" / "ops-ui"
+        # Ready once an executable binary sits where the shim looks first (.local/bin/plainkeep-ui).
+        ui_bin = home / ".local" / "bin" / "plainkeep-ui"
         ui_bin.parent.mkdir(parents=True, exist_ok=True)
         ui_bin.write_text("#!/bin/sh\n")
         ui_bin.chmod(0o755)
         u_rdy = mod.status("ui")[0]
-        check("ui ready once .local/bin/ops-ui is installed+executable", u_rdy["status"] == "ready", str(u_rdy))
+        check("ui ready once .local/bin/plainkeep-ui is installed+executable", u_rdy["status"] == "ready", str(u_rdy))
         u_skip = mod.advance("ui", yes=True, fake=True)
         check("ready ui advance is idempotent (skips)", not u_skip["ran"] and "ui" in u_skip["skipped"], str(u_skip))
         ui_bin.unlink()
@@ -405,7 +405,7 @@ def main() -> int:
 
         def fake_advance(layer_id, *, yes, fake):
             if layer_id == "search":
-                raise subprocess.CalledProcessError(1, ["ops", "index"])
+                raise subprocess.CalledProcessError(1, ["plainkeep", "index"])
             r = mod._result()
             r["ran"].append(f"did {layer_id}")
             return r
@@ -503,7 +503,7 @@ def main() -> int:
 
         def f5_advance(layer_id, *, yes, fake):
             if layer_id == "search":  # ran 2 steps, then blew up on the 3rd
-                exc = subprocess.CalledProcessError(1, ["ops", "index"])
+                exc = subprocess.CalledProcessError(1, ["plainkeep", "index"])
                 exc.ops_partial_ran = ["python -m venv .venv",
                                        ".venv/bin/python3 -m pip install lancedb fastembed"]
                 raise exc
@@ -543,17 +543,17 @@ def main() -> int:
 
         wiz_rows = [
             {"id": "skeleton", "title": "Vault structure", "status": "absent", "required": True,
-             "detail": "", "items": [], "next": "ops setup skeleton"},
+             "detail": "", "items": [], "next": "plainkeep setup skeleton"},
             {"id": "search", "title": "Semantic search", "status": "absent", "required": False,
-             "detail": "", "items": [], "next": "ops setup search --yes"},
+             "detail": "", "items": [], "next": "plainkeep setup search --yes"},
             {"id": "backups", "title": "Durability", "status": "blocked", "required": False,
-             "detail": "backup setup needs human initialization", "items": [], "next": "ops backup init"},
+             "detail": "backup setup needs human initialization", "items": [], "next": "plainkeep backup init"},
             {"id": "models", "title": "File-processing", "status": "ready", "required": False,
              "detail": "file-processing models ready", "items": [], "next": ""},
             {"id": "automation", "title": "Schedules", "status": "absent", "required": False,
-             "detail": "", "items": [], "next": "ops setup automation"},
+             "detail": "", "items": [], "next": "plainkeep setup automation"},
             {"id": "ui", "title": "Terminal UI", "status": "absent", "required": False,
-             "detail": "", "items": [], "next": "ops setup ui --yes"},
+             "detail": "", "items": [], "next": "plainkeep setup ui --yes"},
         ]
         wiz_calls = []
 
@@ -587,11 +587,11 @@ def main() -> int:
         check("wizard notes an already-ready layer and never advances it",
               "already ready" in wiz_out and ("models", True) not in wiz_calls, wiz_out)
         check("wizard surfaces the backups handoff (never prompts/auto-runs it)",
-              "ops backup init" in wiz_out and ("backups", True) not in wiz_calls, wiz_out)
+              "plainkeep backup init" in wiz_out and ("backups", True) not in wiz_calls, wiz_out)
         check("wizard prints standing next-steps (push + backup init)",
               "git push -u origin main" in wiz_out, wiz_out)
 
-        os.environ.pop("OPS_SETUP_FAKE", None)
+        os.environ.pop("PLAINKEEP_SETUP_FAKE", None)
 
         # --- FIX 3: ONE usable-venv probe (start-probe, not os.path.exists) shared by the dispatcher
         # interpreter choice and the create-if-missing logic; a half-built/broken .venv is REPAIRED,
@@ -619,10 +619,10 @@ def main() -> int:
               res_idem["ran"] == [], str(res_idem["ran"]))
         mod = reload_setuplib(home)  # restore module state for any later in-process use
 
-        # --- FIX 1: the `ops` dispatcher must PROBE that .venv/bin/python3 actually starts, not just
+        # --- FIX 1: the `plainkeep` dispatcher must PROBE that .venv/bin/python3 actually starts, not just
         # test `-x`. A broken (executable-but-unstartable) venv python must fall back to bare python3
-        # so ops keeps working, instead of returning 126/127 on every verb. Build an OPS_HOME that
-        # mirrors the repo (symlinks) but carries a deliberately-broken .venv, then run `ops help`. ---
+        # so plainkeep keeps working, instead of returning 126/127 on every verb. Build a PLAINKEEP_HOME that
+        # mirrors the repo (symlinks) but carries a deliberately-broken .venv, then run `plainkeep help`. ---
         broken_home = tmp / "brokenvenv"
         broken_home.mkdir()
         for entry in REPO.iterdir():
@@ -633,10 +633,10 @@ def main() -> int:
         vbin.mkdir(parents=True)
         (vbin / "python3").write_text("#!/nonexistent/interp\nnot a real python\n")
         os.chmod(vbin / "python3", 0o755)
-        f1_env = {**os.environ, "OPS_HOME": str(broken_home)}
-        f1_env.pop("OPS_SETUP_FAKE", None)
-        f1 = subprocess.run([str(REPO / "ops"), "help"], capture_output=True, text=True, env=f1_env)
-        check("FIX 1: broken/unstartable .venv python → dispatcher falls back to bare python3, ops runs",
+        f1_env = {**os.environ, "PLAINKEEP_HOME": str(broken_home)}
+        f1_env.pop("PLAINKEEP_SETUP_FAKE", None)
+        f1 = subprocess.run([str(REPO / "plainkeep"), "help"], capture_output=True, text=True, env=f1_env)
+        check("FIX 1: broken/unstartable .venv python → dispatcher falls back to bare python3, plainkeep runs",
               f1.returncode == 0 and "126" not in (f1.stderr[-40:] or ""),
               (f1.stderr + f1.stdout)[:400])
 
@@ -647,7 +647,7 @@ def main() -> int:
         check("setup dashboard lists six layers",
               all(layer in dashboard.stdout for layer in ("skeleton", "search", "backups", "models", "automation", "ui")),
               dashboard.stdout)
-        check("setup dashboard shows next commands", "ops setup search --yes" in dashboard.stdout, dashboard.stdout)
+        check("setup dashboard shows next commands", "plainkeep setup search --yes" in dashboard.stdout, dashboard.stdout)
 
         json_dash = run_setup(["--json"], cli_home)
         try:
@@ -665,7 +665,7 @@ def main() -> int:
         gated_cli = run_setup(["search"], cli_home)
         check("setup search without yes exits confirm", gated_cli.returncode == 3, gated_cli.stderr + gated_cli.stdout)
         check("setup search confirm includes rerun hint",
-              "re-run: ops setup search --yes" in (gated_cli.stderr + gated_cli.stdout),
+              "re-run: plainkeep setup search --yes" in (gated_cli.stderr + gated_cli.stdout),
               gated_cli.stderr + gated_cli.stdout)
 
         gated_json = run_setup(["search", "--json"], cli_home)
@@ -675,7 +675,7 @@ def main() -> int:
                              and gated_env["ok"] is False
                              and gated_env["verb"] == "setup"
                              and gated_env["error"]["code"] == 3
-                             and gated_env["error"]["hint"] == "re-run: ops setup search --yes")
+                             and gated_env["error"]["hint"] == "re-run: plainkeep setup search --yes")
         except Exception as e:
             gated_json_ok = False
             gated_json.stderr += str(e)
@@ -693,8 +693,8 @@ def main() -> int:
         check("setup --wizard without a tty exits usage (2)", wiz_notty.returncode == 2,
               wiz_notty.stderr + wiz_notty.stdout)
         check("setup --wizard non-tty names the non-interactive alternatives",
-              "ops setup --all --yes" in (wiz_notty.stderr + wiz_notty.stdout)
-              and "ops setup --json" in (wiz_notty.stderr + wiz_notty.stdout),
+              "plainkeep setup --all --yes" in (wiz_notty.stderr + wiz_notty.stdout)
+              and "plainkeep setup --json" in (wiz_notty.stderr + wiz_notty.stdout),
               wiz_notty.stderr + wiz_notty.stdout)
         wiz_json = run_setup(["--wizard", "--json"], cli_home)
         check("setup --wizard --json exits usage (2)", wiz_json.returncode == 2,
@@ -705,7 +705,7 @@ def main() -> int:
 
         backups_cli = run_setup(["backups", "--yes"], cli_home)
         check("setup backups --yes exits ok", backups_cli.returncode == 0, backups_cli.stderr + backups_cli.stdout)
-        check("setup backups --yes reports handoff", "ops backup init" in backups_cli.stdout,
+        check("setup backups --yes reports handoff", "plainkeep backup init" in backups_cli.stdout,
               backups_cli.stderr + backups_cli.stdout)
 
         unknown_cli = run_setup(["bogus"], cli_home)
@@ -718,12 +718,12 @@ def main() -> int:
         check("setup fake search --yes records commands", fake_yes.returncode == 0 and "ollama pull" in fake_yes.stdout,
               fake_yes.stderr + fake_yes.stdout)
 
-        # Deterministic action failure via the OPS_SETUP_FORCE_FAIL seam (host-independent): the layer
+        # Deterministic action failure via the PLAINKEEP_SETUP_FORCE_FAIL seam (host-independent): the layer
         # raises inside advance() and the CLI must emit a clean exit-1 error envelope, no traceback.
         # (Previously this leaned on automation actually failing, which only happened on macOS — off
         # Darwin automation is not_applicable and would skip, so the failure path never ran on CI.)
         fail_json = run_setup(["automation", "--yes", "--json"], cli_home, fake=False,
-                              extra_env={"OPS_SETUP_FORCE_FAIL": "automation"})
+                              extra_env={"PLAINKEEP_SETUP_FORCE_FAIL": "automation"})
         try:
             fail_env = json.loads(fail_json.stdout)
             fail_json_ok = (fail_json.returncode == 1
@@ -740,7 +740,7 @@ def main() -> int:
               fail_json.stderr + fail_json.stdout)
 
         # --- Task 7a: --dry-run previews without --yes and writes/installs NOTHING. (fake=False here:
-        # --dry-run must force the inert path on its own, not lean on OPS_SETUP_FAKE.) ---
+        # --dry-run must force the inert path on its own, not lean on PLAINKEEP_SETUP_FAKE.) ---
         dry_home = make_home(tmp / "dry")
         dry_one = run_setup(["search", "--dry-run", "--json"], dry_home, fake=False)
         try:

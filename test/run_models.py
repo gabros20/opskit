@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""run_models.py — offline suite for `ops models` (search-enrichment proposal §2.1: the download/
+"""run_models.py — offline suite for `plainkeep models` (search-enrichment proposal §2.1: the download/
 offload/on-demand test surface for the model layer). NEVER touches a real ollama daemon or downloads
 anything: PATH is scrubbed so `ollama` resolves to nothing (list/status must still degrade cleanly,
 not crash), and pull/test are only exercised WITHOUT --yes (the confirm gate) — the real --yes paths
 would pull gigabytes and are never run here, mirroring how run_backup_share.py keeps the real transport
-out of the test loop via OPS_SHARE_FAKE (here there's nothing to fake: the gate itself is the seam)."""
+out of the test loop via PLAINKEEP_SHARE_FAKE (here there's nothing to fake: the gate itself is the seam)."""
 from __future__ import annotations
 import json
 import os
@@ -26,7 +26,7 @@ def check(name, cond, detail=""):
 
 
 def run(*args, home):
-    env = {**os.environ, "OPS_HOME": str(home), "PATH": NO_OLLAMA_PATH}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home), "PATH": NO_OLLAMA_PATH}
     return subprocess.run([sys.executable, str(REPO / "bin" / "models" / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 
@@ -107,9 +107,9 @@ def main() -> int:
         check("unknown action -> exit 2 (usage)", r.returncode == 2, r.stdout + r.stderr)
 
         r = run(home=home)
-        check("bare `ops models` (no action) -> exit 2 (usage)", r.returncode == 2, r.stdout + r.stderr)
+        check("bare `plainkeep models` (no action) -> exit 2 (usage)", r.returncode == 2, r.stdout + r.stderr)
 
-    print(f"\n{BOLD}ops models (search-enrichment proposal §2.1) — {len(results)} checks{RESET}\n")
+    print(f"\n{BOLD}plainkeep models (search-enrichment proposal §2.1) — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
     for name, ok, detail in results:
         mark = f"{GREEN}PASS{RESET}" if ok else f"{RED}FAIL{RESET}"

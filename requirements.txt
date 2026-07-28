@@ -1,16 +1,17 @@
-# Personal OS — optional dependencies.
+# plainkeep — optional dependencies.
 #
-# Stage-1 search (ops index/search, keyword + wikilink graph) needs NOTHING beyond Python 3.10+
-# stdlib (sqlite3 with FTS5). The deterministic test suites are stdlib-only too. (3.10 is the true
-# floor: the verbs use PEP 604 `str | None` syntax.)
+# Stage-1 search (plainkeep index/search, keyword + wikilink graph) needs NOTHING beyond Python
+# 3.10+ stdlib (sqlite3 with FTS5). The deterministic test suites are stdlib-only too. (3.10 is the
+# true floor: the verbs use PEP 604 `str | None` syntax.)
 #
-# WHICH interpreter: `ops` dispatches via BARE `python3` on your PATH (see the `ops` script). These
-# packages must be importable by THAT interpreter — not some other venv. If you use a venv, put its
-# bin first on PATH (e.g. `export PATH="$OPS_HOME/.venv/bin:$PATH"`), install there, and confirm with
-# `ops doctor` (it prints "optional: lancedb present"). With OPS_VECTORS=1 but lancedb missing, `ops
-# index` warns and falls back to keyword-only — it never crashes; it just won't build vectors.
+# WHICH interpreter: `plainkeep` dispatches via BARE `python3` on your PATH (see the `plainkeep`
+# script). These packages must be importable by THAT interpreter — not some other venv. If you use a
+# venv, put its bin first on PATH (e.g. `export PATH="$PLAINKEEP_HOME/.venv/bin:$PATH"`), install
+# there, and confirm with `plainkeep doctor` (it prints "optional: lancedb present"). With
+# PLAINKEEP_VECTORS=1 but lancedb missing, `plainkeep index` warns and falls back to keyword-only —
+# it never crashes; it just won't build vectors.
 #
-# Stage-2 vectors (OPS_VECTORS=1) — the scale-grade semantic layer (ADR-006) — needs lancedb
+# Stage-2 vectors (PLAINKEEP_VECTORS=1) — the scale-grade semantic layer (ADR-006) — needs lancedb
 # (embedded, file-based ANN vector store; no server). LanceDB stopped publishing macOS-Intel
 # (x86_64) wheels after 0.25.x, so Intel Macs cap there while Apple Silicon / Linux / Windows take a
 # modern release. These two markers are mutually exclusive, so `pip install -r` resolves cleanly on
@@ -18,19 +19,21 @@
 lancedb>=0.25,<0.26 ; platform_system == "Darwin" and platform_machine == "x86_64"
 lancedb>=0.33 ; platform_system != "Darwin" or platform_machine != "x86_64"
 #
-# Stage-3 rerank (OPS_RERANK=1) — local cross-encoder precision layer (ADR-006):
+# Stage-3 rerank (PLAINKEEP_RERANK=1) — local cross-encoder precision layer (ADR-006):
 fastembed>=0.4         # ONNX runtime, no torch; auto-picks jina-reranker-v2-base-multilingual
 #
 # ...plus a local embedder, NOT a pip dep: a running Ollama with the model pulled —
 #   ollama pull embeddinggemma         # default (ADR-005); or bge-m3 / qwen3-embedding:0.6b
-# Override the model with OPS_EMBED_MODEL. Everything stays local/offline; no cloud, no server.
+# Override the model with PLAINKEEP_EMBED_MODEL. Everything stays local/offline; no cloud, no server.
 #
-# Bookmark extraction (ops bookmark) — optional local upgrade. Without it, `ops bookmark` still
-# works (built-in crude strip); with it you get real main-content article → Markdown, all local:
+# Bookmark extraction (plainkeep bookmark) — optional local upgrade. Without it, `plainkeep
+# bookmark` still works (built-in crude strip); with it you get real main-content article →
+# Markdown, all local:
 trafilatura>=2.0       # best-in-class local extractor (drops nav/ads, native MD). Auto-detected.
 #
-# Image reading (ops files extract on images; see docs/design/proposals/2026-07-06-image-reading.md)
-# — three layers, each an auto-detected optional dep, deterministic fallback throughout:
+# Image reading (plainkeep files extract on images; see
+# docs/design/proposals/2026-07-06-image-reading.md) — three layers, each an auto-detected optional
+# dep, deterministic fallback throughout:
 # Layer 1 (metadata: format/dimensions/EXIF). Without it, extraction falls back to stdlib basics
 # (format + dimensions only, no EXIF) — it never crashes:
 Pillow>=10.0
@@ -41,22 +44,23 @@ mlx-vlm>=0.1 ; platform_system == "Darwin" and platform_machine == "arm64"
 #
 # NOTE: the model weights themselves are NOT pip packages. On Intel (or any host without mlx-vlm),
 # Layer 2/3 run the SAME models through a running Ollama instead:
-#   ollama pull qwen3-vl:4b       # Layer 3 primary (OPS_VLM)
-#   ollama pull moondream         # Layer 3 fallback (OPS_VLM_FALLBACK)
-#   ollama pull glm-ocr           # Layer 2 primary (OPS_OCR) — GGUF, pulled not pip-installed
-#   ollama pull deepseek-ocr      # Layer 2 alternative (OPS_OCR=deepseek-ocr)
+#   ollama pull qwen3-vl:4b       # Layer 3 primary (PLAINKEEP_VLM)
+#   ollama pull moondream         # Layer 3 fallback (PLAINKEEP_VLM_FALLBACK)
+#   ollama pull glm-ocr           # Layer 2 primary (PLAINKEEP_OCR) — GGUF, pulled not pip-installed
+#   ollama pull deepseek-ocr      # Layer 2 alternative (PLAINKEEP_OCR=deepseek-ocr)
 # If neither mlx-vlm nor Ollama is available, Layer 2 degrades to the deterministic OCR fallbacks
-# below (no model download, matches the existing `ops files extract` image tier):
+# below (no model download, matches the existing `plainkeep files extract` image tier):
 #   ocrmac      — Apple Vision framework, Apple Silicon or Intel, install via: pip install ocrmac
 #   tesseract   — system binary, any platform, install via: brew install tesseract
 # Layer 3 (--describe) has no non-model fallback; with neither mlx-vlm nor Ollama, it is skipped.
 #
-# Search enrichment (ops enrich; auto-wired into `ops files extract`/`ops bookmark`; see
-# docs/search-enrichment.md) — NOT a pip dep, a model pulled via Ollama:
-#   ollama pull gemma4:e4b            # default (OPS_ENRICH_MODEL) — EN + Hungarian, ~5 GB
+# Search enrichment (plainkeep enrich; auto-wired into `plainkeep files extract`/`plainkeep
+# bookmark`; see docs/search-enrichment.md) — NOT a pip dep, a model pulled via Ollama:
+#   ollama pull gemma4:e4b            # default (PLAINKEEP_ENRICH_MODEL) — EN + Hungarian, ~5 GB
 #   ollama pull OpenEuroLLM-Hungarian # Hungarian-max override
 #   ollama pull gemma4:e2b            # low-RAM alternative
 # With no model reachable, enrichment falls back to a deterministic stdlib keyword floor (no pip
-# deps) — it never crashes. STT model swapping (OPS_STT_MODEL/OPS_STT_RUNTIME) needs no new package
-# here either — it overrides the model id/backend within whichever ASR pip package (parakeet-mlx,
-# mlx-whisper, faster-whisper) `ops files extract`'s audio tier already auto-detects.
+# deps) — it never crashes. STT model swapping (PLAINKEEP_STT_MODEL/PLAINKEEP_STT_RUNTIME) needs no
+# new package here either — it overrides the model id/backend within whichever ASR pip package
+# (parakeet-mlx, mlx-whisper, faster-whisper) `plainkeep files extract`'s audio tier already
+# auto-detects.

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-ops bookmark <url> [--note "<text>"] [--no-fetch] [--archive] — save a link as a wiki note (issue #1
+plainkeep bookmark <url> [--note "<text>"] [--no-fetch] [--archive] — save a link as a wiki note (issue #1
 gap F). Local-first: the note is created from the URL immediately and always works offline. Title +
 readable text are a BEST-EFFORT external GET (an external *read*, which the §5 wall allows — it never
 transmits); --no-fetch skips the network, degrading to the URL as the title. --archive additionally
-snapshots the fetched HTML into ~/files/bookmarks/ (via the same shadow-asset idea as `ops files`),
+snapshots the fetched HTML into ~/files/bookmarks/ (via the same shadow-asset idea as `plainkeep files`),
 so the bookmark survives link-rot. The note is a data-driven `type: bookmark` (see lib/notetype).
 
-Testability: OPS_BOOKMARK_FIXTURE=<file> feeds local HTML instead of the network, so the fetch/parse/
+Testability: PLAINKEEP_BOOKMARK_FIXTURE=<file> feeds local HTML instead of the network, so the fetch/parse/
 archive paths are exercised offline and deterministically.
 """
 from __future__ import annotations
@@ -38,8 +38,8 @@ def _unescape(s: str) -> str:
 
 
 def _fetch(url: str):
-    """Return the page HTML, or None on any failure/offline. Honors OPS_BOOKMARK_FIXTURE for tests."""
-    fixture = os.environ.get("OPS_BOOKMARK_FIXTURE")
+    """Return the page HTML, or None on any failure/offline. Honors PLAINKEEP_BOOKMARK_FIXTURE for tests."""
+    fixture = os.environ.get("PLAINKEEP_BOOKMARK_FIXTURE")
     if fixture:
         try:
             return Path(fixture).read_text(encoding="utf-8", errors="replace")
@@ -47,7 +47,7 @@ def _fetch(url: str):
             return None
     try:
         import urllib.request
-        req = urllib.request.Request(url, headers={"User-Agent": "ops-bookmark/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "plainkeep-bookmark/1.0"})
         with urllib.request.urlopen(req, timeout=8) as r:  # noqa: S310 (http/https validated below)
             return r.read(600_000).decode("utf-8", "replace")
     except Exception:
@@ -97,7 +97,7 @@ def main(argv: list[str]) -> int:
 
     if not args:
         output.fail(output.EXIT_USAGE,
-                    "usage: ops bookmark <url> [--note \"<text>\"] [--no-fetch] [--archive]", verb="bookmark")
+                    "usage: plainkeep bookmark <url> [--note \"<text>\"] [--no-fetch] [--archive]", verb="bookmark")
     url = args[0]
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
@@ -125,7 +125,7 @@ def main(argv: list[str]) -> int:
         slug, i = f"{base}-{i}", i + 1
 
     f = paths.WIKI / notetype.type_dir("bookmark") / f"{slug}.md"
-    rel = f.relative_to(paths.OPS_HOME)
+    rel = f.relative_to(paths.PLAINKEEP_HOME)
     if dry:
         data = {"dry_run": True, "url": url, "title": title, "slug": slug, "would_write": str(rel)}
         return output.emit(data, "bookmark",
@@ -144,7 +144,7 @@ def main(argv: list[str]) -> int:
     d.mkdir(parents=True, exist_ok=True)
     f.write_text(notetype.render("bookmark", title=title, url=url, body=body, slug=slug), encoding="utf-8")
 
-    if os.environ.get("OPS_ENRICH", "").strip().lower() != "off":
+    if os.environ.get("PLAINKEEP_ENRICH", "").strip().lower() != "off":
         try:
             enrichverb.enrich_note(slug)  # best-effort — an enrich failure must never fail the save
         except Exception:

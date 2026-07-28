@@ -16,9 +16,9 @@ which is what makes automation safe rather than scary.
 |---|---|
 | `read` | pure read — runs freely, even unattended |
 | `safe_write` | writes inside the roots — every change is a revertible git diff |
-| `draft_only` | produces a draft (e.g. `ops invoice`) — a human sends; the system never transmits |
+| `draft_only` | produces a draft (e.g. `plainkeep invoice`) — a human sends; the system never transmits |
 | `confirm` | needs an explicit `--yes`; the default for any new/undeclared verb |
 | `deny` | always refused: force-push, `rm -rf`, reading secrets, writing iCloud/family paths |
 
-Because most of the daily verbs in [[the-ops-loop]] are `read` or `safe_write`, and it's all git
+Because most of the daily verbs in [[the-plainkeep-loop]] are `read` or `safe_write`, and it's all git
 underneath, even a mistake is one `git revert` away. See [[welcome]] to start using it.

@@ -7,7 +7,7 @@ Envelope (ok):     {"ops_json": 1, "ok": true,  "verb": "...", "data": {...}}
 Envelope (error):  {"ops_json": 1, "ok": false, "verb": "...", "error": {"code": N, "message": "...", "hint": "..."}}
 
 Multi-row verbs stream NDJSON under `--json`: ONE header object (ok/verb/count) then one JSON
-object per row. The envelope only ever changes with an explicit `OPS_JSON_VERSION` bump (the `jc`
+object per row. The envelope only ever changes with an explicit `PLAINKEEP_JSON_VERSION` bump (the `jc`
 lesson: an unstable machine schema is worse than none).
 
 Exit-code protocol (proposal Part 0.3), shared with the guardrail/dispatcher:
@@ -21,14 +21,14 @@ Verbs adopt this mechanically:
     return output.emit(data, "status", human=render)   # render(data) prints exactly as before
 
 `emit`/`emit_rows`/`fail` decide mode themselves via `json_mode()` (which reads the real argv +
-`OPS_JSON`), so `--json` need only be stripped from the verb's own parsing, not from the process.
+`PLAINKEEP_JSON`), so `--json` need only be stripped from the verb's own parsing, not from the process.
 """
 from __future__ import annotations
 import json
 import os
 import sys
 
-OPS_JSON_VERSION = 1
+PLAINKEEP_JSON_VERSION = 1
 
 # Exit-code protocol (single source of truth for the whole surface).
 EXIT_OK = 0
@@ -42,11 +42,11 @@ _TRUTHY = ("1", "true", "yes", "on")
 
 
 def _env_json() -> bool:
-    return os.environ.get("OPS_JSON", "").lower() in _TRUTHY
+    return os.environ.get("PLAINKEEP_JSON", "").lower() in _TRUTHY
 
 
 def json_mode(argv=None) -> bool:
-    """True when JSON output is requested: `--json` anywhere in argv, or OPS_JSON=1 in the env.
+    """True when JSON output is requested: `--json` anywhere in argv, or PLAINKEEP_JSON=1 in the env.
     Defaults to the real process argv so a verb that already stripped `--json` locally still emits
     JSON."""
     args = sys.argv[1:] if argv is None else argv
@@ -54,7 +54,7 @@ def json_mode(argv=None) -> bool:
 
 
 def parse_argv(argv=None):
-    """Return (json_on, argv_without_json). Detects and strips every `--json`, and honours OPS_JSON=1
+    """Return (json_on, argv_without_json). Detects and strips every `--json`, and honours PLAINKEEP_JSON=1
     so a verb can parse its own flags without tripping over the global one."""
     args = list(sys.argv[1:] if argv is None else argv)
     stripped = [a for a in args if a != "--json"]
@@ -81,7 +81,7 @@ def emit(data: dict, verb: str, human=None) -> int:
     """Scalar verb: print the JSON envelope under `--json`, else the human rendering. Returns EXIT_OK
     so a verb can `return output.emit(...)`."""
     if json_mode():
-        env = {"ops_json": OPS_JSON_VERSION, "ok": True, "verb": verb, "data": data}
+        env = {"ops_json": PLAINKEEP_JSON_VERSION, "ok": True, "verb": verb, "data": data}
         sys.stdout.write(json.dumps(env, ensure_ascii=False) + "\n")
     else:
         _render_human(human, data, sys.stdout)
@@ -93,7 +93,7 @@ def emit_rows(rows, verb: str, human=None, header: dict | None = None) -> int:
     human rendering. `rows` is an iterable of dicts; `header` merges extra fields into the header."""
     rows = list(rows)
     if json_mode():
-        head = {"ops_json": OPS_JSON_VERSION, "ok": True, "verb": verb, "count": len(rows)}
+        head = {"ops_json": PLAINKEEP_JSON_VERSION, "ok": True, "verb": verb, "count": len(rows)}
         if header:
             head.update(header)
         lines = [json.dumps(head, ensure_ascii=False)]
@@ -111,7 +111,7 @@ def fail(code: int, message: str, hint: str | None = None, verb: str | None = No
         err = {"code": code, "message": message}
         if hint:
             err["hint"] = hint
-        env = {"ops_json": OPS_JSON_VERSION, "ok": False, "verb": verb, "error": err}
+        env = {"ops_json": PLAINKEEP_JSON_VERSION, "ok": False, "verb": verb, "error": err}
         sys.stdout.write(json.dumps(env, ensure_ascii=False) + "\n")
     else:
         sys.stderr.write(message + (f" ({hint})" if hint else "") + "\n")

@@ -1,5 +1,5 @@
 """
-sharelib.py — pure, dependency-light helpers for `ops share` (proposal Part 5.2). Kept free of any
+sharelib.py — pure, dependency-light helpers for `plainkeep share` (proposal Part 5.2). Kept free of any
 `from lib import …` so a test can load it by file path (the bin/lib-namespace-vs-test/lib gotcha),
 and network-free except for the one lazily-imported fetch helper, so bundling / HTML rendering are
 unit-testable offline.
@@ -94,7 +94,7 @@ _CSS = (
     "th,td{border:1px solid var(--line);padding:.45rem .65rem;text-align:left;vertical-align:top}"
     "th{font-weight:650;background:var(--code);white-space:nowrap}"
     "td code{white-space:nowrap}"
-    ".ops-note{margin-bottom:2rem}"
+    ".plainkeep-note{margin-bottom:2rem}"
 )
 
 
@@ -269,7 +269,7 @@ def render_bundle(notes: list[dict], image_resolver=None) -> str:
     for i, n in enumerate(notes):
         if i:
             parts.append("<hr>")
-        parts.append(f'<section class="ops-note" id="note-{html.escape(n["slug"])}">')
+        parts.append(f'<section class="plainkeep-note" id="note-{html.escape(n["slug"])}">')
         parts.append(render_note_html(n["md"], resolvable, image_resolver))
         parts.append("</section>")
     parts.append("</body></html>")
@@ -352,7 +352,7 @@ def markdown_from_blob(blob: bytes) -> str:
     unpacked = unpack_bundle(blob)
     if unpacked is not None:
         return unpacked[0].decode("utf-8")
-    raise ValueError("legacy encrypted share — re-publish with current ops share")
+    raise ValueError("legacy encrypted share — re-publish with current plainkeep share")
 
 
 class SharePullError(Exception):
@@ -368,7 +368,7 @@ def fetch_share_blob(origin: str, share_id: str, *, timeout: int = 30) -> bytes:
     url = urljoin(origin.rstrip("/") + "/", f"{share_id}?raw=1")
     req = urllib.request.Request(
         url,
-        headers={"Accept": "application/octet-stream", "User-Agent": "ops-share-pull/1"},
+        headers={"Accept": "application/octet-stream", "User-Agent": "plainkeep-share-pull/1"},
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -377,14 +377,14 @@ def fetch_share_blob(origin: str, share_id: str, *, timeout: int = 30) -> bytes:
         if e.code == 404:
             raise SharePullError("share expired or revoked") from e
         if e.code == 410:
-            raise SharePullError("legacy encrypted share — re-publish with current ops share") from e
+            raise SharePullError("legacy encrypted share — re-publish with current plainkeep share") from e
         raise SharePullError(f"fetch failed: HTTP {e.code}") from e
     except Exception as e:
         raise SharePullError(f"fetch failed: {e}") from e
 
 
 def pull_markdown_from_url(url: str) -> str:
-    """Capability share URL → wiki markdown. No ops ledger, no dispatcher — for any Python caller."""
+    """Capability share URL → wiki markdown. No plainkeep ledger, no dispatcher — for any Python caller."""
     origin, sid = parse_share_link(url)
     blob = fetch_share_blob(origin, sid)
     return markdown_from_blob(blob)

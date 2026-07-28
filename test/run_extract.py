@@ -7,8 +7,8 @@ No optional dep is installed (they are genuinely absent here) so this asserts th
   - same-bytes + same-tool re-run is an idempotent no-op; --reextract forces a rewrite,
   - a media tier whose dep is absent (PDF) degrades with an install hint and writes nothing,
   - `ingest --extract` chains extraction onto a freshly-filed source,
-  - `ops doctor` flags the three provenance-plane violations (Part 4.3),
-  - `ops search --author human|agent` filters the provenance planes.
+  - `plainkeep doctor` flags the three provenance-plane violations (Part 4.3),
+  - `plainkeep search --author human|agent` filters the provenance planes.
 """
 from __future__ import annotations
 import hashlib
@@ -29,9 +29,9 @@ def check(name, cond, detail=""):
 
 
 def _run(script, ops, *args, roots=None, extra=None):
-    env = {**os.environ, "OPS_HOME": str(ops), **(extra or {})}
+    env = {**os.environ, "PLAINKEEP_HOME": str(ops), **(extra or {})}
     if roots is not None:
-        env["OPS_ROOTS_HOME"] = str(roots)
+        env["PLAINKEEP_ROOTS_HOME"] = str(roots)
     return subprocess.run([sys.executable, str(REPO / "bin" / script / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 

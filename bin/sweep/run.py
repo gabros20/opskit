@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-ops sweep [--dry-run] — the §9.4 macOS-inbox decay machine. Desktop/Downloads files untouched for
+plainkeep sweep [--dry-run] — the §9.4 macOS-inbox decay machine. Desktop/Downloads files untouched for
 7 days MOVE (never delete) into <zone>/_swept/YYYY-MM/; items that have sat in _swept for 60 days go
-to the Trash. So you get a week to `ops files ingest` what matters, then a 60-day net. Idempotent —
+to the Trash. So you get a week to `plainkeep files ingest` what matters, then a 60-day net. Idempotent —
 safe to run repeatedly and as the nightly job. Rescue is by ingest, not by reopening (§9.4).
 """
 import os
@@ -15,9 +15,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import output, paths  # noqa: E402
 
-HOME = Path(os.environ.get("OPS_SWEEP_HOME", os.environ.get("HOME", "")))
-SWEEP_DAYS = int(os.environ.get("OPS_SWEEP_DAYS", "7"))
-TRASH_DAYS = int(os.environ.get("OPS_TRASH_DAYS", "60"))
+HOME = Path(os.environ.get("PLAINKEEP_SWEEP_HOME", os.environ.get("HOME", "")))
+SWEEP_DAYS = int(os.environ.get("PLAINKEEP_SWEEP_DAYS", "7"))
+TRASH_DAYS = int(os.environ.get("PLAINKEEP_TRASH_DAYS", "60"))
 ZONES = ["Desktop", "Downloads"]
 DAY = 86400
 
@@ -105,10 +105,10 @@ def main(argv):
 
 
 def _share_warnings():
-    """Read ~/ops/.share/ledger.json (Part 5.2): flag active shares past their TTL, and active shares
+    """Read ~/plainkeep/.share/ledger.json (Part 5.2): flag active shares past their TTL, and active shares
     whose source note was edited AFTER it was shared (the published blob is now stale)."""
     import json
-    led_path = paths.OPS_HOME / ".share" / "ledger.json"
+    led_path = paths.PLAINKEEP_HOME / ".share" / "ledger.json"
     try:
         shares = json.loads(led_path.read_text(encoding="utf-8")).get("shares", [])
     except Exception:
@@ -125,7 +125,7 @@ def _share_warnings():
             continue
         created = s.get("created_ts", 0)
         for rel in s.get("note_paths", []):
-            p = paths.OPS_HOME / rel
+            p = paths.PLAINKEEP_HOME / rel
             try:
                 if created and p.stat().st_mtime > created + 1:
                     warnings.append({"kind": "edited", "id": s.get("id", "?"),

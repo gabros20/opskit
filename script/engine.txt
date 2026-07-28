@@ -9,7 +9,7 @@
 # One path per line; blank lines and #comments ignored.
 # Note: bin/share/worker/wrangler.toml is NOT in upstream (per-vault); see wrangler.toml.example.
 
-ops
+plainkeep
 VERSION
 bin
 frontends

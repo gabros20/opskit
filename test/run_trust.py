@@ -4,7 +4,7 @@ run_trust.py — the "trust" wave (proposal Parts 0.1/0.3/0.4), offline + stdlib
   1. exit-code protocol + self-teaching errors — guardrail CLI maps confirm→3, deny→5, unknown→4
      (with a did-you-mean), allow→0, and the dispatcher PROPAGATES those instead of flattening to 1.
   2. script/update 3-way merge — a scripted two-repo fixture (upstream + clone) proves fast-path,
-     clean merge, and conflict-marker behavior against a tracked .ops-engine-ref.
+     clean merge, and conflict-marker behavior against a tracked .plainkeep-engine-ref.
   3. doctor additions — sync-wall (no .git under iCloud/Dropbox/Syncthing), <2 push-remote warning,
      and the frontmatter Properties round-trip check.
 """
@@ -60,7 +60,7 @@ def test_exit_codes():
 
     # remediation is the exact re-run line, not a class name
     check("confirm remediation prints the exact re-run",
-          bg._remediation("archive", ["foo"]) == "re-run: ops archive foo --yes")
+          bg._remediation("archive", ["foo"]) == "re-run: plainkeep archive foo --yes")
 
     # the guardrail CLI end-to-end against an isolated bin/ (no confirm/deny verb ships today)
     with tempfile.TemporaryDirectory() as td:
@@ -88,7 +88,7 @@ def test_exit_codes():
 
         r = cli("confirmy")
         check("CLI confirm-class → exit 3 + remediation",
-              r.returncode == 3 and "re-run: ops confirmy --yes" in r.stderr, r.stderr)
+              r.returncode == 3 and "re-run: plainkeep confirmy --yes" in r.stderr, r.stderr)
         r = cli("confirmy", "--yes")
         check("CLI confirm-class with --yes → exit 0", r.returncode == 0, r.stderr)
         r = cli("denyy")
@@ -100,10 +100,10 @@ def test_exit_codes():
               r.returncode == 4 and "confirmy" in r.stderr and "did you mean" in r.stderr, r.stderr)
 
     # the real dispatcher must PROPAGATE the code (not `|| exit 1`) for an unknown verb
-    d = subprocess.run([str(REPO / "ops"), "serch"], capture_output=True, text=True)
+    d = subprocess.run([str(REPO / "plainkeep"), "serch"], capture_output=True, text=True)
     check("dispatcher unknown verb → exit 4 (did-you-mean: search)",
           d.returncode == 4 and "search" in d.stderr, d.stderr)
-    d = subprocess.run([str(REPO / "ops"), "help"], capture_output=True, text=True)
+    d = subprocess.run([str(REPO / "plainkeep"), "help"], capture_output=True, text=True)
     check("dispatcher allow verb → exit 0", d.returncode == 0, d.stderr)
 
 
@@ -137,9 +137,9 @@ def test_update_merge():
 
         # --- first run: no ref → fast-path + loud warning, ref written ---
         r = update()
-        ref = vault / ".ops-engine-ref"
-        check("first update warns about the missing ref", "no .ops-engine-ref" in r.stderr, r.stderr)
-        check("first update writes .ops-engine-ref = upstream HEAD",
+        ref = vault / ".plainkeep-engine-ref"
+        check("first update warns about the missing ref", "no .plainkeep-engine-ref" in r.stderr, r.stderr)
+        check("first update writes .plainkeep-engine-ref = upstream HEAD",
               ref.exists() and ref.read_text().strip() == v1, r.stdout + r.stderr)
         git(vault, "add", "-A"); git(vault, "commit", "-q", "-m", "sync v1")
 
@@ -177,17 +177,17 @@ def test_update_merge():
 def _well_formed(home: Path):
     shutil.copy(REPO / "AGENTS.md", home / "AGENTS.md")
     shutil.copy(REPO / "CLAUDE.md", home / "CLAUDE.md")
-    (home / "skills" / "operate-ops").mkdir(parents=True)
-    shutil.copy(REPO / "skills" / "operate-ops" / "SKILL.md", home / "skills" / "operate-ops" / "SKILL.md")
+    (home / "skills" / "operate-plainkeep").mkdir(parents=True)
+    shutil.copy(REPO / "skills" / "operate-plainkeep" / "SKILL.md", home / "skills" / "operate-plainkeep" / "SKILL.md")
     (home / ".codex").mkdir(); (home / ".claude").mkdir()
     (home / ".codex" / "config.toml").write_text('sandbox_mode="workspace-write"\n')
-    (home / ".claude" / "settings.json").write_text('{"permissions":{"allow":["Bash(ops:*)"]}}')
+    (home / ".claude" / "settings.json").write_text('{"permissions":{"allow":["Bash(plainkeep:*)"]}}')
     os.symlink("../skills", home / ".codex" / "skills")
     os.symlink("../skills", home / ".claude" / "skills")
 
 
 def _doctor(home, roots):
-    env = {**os.environ, "OPS_HOME": str(home), "OPS_ROOTS_HOME": str(roots)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home), "PLAINKEEP_ROOTS_HOME": str(roots)}
     subprocess.run([sys.executable, str(REPO / "bin" / "doctor" / "run.py"), "--init"],
                    capture_output=True, text=True, env=env)
     subprocess.run([sys.executable, str(REPO / "bin" / "help" / "run.py")],
@@ -203,7 +203,7 @@ def test_doctor():
         home.mkdir(); roots.mkdir()
         _well_formed(home)
         _git_init(home)
-        git(home, "remote", "add", "origin", "https://example.com/ops.git")
+        git(home, "remote", "add", "origin", "https://example.com/plainkeep.git")
         nd = home / "wiki" / "notes"
         nd.mkdir(parents=True)
         (nd / "churn.md").write_text("---\ntype: note\ntitle: Churn\ntags: [a, b]\n---\n# Churn\n")
@@ -212,7 +212,7 @@ def test_doctor():
         check("doctor: warns on a single push remote", "push remote" in r.stdout, r.stdout)
         check("doctor: flags frontmatter Properties would churn",
               "churn" in r.stdout and "churn.md" in r.stdout, r.stdout)
-        check("doctor: ~/ops not under a cloud-sync tree", "not under a cloud-sync tree" in r.stdout, r.stdout)
+        check("doctor: ~/plainkeep not under a cloud-sync tree", "not under a cloud-sync tree" in r.stdout, r.stdout)
 
     # a clean-frontmatter vault is reported stable
     with tempfile.TemporaryDirectory() as td:
@@ -231,7 +231,7 @@ def test_doctor():
         home.mkdir(parents=True); roots.mkdir()
         _well_formed(home)
         r = _doctor(home, roots)
-        check("doctor: FAILs when ~/ops is under Dropbox",
+        check("doctor: FAILs when ~/plainkeep is under Dropbox",
               r.returncode == 1 and "cloud-sync" in r.stdout, r.stdout)
 
     # a work repo whose .git is under a cloud-sync tree → FAIL

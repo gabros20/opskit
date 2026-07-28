@@ -1,19 +1,19 @@
 # Agent access — read shared wiki notes
 
 How a shared link serves raw wiki markdown to any agent with a fetch tool. For anyone pointing an
-agent (or a plain `curl`) at an `ops share` link.
+agent (or a plain `curl`) at a `plainkeep share` link.
 
 There is one link. Append `.md` and the agent reads the exact wiki source.
 
 ## The link
 
-`ops share <slug> --yes` prints:
+`plainkeep share <slug> --yes` prints:
 
 ```text
 shared note <slug>
   https://ops-share.example.workers.dev/abc123def456ghi789jkl012
   agents / LLMs: https://ops-share.example.workers.dev/abc123def456ghi789jkl012.md   (raw markdown — paste into any chat/coding agent)
-  revoke: ops share revoke abc123def456ghi789jkl012 --yes
+  revoke: plainkeep share revoke abc123def456ghi789jkl012 --yes
 ```
 
 - **A browser** opening the bare URL gets the rendered HTML page.
@@ -25,7 +25,7 @@ byte-identical to what was published.
 
 No headers. No keys. No query strings. No URL math beyond "add `.md`".
 
-`agent_url` in `--json` output and `ops share list --json` is always `url + ".md"`.
+`agent_url` in `--json` output and `plainkeep share list --json` is always `url + ".md"`.
 
 ## Content negotiation (the lazy-paste bonus)
 
@@ -42,13 +42,13 @@ curl https://<worker>/<token>.md      # markdown, guaranteed
 curl https://<worker>/<token>         # markdown too, via negotiation (non-browser Accept)
 ```
 
-## With `ops` on the machine
+## With `plainkeep` on the machine
 
 ```bash
-ops share pull 'https://<worker>/<token>'   # fetch + unpack locally, same markdown, no browser
+plainkeep share pull 'https://<worker>/<token>'   # fetch + unpack locally, same markdown, no browser
 ```
 
-`ops share pull <url> [--out file.md]` works on the bare link or the `.md` link interchangeably. It
+`plainkeep share pull <url> [--out file.md]` works on the bare link or the `.md` link interchangeably. It
 normalizes either into the same fetch.
 
 ## Legacy links
@@ -56,8 +56,8 @@ normalizes either into the same fetch.
 Anything published under the previous encrypted model (`#fragment`, `?k=`, `X-Ops-Share-Key`) is
 dead.
 
-Every route for a legacy blob returns **HTTP 410** with a `re-publish with current ops share` hint.
-There is no key to recover it with. Re-run `ops share <slug> --yes` to get a current link.
+Every route for a legacy blob returns **HTTP 410** with a `re-publish with current plainkeep share` hint.
+There is no key to recover it with. Re-run `plainkeep share <slug> --yes` to get a current link.
 
 ## Tests
 

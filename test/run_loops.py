@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""run_loops.py — exercises the daily/weekly rhythm verbs (start, close, week) in a temp OPS_HOME."""
+"""run_loops.py — exercises the daily/weekly rhythm verbs (start, close, week) in a temp PLAINKEEP_HOME."""
 from __future__ import annotations
 import os
 import subprocess
@@ -27,7 +27,7 @@ def task(home, status, tid, title, created, updated):
 
 
 def run(home, verb, *args):
-    env = {**os.environ, "OPS_HOME": str(home)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home)}
     return subprocess.run([sys.executable, str(REPO / "bin" / verb / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 

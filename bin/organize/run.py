@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-ops organize scan | review | apply — the self-organization loop (proposal Part 4.4). The safety
+plainkeep organize scan | review | apply — the self-organization loop (proposal Part 4.4). The safety
 architecture every future autonomous capability reuses: propose-then-approve, never direct edits.
 
   scan    ZERO-LLM candidate generation (orphan/near-duplicate/link/tag-case/frontmatter heuristics)
           -> a typed proposal queue inbox/organize/<date>.jsonl, one op per line. A model (agent.py,
-          scope=read) only RANKS/LABELS when OPS_AGENT is set; with none, heuristic confidences. A
+          scope=read) only RANKS/LABELS when PLAINKEEP_AGENT is set; with none, heuristic confidences. A
           hallucinating model can only mis-rank, never mutate.
   review  triage-style paging showing the EXACT diff each op would produce; accept/reject/defer are
           APPENDED to the queue as new status lines (audit ledger — latest status wins on replay,
@@ -41,7 +41,7 @@ SAFE = {"add_link", "refresh_hub", "normalize_tag", "fix_frontmatter"}  # --safe
 DEFAULT_MAX_OPS = 20
 DEFAULT_MAX_LINES = 300
 
-QUEUE_DIR = paths.OPS_HOME / "inbox" / "organize"
+QUEUE_DIR = paths.PLAINKEEP_HOME / "inbox" / "organize"
 
 
 # --------------------------------------------------------------------------- queue I/O (the ledger)
@@ -123,7 +123,7 @@ def _jaccard(a: set, b: set) -> float:
 def _protected(path: Path):
     """(is_protected, why) — conventions, index files, entity hubs, and pinned notes are review-only
     regardless of confidence (Part 4.4)."""
-    rel = path.relative_to(paths.OPS_HOME).as_posix()
+    rel = path.relative_to(paths.PLAINKEEP_HOME).as_posix()
     if rel == "wiki/conventions.md":
         return True, "wiki/conventions.md"
     if path.name == "index.md":
@@ -214,7 +214,7 @@ def _difflines(old: str, new: str) -> int:
 
 def _diff_str(path: Path, new: str) -> str:
     old = path.read_text(encoding="utf-8")
-    rel = path.relative_to(paths.OPS_HOME).as_posix()
+    rel = path.relative_to(paths.PLAINKEEP_HOME).as_posix()
     d = list(difflib.unified_diff(old.splitlines(), new.splitlines(),
                                   fromfile=rel, tofile=rel, lineterm="", n=1))
     return "\n".join(d[:20])
@@ -302,7 +302,7 @@ def _candidates() -> list:
     # hub back-references -> refresh_hub (protected -> review-only, but still proposed)
     for h in notes:
         if not (typ[h] in ("client", "project", "area")
-                or notes[h].relative_to(paths.OPS_HOME).as_posix().startswith(("wiki/clients/", "wiki/projects/"))):
+                or notes[h].relative_to(paths.PLAINKEEP_HOME).as_posix().startswith(("wiki/clients/", "wiki/projects/"))):
             continue
         missing = [s for s in notes if h in outn[s] and s not in outn[h] and s != h]
         if missing:
@@ -314,7 +314,7 @@ def _candidates() -> list:
 
 def _rank(ops: list) -> bool:
     """Optional LLM RANK/LABEL pass (scope=read): adjust confidences only, never mutate. Best-effort;
-    returns True if a model was consulted. With OPS_AGENT=none this is skipped entirely."""
+    returns True if a model was consulted. With PLAINKEEP_AGENT=none this is skipped entirely."""
     if not ops or not agent.available():
         return False
     listing = "\n".join(f"{o['id']}\t{o['op']}\t{o['target']}\t{o['rationale']}" for o in ops[:60])
@@ -341,7 +341,7 @@ def cmd_scan(argv, dry):
     ranked = _rank(ops)
     ops.sort(key=lambda o: -o["confidence"])
     qpath = QUEUE_DIR / f"{date.today().isoformat()}.jsonl"
-    rel = qpath.relative_to(paths.OPS_HOME).as_posix()
+    rel = qpath.relative_to(paths.PLAINKEEP_HOME).as_posix()
     rows = [{"id": o["id"], "op": o["op"], "target": o["target"], "confidence": o["confidence"],
              "rationale": o["rationale"], "status": "proposed"} for o in ops]
     if not dry:
@@ -355,7 +355,7 @@ def cmd_scan(argv, dry):
         for r in rs:
             out.append(f"  {DIM}{r['confidence']:.2f}{RESET} {r['op']:<15} {CYAN}{r['target']:<24}{RESET} "
                        f"{DIM}{r['rationale'][:50]}{RESET}")
-        out.append(f"\n  review:  ops organize review        apply:  ops organize apply --yes"
+        out.append(f"\n  review:  plainkeep organize review        apply:  plainkeep organize apply --yes"
                    + ("  (dry run — nothing written)" if dry else ""))
         return "\n".join(out)
 
@@ -368,7 +368,7 @@ def cmd_scan(argv, dry):
 def cmd_review(argv, dry, yes, js):
     qpath = _queue_path(argv)
     ops, status, order = _read_queue(qpath)
-    rel = qpath.relative_to(paths.OPS_HOME).as_posix() if _under_ops(qpath) else str(qpath)
+    rel = qpath.relative_to(paths.PLAINKEEP_HOME).as_posix() if _under_home(qpath) else str(qpath)
     pending = [oid for oid in order if status.get(oid) == "proposed"]
 
     def _ids(flag):
@@ -397,7 +397,7 @@ def cmd_review(argv, dry, yes, js):
         return output.emit_rows(rows, "organize", header={"queue": rel, "pending": len(pending)})
 
     if not order:
-        print(f"no proposal queue (run `ops organize scan`).")
+        print(f"no proposal queue (run `plainkeep organize scan`).")
         return 0
     print(f"organize review: {len(pending)} pending / {len(order)} op(s) in {rel}\n")
     for oid in pending:
@@ -420,9 +420,9 @@ def cmd_review(argv, dry, yes, js):
     return 0
 
 
-def _under_ops(p: Path) -> bool:
+def _under_home(p: Path) -> bool:
     try:
-        p.relative_to(paths.OPS_HOME)
+        p.relative_to(paths.PLAINKEEP_HOME)
         return True
     except ValueError:
         return False
@@ -464,15 +464,15 @@ def cmd_apply(argv, dry: bool = False):
     yes = "--yes" in argv or "-y" in argv
     if not yes and not dry:                             # confirm-class: self-gate for direct calls too
         output.fail(output.EXIT_CONFIRM,
-                    "ops organize apply is confirm-class — re-run with --yes to replay approved ops"
+                    "plainkeep organize apply is confirm-class — re-run with --yes to replay approved ops"
                     " (or preview with --dry-run)",
-                    hint="re-run: ops organize apply --yes", verb="organize")
+                    hint="re-run: plainkeep organize apply --yes", verb="organize")
     safe_only = "--safe-only" in argv
     max_ops = _int_flag(argv, "--max-ops", DEFAULT_MAX_OPS)
     max_lines = _int_flag(argv, "--max-lines", DEFAULT_MAX_LINES)
     qpath = _queue_path(argv)
     ops, status, order = _read_queue(qpath)
-    rel_q = qpath.relative_to(paths.OPS_HOME).as_posix() if _under_ops(qpath) else str(qpath)
+    rel_q = qpath.relative_to(paths.PLAINKEEP_HOME).as_posix() if _under_home(qpath) else str(qpath)
 
     applied = skipped = rejected = 0
     changed_lines = 0
@@ -505,7 +505,7 @@ def cmd_apply(argv, dry: bool = False):
             note("deferred", f"edit budget reached ({applied}/{max_ops} ops, {changed_lines}/{max_lines} lines)")
             break
         if not dry:                                     # a true dry-run IS a read: no write/commit/ledger
-            rel = path.relative_to(paths.OPS_HOME).as_posix()
+            rel = path.relative_to(paths.PLAINKEEP_HOME).as_posix()
             path.write_text(new, encoding="utf-8")
             _commit(rel, f"organize: {o['op']} {o['target']} — {o['rationale']}")
             _append_status(qpath, oid, "applied")
@@ -525,7 +525,7 @@ def cmd_apply(argv, dry: bool = False):
         if budget_hit:
             out.append(f"  {YEL}stopped at the edit budget — re-run to continue{RESET}")
         if dry:
-            out.append(f"  {DIM}(dry run — nothing written; apply for real: ops organize apply --yes){RESET}")
+            out.append(f"  {DIM}(dry run — nothing written; apply for real: plainkeep organize apply --yes){RESET}")
         return "\n".join(out)
 
     return output.emit_rows(results, "organize", human=render,
@@ -547,7 +547,7 @@ def main(argv):
     if action == "apply":
         return cmd_apply(rest, dry)
     output.fail(output.EXIT_USAGE,
-                "usage: ops organize scan [--dry-run] | review [--accept|--reject|--defer <ids|all>] "
+                "usage: plainkeep organize scan [--dry-run] | review [--accept|--reject|--defer <ids|all>] "
                 "[--dry-run|--yes] | apply [--yes|--dry-run] [--safe-only] [--max-ops N] [--max-lines N]",
                 verb="organize")
 

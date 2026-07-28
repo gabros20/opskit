@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops invoice <client> --amount <net> [--desc "<line item>"] — DRAFT an invoice (§4.1). Reads the
+plainkeep invoice <client> --amount <net> [--desc "<line item>"] — DRAFT an invoice (§4.1). Reads the
 tax rule from templates/tax-formula.md, computes net/VAT/gross, and writes a draft into the client's
 ~/files/clients/<slug>/out/. It NEVER sends — you review and send by hand (§3). draft_only.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import output, paths  # noqa: E402
 
-FORMULA = paths.OPS_HOME / "templates" / "tax-formula.md"
+FORMULA = paths.PLAINKEEP_HOME / "templates" / "tax-formula.md"
 
 
 def _next_inv_no(out: Path, day: str) -> str:
@@ -31,7 +31,7 @@ def main(argv):
     argv = [a for a in argv if a != "--dry-run"]
     if not argv:
         output.fail(output.EXIT_USAGE,
-                    'usage: ops invoice <client> --amount <net> [--desc "<text>"]', verb="invoice")
+                    'usage: plainkeep invoice <client> --amount <net> [--desc "<text>"]', verb="invoice")
     slug = paths.slugify(argv[0])
     amount = desc = None
     i = 1
@@ -44,7 +44,7 @@ def main(argv):
     hub = paths.WIKI / "clients" / f"{slug}.md"
     if not hub.exists():
         output.fail(output.EXIT_UNEXPECTED,
-                    f"no client '{slug}' (wiki/clients/{slug}.md). Create it: ops new client \"{argv[0]}\"",
+                    f"no client '{slug}' (wiki/clients/{slug}.md). Create it: plainkeep new client \"{argv[0]}\"",
                     verb="invoice")
     if amount is None:
         output.fail(output.EXIT_USAGE, "an --amount (net) is required", verb="invoice")
@@ -83,7 +83,7 @@ def main(argv):
     draft = out / f"invoice-{day}-{inv.rsplit('-', 1)[1]}.md"
     draft.write_text(
         f"# DRAFT invoice {inv}\n\n"
-        f"> **DRAFT — not sent.** Review, export, and send by hand. `ops` never transmits (§3).\n\n"
+        f"> **DRAFT — not sent.** Review, export, and send by hand. `plainkeep` never transmits (§3).\n\n"
         f"- From: {seller}\n- To: {client_name}\n- Date: {paths.today()}   Due: {due} ({terms} days)\n\n"
         f"| Item | Net |\n|---|---|\n| {desc or 'Services rendered'} | {net:.2f} {cur} |\n\n"
         f"- Net:   {net:.2f} {cur}\n- VAT ({rate*100:.0f}%): {vat:.2f} {cur}\n- **Gross: {gross:.2f} {cur}**\n",

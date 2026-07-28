@@ -318,3 +318,28 @@ Binary distribution resolves the only real objection to co-location — a Node p
 every derived vault via `script/update`. **Status.** Done. Layer + probes + seams
 (`_gh_present`/`_ui_*`) in `setuplib`, tests in `run_setup_layers` (host-independent), CI `ui` job
 (typecheck + compile smoke + non-TTY exit-2 contract), release workflow, docs updated.
+
+## ADR-012 — rename opskit -> plainkeep with full-consistency naming (2026-07-28)
+**Status.** Accepted.
+**Context.** `opskit` collided with 40+ same-named GitHub repos, the `opskit` name was already
+squatted on both npm and PyPI, and "ops" reads as DevOps tooling to anyone skimming a repo list —
+a semantic miscategorization for a personal knowledge/task system that has nothing to do with
+infrastructure operations. A name that cannot be searched for and is misread on sight was judged
+not to be a cosmetic problem but a load-bearing one, worth a full-consistency rename rather than a
+patch.
+**Decision.** Rename the brand, the CLI, and every internal name for one-name consistency rather
+than layering a new label over the old internals: brand `opskit` → `plainkeep`; CLI dispatcher
+`ops` → `plainkeep`; vault folder `~/ops` → `~/plainkeep`; every `OPS_*` environment variable and
+same-named Python constant → `PLAINKEEP_*`; the machine contract file `ops.json` → `plainkeep.json`
+(contract phrase `ops.json/3` → `plainkeep.json/3`); the terminal UI binary `ops-ui` →
+`plainkeep-ui`. One name, everywhere, rather than a marketing rename over unchanged internals.
+**Alternatives.** (a) Keep the `opskit` name and rely on GitHub topics/description for
+discoverability — rejected: the name collision with 40+ repos is permanent and topics don't fix
+what a human reads first. (b) Rename the CLI to the shorter `keep` — rejected: standing alone,
+"keep" is an ambiguous brand fragment (a note-taking app, a password vault, a to-do list all fit
+that word equally), where `plainkeep` reads unambiguously as this system's own name.
+**Consequences.** Existing vaults migrate manually: `mv ~/ops ~/plainkeep`, re-symlink the
+dispatcher onto PATH, rename `.ops-engine-ref` → `.plainkeep-engine-ref`, and export the renamed
+`PLAINKEEP_*` environment variables in place of the old `OPS_*` ones. The terminal UI is released
+as `ui-v0.2.0` with `plainkeep-ui` release assets (`plainkeep-ui-darwin-arm64`, etc.), superseding
+the `ops-ui`-named assets from ADR-011's release workflow.

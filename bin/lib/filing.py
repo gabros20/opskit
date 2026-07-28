@@ -1,7 +1,7 @@
 """
 filing.py — the single factory for tasks and captured notes. The SHAPE of a task/note is guaranteed
 here, in one place (Iron Law: the system owns WHERE/HOW); verbs decide only WHAT goes in it. Both
-`ops task add` and `ops triage` create tasks through create_task(), so the frontmatter can never drift.
+`plainkeep task add` and `plainkeep triage` create tasks through create_task(), so the frontmatter can never drift.
 """
 from __future__ import annotations
 import re

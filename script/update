@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # script/update — pull engine improvements from the template without touching your content.
 #
-#   ~/ops/script/update [--remote upstream] [--branch main]
+#   ~/plainkeep/script/update [--remote upstream] [--branch main]
 #
 # It fetches the template and checks out ONLY the engine paths listed in script/engine.txt — so
 # bin/, skills/, the dispatcher, the contract files, and the design docs are refreshed, while your
@@ -26,11 +26,11 @@ printf '\033[1mfetching %s\033[0m\n' "$REMOTE"
 git -C "$ROOT" fetch -q "$REMOTE"
 
 # 3-way merge (Part 0.1): plain `git checkout upstream -- path` silently DISCARDS local engine edits.
-# .ops-engine-ref records the last-synced upstream commit; per engine FILE: unmodified since that ref
+# .plainkeep-engine-ref records the last-synced upstream commit; per engine FILE: unmodified since that ref
 # → fast-path checkout; locally modified → `git merge-file` (base=ref, theirs=upstream, ours=working
 # tree), staged, with conflict markers surfaced. First run (no ref) falls back + warns loudly.
 UPSTREAM_SHA="$(git -C "$ROOT" rev-parse "$REMOTE/$BRANCH")"
-REFFILE="$ROOT/.ops-engine-ref"
+REFFILE="$ROOT/.plainkeep-engine-ref"
 REF=""
 if [ -f "$REFFILE" ]; then
   REF="$(tr -d '[:space:]' < "$REFFILE")"
@@ -39,10 +39,10 @@ if [ -f "$REFFILE" ]; then
   # 3-way-merges against an EMPTY base → spurious conflict markers everywhere. Reject a malformed or
   # unknown ref loudly and fall back to the no-ref path (fast checkout) — never merge against garbage.
   if ! printf '%s' "$REF" | grep -qiE '^[0-9a-f]{40}$'; then
-    printf '\033[33mwarning: .ops-engine-ref is not a single 40-char SHA (%d chars) — ignoring it; treating as a first sync (it is rewritten cleanly below).\033[0m\n' "${#REF}" >&2
+    printf '\033[33mwarning: .plainkeep-engine-ref is not a single 40-char SHA (%d chars) — ignoring it; treating as a first sync (it is rewritten cleanly below).\033[0m\n' "${#REF}" >&2
     REF=""
   elif ! git -C "$ROOT" rev-parse --verify --quiet "${REF}^{commit}" >/dev/null 2>&1; then
-    printf '\033[33mwarning: .ops-engine-ref %s is not a fetched commit — treating as a first sync; run `git fetch %s` for a real 3-way merge.\033[0m\n' "${REF:0:8}" "$REMOTE" >&2
+    printf '\033[33mwarning: .plainkeep-engine-ref %s is not a fetched commit — treating as a first sync; run `git fetch %s` for a real 3-way merge.\033[0m\n' "${REF:0:8}" "$REMOTE" >&2
     REF=""
   fi
 fi
@@ -68,7 +68,7 @@ merge_file() {  # 3-way merge upstream changes into our working file; base = ref
 }
 
 if [ -z "$REF" ]; then
-  printf '\033[33mwarning: no .ops-engine-ref — first sync cannot 3-way merge; local engine edits may be overwritten. Recording the ref for next time.\033[0m\n' >&2
+  printf '\033[33mwarning: no .plainkeep-engine-ref — first sync cannot 3-way merge; local engine edits may be overwritten. Recording the ref for next time.\033[0m\n' >&2
   printf '\033[1mrefreshing engine paths from %s/%s\033[0m\n' "$REMOTE" "$BRANCH"
   while IFS= read -r path; do
     case "$path" in ''|\#*) continue ;; esac
@@ -97,9 +97,9 @@ else
   done < "$ROOT/script/engine.txt"
 fi
 
-printf '%s\n' "$UPSTREAM_SHA" > "$REFFILE"; g add -- .ops-engine-ref   # single clean write: one SHA + newline, never appended
+printf '%s\n' "$UPSTREAM_SHA" > "$REFFILE"; g add -- .plainkeep-engine-ref   # single clean write: one SHA + newline, never appended
 
-"$ROOT/ops" help >/dev/null 2>&1 || true   # regenerate ops.json from any new cmd.json
+"$ROOT/plainkeep" help >/dev/null 2>&1 || true   # regenerate plainkeep.json from any new cmd.json
 echo
 if [ "${#CONFLICTS[@]}" -gt 0 ]; then
   printf '\033[1m\033[33m%d file(s) have merge conflicts — resolve before committing:\033[0m\n' "${#CONFLICTS[@]}"
@@ -111,6 +111,6 @@ if git -C "$ROOT" diff --cached --quiet; then
 else
   printf '\033[1mengine updated (staged).\033[0m review then commit:\n'
   echo "  git -C '$ROOT' diff --staged       # what changed"
-  echo "  ops doctor                          # confirm healthy"
-  echo "  git -C '$ROOT' commit -m 'ops: update engine from upstream'"
+  echo "  plainkeep doctor                          # confirm healthy"
+  echo "  git -C '$ROOT' commit -m 'plainkeep: update engine from upstream'"
 fi

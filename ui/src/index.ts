@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// ops-ui — the human terminal UI for ops. Bare `ops-ui` launches the guided loop.
-// (The `ops` dispatcher's `bin/ui/` shim execs this binary when a human runs `ops ui`.)
+// plainkeep-ui — the human terminal UI for plainkeep. Bare `plainkeep-ui` launches the guided loop.
+// (The `plainkeep` dispatcher's `bin/ui/` shim execs this binary when a human runs `plainkeep ui`.)
 import { main } from "./app.js";
 import { VERSION } from "./version.js";
 

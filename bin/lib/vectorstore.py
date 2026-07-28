@@ -9,8 +9,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-OPS_HOME = Path(os.environ.get("OPS_HOME", Path(__file__).resolve().parents[2]))
-LANCE_DIR = OPS_HOME / ".index" / "vectors.lance"
+PLAINKEEP_HOME = Path(os.environ.get("PLAINKEEP_HOME", Path(__file__).resolve().parents[2]))
+LANCE_DIR = PLAINKEEP_HOME / ".index" / "vectors.lance"
 TABLE = "chunks"
 # Build an ANN index once the table is big enough to need it; below this, flat scan is exact + fast.
 ANN_THRESHOLD = 50_000

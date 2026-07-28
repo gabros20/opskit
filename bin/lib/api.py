@@ -1,15 +1,15 @@
 """
 api.py — the frozen public SDK (proposal Part 2.3). The ONE module a plugin verb may import: a small,
 blessed re-export of lib internals with a versioned contract. Everything else in lib/ is PRIVATE and
-may change without notice; only the names in `__all__` here are stable across an `OPS_API_VERSION`.
+may change without notice; only the names in `__all__` here are stable across an `PLAINKEEP_API_VERSION`.
 
 Why this exists: a plugin verb is the same shape as an engine verb (run.py + cmd.json, re-entering
-through `ops <verb>`), so it MUST inherit the Iron Law seam — `classify()` gives a plugin the same
+through `plainkeep <verb>`), so it MUST inherit the Iron Law seam — `classify()` gives a plugin the same
 path-wall + transmit-block a core verb gets, instead of reaching around lib to skip it. The rest is
 the minimum a useful verb needs: where things live (`paths`), how to journal, how to load/render note
 types, how to borrow the model (`run_agent`), and how to emit the `--json` envelope (`output`).
 
-A plugin declares the range it needs in plugin.json (`"api": ">=1,<2"`); `ops plugin add` refuses a
+A plugin declares the range it needs in plugin.json (`"api": ">=1,<2"`); `plainkeep plugin add` refuses a
 pack outside it. `test/run_plugin.py` snapshots every exported name's signature and fails on a
 silent removal or change — the contract is checkable, not implicit.
 """
@@ -21,10 +21,10 @@ from . import notetype         # type: ignore
 from . import agent            # type: ignore
 from . import output           # type: ignore
 
-OPS_API_VERSION = "1.0"
+PLAINKEEP_API_VERSION = "1.0"
 
 # --- filesystem roots + helpers (paths essentials) ---------------------------------------------
-OPS_HOME = paths.OPS_HOME
+PLAINKEEP_HOME = paths.PLAINKEEP_HOME
 WIKI = paths.WIKI
 INBOX = paths.INBOX
 append_journal = paths.append_journal
@@ -51,8 +51,8 @@ emit_rows = output.emit_rows
 fail = output.fail
 
 __all__ = [
-    "OPS_API_VERSION",
-    "OPS_HOME", "WIKI", "INBOX", "append_journal", "slugify", "today", "fm_field", "link_targets",
+    "PLAINKEEP_API_VERSION",
+    "PLAINKEEP_HOME", "WIKI", "INBOX", "append_journal", "slugify", "today", "fm_field", "link_targets",
     "classify",
     "load_types", "type_dir", "is_type", "render_note",
     "run_agent",

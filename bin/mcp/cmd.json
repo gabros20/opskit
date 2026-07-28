@@ -1,9 +1,9 @@
 {
   "verb": "mcp",
-  "summary": "internal: stateless stdio MCP server exposing every ops verb as an agent tool",
-  "usage": "ops mcp   (spawned by an agent host; `ops mcp --setup` prints the install line)",
+  "summary": "internal: stateless stdio MCP server exposing every plainkeep verb as an agent tool",
+  "usage": "plainkeep mcp   (spawned by an agent host; `plainkeep mcp --setup` prints the install line)",
   "risk": "read",
   "hidden": true,
-  "reads": ["ops.json"],
+  "reads": ["plainkeep.json"],
   "writes": []
 }

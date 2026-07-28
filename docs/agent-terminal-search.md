@@ -1,8 +1,8 @@
-# Running ops from an agent terminal (venv, PATH, and semantic search)
+# Running plainkeep from an agent terminal (venv, PATH, and semantic search)
 
-This guide gets stage-2/3 semantic search (`OPS_VECTORS=1`, `OPS_RERANK=1`) working when `ops` is
+This guide gets stage-2/3 semantic search (`PLAINKEEP_VECTORS=1`, `PLAINKEEP_RERANK=1`) working when `plainkeep` is
 driven by an **agent terminal** instead of your interactive shell. Read it if keyword search works
-but vectors don't, or if `ops index` warns that `lancedb` is missing even though you installed it.
+but vectors don't, or if `plainkeep index` warns that `lancedb` is missing even though you installed it.
 
 An "agent terminal" is any non-interactive driver: a Telegram/Hermes-style agent, a dispatched
 Claude Code session, or a cron job.
@@ -16,34 +16,34 @@ Claude Code session, or a cron job.
 One command provisions everything, and the dispatcher finds it automatically:
 
 ```bash
-cd "$OPS_HOME"          # e.g. ~/ops
-ops setup search --yes  # .venv + lancedb/fastembed + embed model + index — one command
+cd "$PLAINKEEP_HOME"          # e.g. ~/plainkeep
+plainkeep setup search --yes  # .venv + lancedb/fastembed + embed model + index — one command
 ```
 
-`ops setup search --yes` does four things:
+`plainkeep setup search --yes` does four things:
 
-1. Creates `$OPS_HOME/.venv`.
+1. Creates `$PLAINKEEP_HOME/.venv`.
 2. Installs *only* the search deps (`lancedb` + `fastembed`, from `requirements-search.txt`) into it.
 3. Pulls the embedding model.
 4. Builds the index.
 
-Preview it first with `ops setup search --dry-run`. That writes nothing and needs no `--yes`.
+Preview it first with `plainkeep setup search --dry-run`. That writes nothing and needs no `--yes`.
 
 ### How the dispatcher picks its interpreter
 
-The `ops` dispatcher **prefers `$OPS_HOME/.venv/bin/python3` whenever it exists and starts** — for
-the guardrail, the resolver, and every verb. So `ops index` and `ops search` import the vector plane
-with no manual `PATH` surgery.
+The `plainkeep` dispatcher **prefers `$PLAINKEEP_HOME/.venv/bin/python3` whenever it exists and starts**
+— for the guardrail, the resolver, and every verb. So `plainkeep index` and `plainkeep search` import
+the vector plane with no manual `PATH` surgery.
 
 If there is no venv, or the venv python is broken (a stale symlink after a system-python upgrade),
 the dispatcher falls back to bare `python3`. That is the stdlib keyword floor. It never fails every
 verb just because the vector plane is missing.
 
 ```
-ops  ──►  $OPS_HOME/.venv/bin/python3   (if it exists — created by `ops setup search`)
-          └─ else bare python3 on PATH  ──►  import lancedb ?
-                                               ├─ yes → stage-2 vectors
-                                               └─ no  → keyword-only (a warning, never a crash)
+plainkeep  ──►  $PLAINKEEP_HOME/.venv/bin/python3   (if it exists — created by `plainkeep setup search`)
+           └─ else bare python3 on PATH  ──►  import lancedb ?
+                                                ├─ yes → stage-2 vectors
+                                                └─ no  → keyword-only (a warning, never a crash)
 ```
 
 ### The contract (ADR-009)
@@ -51,27 +51,28 @@ ops  ──►  $OPS_HOME/.venv/bin/python3   (if it exists — created by `ops 
 | Interpreter | Holds | When the dispatcher uses it |
 |---|---|---|
 | bare `python3` | stdlib floor (keyword + graph) | no venv, or venv python won't start |
-| `$OPS_HOME/.venv/bin/python3` | all optional deps (search + models) | it exists and passes a start-probe |
+| `$PLAINKEEP_HOME/.venv/bin/python3` | all optional deps (search + models) | it exists and passes a start-probe |
 
-Agent terminals inherit this for free. They run the same `ops` script, so they get the same
+Agent terminals inherit this for free. They run the same `plainkeep` script, so they get the same
 interpreter with no per-agent PATH ordering.
 
 > [!NOTE]
-> The `.venv` is the single home for **all** optional deps, not just search. `ops setup models --yes`
-> installs the file-processing deps (Pillow, trafilatura, mlx-vlm) into the same venv. So `ops files`,
-> `ops enrich`, and `ops doctor` see them under the same dispatcher-preferred interpreter. This page
-> focuses on search, but the interpreter contract covers both.
+> The `.venv` is the single home for **all** optional deps, not just search. `plainkeep setup models
+> --yes` installs the file-processing deps (Pillow, trafilatura, mlx-vlm) into the same venv. So
+> `plainkeep files`, `plainkeep enrich`, and `plainkeep doctor` see them under the same
+> dispatcher-preferred interpreter. This page focuses on search, but the interpreter contract covers
+> both.
 
 > [!NOTE]
 > On **macOS Intel (x86_64)**, `pip` resolves `lancedb` to 0.25.x. That is expected and works.
 > `requirements-search.txt` carries platform-aware markers, so it installs cleanly on every host.
 
-## What the agent terminal still needs: `OPS_HOME` and the `OPS_*` flags
+## What the agent terminal still needs: `PLAINKEEP_HOME` and the `PLAINKEEP_*` flags
 
 The interpreter is handled for you. Two things still must reach the agent's shell:
 
-- **`OPS_HOME`** — so `ops` and its venv resolve to *your* vault, not a default.
-- **`OPS_VECTORS=1` / `OPS_RERANK=1`** — the opt-in flags that turn the vector/rerank arms *on* at
+- **`PLAINKEEP_HOME`** — so `plainkeep` and its venv resolve to *your* vault, not a default.
+- **`PLAINKEEP_VECTORS=1` / `PLAINKEEP_RERANK=1`** — the opt-in flags that turn the vector/rerank arms *on* at
   query time. The venv makes them importable; these flags make search *use* them.
 
 An interactive login shell sources `~/.zshrc`, so these are already present.
@@ -79,8 +80,8 @@ An interactive login shell sources `~/.zshrc`, so these are already present.
 An agent terminal frequently is not. It builds its own environment per session and may source only
 bash profiles (`~/.profile`, `~/.bash_profile`), which on a zsh-only Mac often don't exist.
 
-The fix is generic: **point the agent's terminal at a bash-safe init file that exports `OPS_HOME` and
-the `OPS_*` flags.** Use `export` statements only, no zsh-only syntax, because agent terminals
+The fix is generic: **point the agent's terminal at a bash-safe init file that exports
+`PLAINKEEP_HOME` and the `PLAINKEEP_*` flags.** Use `export` statements only, no zsh-only syntax, because agent terminals
 typically source init files with `bash`. You do not need to prepend `.venv/bin` to `PATH` — the
 dispatcher does that job.
 
@@ -93,7 +94,7 @@ Point Hermes at your init file:
 ```yaml
 terminal:
   backend: local
-  cwd: ~/ops
+  cwd: ~/plainkeep
   shell_init_files:
     - /Users/<you>/.zshrc          # or a dedicated bash shim, see below
 ```
@@ -108,16 +109,16 @@ terminal:
 If your `~/.zshrc` has zsh-only constructs, don't source it with bash. Use a dedicated shim instead:
 
 ```bash
-# ~/.hermes/ops-shell-init.sh   (bash-safe: export only)
-export OPS_HOME="$HOME/ops"
-export OPS_VECTORS=1     # the dispatcher already prefers $OPS_HOME/.venv/bin/python3 — no PATH surgery
-export OPS_RERANK=1
+# ~/.hermes/plainkeep-shell-init.sh   (bash-safe: export only)
+export PLAINKEEP_HOME="$HOME/plainkeep"
+export PLAINKEEP_VECTORS=1     # the dispatcher already prefers $PLAINKEEP_HOME/.venv/bin/python3 — no PATH surgery
+export PLAINKEEP_RERANK=1
 ```
 
 ```yaml
 terminal:
   shell_init_files:
-    - /Users/<you>/.hermes/ops-shell-init.sh
+    - /Users/<you>/.hermes/plainkeep-shell-init.sh
 ```
 
 **Session/reload behavior (Hermes):** a config change may be picked up by file mtime, but **existing
@@ -131,20 +132,20 @@ Run these *in the agent's terminal*, not your own. The whole point is that its e
 from yours.
 
 ```bash
-ops setup search           # expect: search "ready" (deps-importable ✓ · model-pulled ✓ · index-built ✓)
-ops doctor                 # expect: "optional: lancedb present (stage-2 vectors)"
-ops index                  # embeds notes → vectors.lance (no fallback warning)
-ops search "some idea"     # semantic hits, not just keyword
+plainkeep setup search           # expect: search "ready" (deps-importable ✓ · model-pulled ✓ · index-built ✓)
+plainkeep doctor                 # expect: "optional: lancedb present (stage-2 vectors)"
+plainkeep index                  # embeds notes → vectors.lance (no fallback warning)
+plainkeep search "some idea"     # semantic hits, not just keyword
 ```
 
 If a check fails:
 
 | Symptom | Fix |
 |---|---|
-| `ops setup search` reports `blocked` | Run the exact command in its `next` field (e.g. install ollama). |
-| `ops doctor` prints `OPS_VECTORS=1 but lancedb is NOT importable by this python3` | The venv wasn't created or is missing deps. Re-run `ops setup search --yes` (or preview with `--dry-run`). |
+| `plainkeep setup search` reports `blocked` | Run the exact command in its `next` field (e.g. install ollama). |
+| `plainkeep doctor` prints `PLAINKEEP_VECTORS=1 but lancedb is NOT importable by this python3` | The venv wasn't created or is missing deps. Re-run `plainkeep setup search --yes` (or preview with `--dry-run`). |
 
-`ops index` still succeeds keyword-only. It never crashes on a missing vector plane. That graceful
+`plainkeep index` still succeeds keyword-only. It never crashes on a missing vector plane. That graceful
 fallback is by design — see the CHANGELOG / issue #3.
 
 ## What this deliberately does not require
@@ -153,7 +154,7 @@ fallback is by design — see the CHANGELOG / issue #3.
 - No `PATH` ordering.
 - No vault-side daemon.
 
-`ops setup search` creates the one venv and the dispatcher prefers it. The stdlib keyword floor still
-runs on bare `python3` when there is no venv. An agent terminal only needs `OPS_HOME` and the `OPS_*`
-flags in its environment — it runs the same `ops` script, so it inherits the same interpreter. One
-install story, everywhere.
+`plainkeep setup search` creates the one venv and the dispatcher prefers it. The stdlib keyword floor
+still runs on bare `python3` when there is no venv. An agent terminal only needs `PLAINKEEP_HOME` and
+the `PLAINKEEP_*` flags in its environment — it runs the same `plainkeep` script, so it inherits the
+same interpreter. One install story, everywhere.

@@ -8,7 +8,7 @@ Every real model/tool call sits behind a tiny probe (`_has_mlx()`, `_has_ollama(
 the runner functions — the runners themselves are marked `# pragma: no cover` and must never run in
 tests. This mirrors bin/files/run.py's `_tier_*` graceful-degrade style.
 
-Test seam: OPS_IMAGE_FAKE (mirrors bin/share/run.py's `_fake()`) short-circuits read_text/describe to
+Test seam: PLAINKEEP_IMAGE_FAKE (mirrors bin/share/run.py's `_fake()`) short-circuits read_text/describe to
 canned output so the offline suite can exercise dispatch logic with zero models installed.
 """
 from __future__ import annotations
@@ -42,7 +42,7 @@ def have_pillow() -> bool:
 
 
 def _fake() -> bool:
-    return os.environ.get("OPS_IMAGE_FAKE", "").strip().lower() in ("1", "true", "yes")
+    return os.environ.get("PLAINKEEP_IMAGE_FAKE", "").strip().lower() in ("1", "true", "yes")
 
 
 def _have_mod(name: str) -> bool:
@@ -81,9 +81,9 @@ def _has_tesseract() -> bool:
 
 
 def _mlx_enabled() -> bool:
-    """OPS_MLX=off forces the ollama runtime for VLM even on Apple Silicon (describe() only — the OCR
+    """PLAINKEEP_MLX=off forces the ollama runtime for VLM even on Apple Silicon (describe() only — the OCR
     auto chain has no such override, per the tiered-extraction contract)."""
-    return (os.environ.get("OPS_MLX", "auto") or "auto").strip().lower() != "off"
+    return (os.environ.get("PLAINKEEP_MLX", "auto") or "auto").strip().lower() != "off"
 
 
 # --------------------------------------------------------------------------- metadata (stdlib + optional Pillow)
@@ -142,7 +142,7 @@ def _ollama_generate(model: str, prompt: str, b64_image: str, keep_alive) -> str
 def _run_ollama_ocr(path: Path, model: str) -> str:  # pragma: no cover - real model call, never in tests
     b64 = base64.b64encode(Path(path).read_bytes()).decode("ascii")
     return _ollama_generate(model, "Transcribe all text in this image, verbatim.", b64,
-                            os.environ.get("OPS_VLM_KEEP_ALIVE", "0"))
+                            os.environ.get("PLAINKEEP_VLM_KEEP_ALIVE", "0"))
 
 
 def _run_ocrmac(path: Path) -> str:  # pragma: no cover - real model call, never in tests
@@ -155,14 +155,14 @@ def _run_tesseract(path: Path) -> str:  # pragma: no cover - real model call, ne
 
 
 def read_text(path, opts: dict | None = None) -> tuple[str, str]:
-    """OCR dispatch. OPS_OCR selects a backend (default auto); auto falls through mlx-vlm → ollama →
+    """OCR dispatch. PLAINKEEP_OCR selects a backend (default auto); auto falls through mlx-vlm → ollama →
     ocrmac → tesseract → none. An explicit backend that's unavailable returns ("", "none") — no
     chaining onto the next tier (that's what auto is for)."""
     opts = opts or {}
     p = Path(path)
     if _fake():
         return f"[fake-ocr] {p.name}", "fake"
-    mode = (os.environ.get("OPS_OCR", "auto") or "auto").strip().lower()
+    mode = (os.environ.get("PLAINKEEP_OCR", "auto") or "auto").strip().lower()
     if mode == "none":
         return "", "none"
     if mode == "glm-ocr":
@@ -192,7 +192,7 @@ def ocr_backend_label(opts: dict | None = None) -> str | None:
     opts = opts or {}
     if _fake():
         return "fake"
-    mode = (os.environ.get("OPS_OCR", "auto") or "auto").strip().lower()
+    mode = (os.environ.get("PLAINKEEP_OCR", "auto") or "auto").strip().lower()
     if mode == "none":
         return None
     if mode == "glm-ocr":
@@ -261,17 +261,17 @@ def _try_vlm(path: Path, model: str, keep_alive: str):
 
 
 def describe(path, opts: dict | None = None) -> tuple[str, str, str]:
-    """VLM dispatch: primary (OPS_VLM) then fallback (OPS_VLM_FALLBACK), each via mlx-vlm when
-    eligible else ollama. OPS_VLM=none skips entirely; either model missing/failing falls through."""
+    """VLM dispatch: primary (PLAINKEEP_VLM) then fallback (PLAINKEEP_VLM_FALLBACK), each via mlx-vlm when
+    eligible else ollama. PLAINKEEP_VLM=none skips entirely; either model missing/failing falls through."""
     opts = opts or {}
     p = Path(path)
     if _fake():
         return "fake caption", "fake description", "fake"
-    primary = (os.environ.get("OPS_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip()
+    primary = (os.environ.get("PLAINKEEP_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip()
     if primary.lower() == "none":
         return "", "", "none"
-    fallback = (os.environ.get("OPS_VLM_FALLBACK", "moondream") or "moondream").strip()
-    keep_alive = os.environ.get("OPS_VLM_KEEP_ALIVE", "0")
+    fallback = (os.environ.get("PLAINKEEP_VLM_FALLBACK", "moondream") or "moondream").strip()
+    keep_alive = os.environ.get("PLAINKEEP_VLM_KEEP_ALIVE", "0")
     for model in (primary, fallback):
         r = _try_vlm(p, model, keep_alive)
         if r is not None:
@@ -289,6 +289,6 @@ def backends_status() -> dict:
         "ocrmac": _has_ocrmac(),
         "tesseract": _has_tesseract(),
         "pillow": HAVE_PILLOW,
-        "ocr_selected": (os.environ.get("OPS_OCR", "auto") or "auto").strip().lower(),
-        "vlm_selected": (os.environ.get("OPS_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip(),
+        "ocr_selected": (os.environ.get("PLAINKEEP_OCR", "auto") or "auto").strip().lower(),
+        "vlm_selected": (os.environ.get("PLAINKEEP_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip(),
     }

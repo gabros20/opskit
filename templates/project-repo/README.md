@@ -1,6 +1,6 @@
 # {{name}}
 
-> Scaffolded {{date}} by `ops new`. Wiki hub: [[{{slug}}]] in `~/ops/wiki/projects/`.
+> Scaffolded {{date}} by `plainkeep new`. Wiki hub: [[{{slug}}]] in `~/plainkeep/wiki/projects/`.
 
 ## What this is
 

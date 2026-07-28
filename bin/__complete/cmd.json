@@ -1,7 +1,7 @@
 {
   "verb": "__complete",
   "summary": "internal: emit shell-completion candidates for the words typed so far",
-  "usage": "ops __complete [prior words...]",
+  "usage": "plainkeep __complete [prior words...]",
   "risk": "read",
   "hidden": true,
   "reads": ["bin/*/cmd.json", "wiki/", "tasks/"],

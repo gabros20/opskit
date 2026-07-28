@@ -181,7 +181,7 @@ def main() -> int:
     caveat = ("real local embeddings used; remaining unknown is the SHARE of YOUR real queries that\n"
               "  are semantic — re-run on your actual query log to settle the magnitude."
               if real_vectors else
-              "synthetic corpus + conservative proxy; set OPS_EMBED_CMD or run ollama for real vectors.")
+              "synthetic corpus + conservative proxy; set PLAINKEEP_EMBED_CMD or run ollama for real vectors.")
     print(f"{DIM}  NOTE: {caveat}\n"
           f"  Mechanism is philosophy-safe: vectors live in .index (gitignored, rebuildable from md),\n"
           f"  embedded local model (offline, free) — 'one SQLite file over a server', not a new source of truth.{RESET}")

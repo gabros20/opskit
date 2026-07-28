@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-ops mcp — the agent transport (proposal Part 2.4). A STATELESS stdio MCP server: the agent host
+plainkeep mcp — the agent transport (proposal Part 2.4). A STATELESS stdio MCP server: the agent host
 spawns it per session, it dies on stdin EOF. No daemon, no HTTP, no resident state (the daemon
 verdict — a resident process accumulates state plaintext can't rebuild).
 
 STDLIB ONLY: the JSON-RPC 2.0 / MCP handshake (initialize · notifications/initialized · tools/list ·
 tools/call) is implemented by hand over newline-delimited JSON on stdin/stdout — no mcp/fastmcp dep.
 
-  • The tool list is GENERATED from the ops surface (manifest.load_cmds → the same data as ops.json/3:
+  • The tool list is GENERATED from the plainkeep surface (manifest.load_cmds → the same data as plainkeep.json/3:
     summaries + hints become descriptions, args become inputSchema). Plugins appear automatically.
-  • A tools/call SHELLS OUT: subprocess [<abs>/ops, verb, ...args, --json]. Execution RE-ENTERS through
+  • A tools/call SHELLS OUT: subprocess [<abs>/plainkeep, verb, ...args, --json]. Execution RE-ENTERS through
     the dispatcher, so the guardrail + .logs stay the single enforcement path (anti-roadmap #2 — never
     import verb/lib code to skip the dispatcher).
   • Exit 3 (confirm-needed) becomes a structured needs-`--yes` result carrying the exact re-run; the
     server NEVER auto-appends --yes.
 
-`ops mcp --setup` prints the `claude mcp add ops -- <abs>/ops mcp` line. Hidden/read-class (like
+`plainkeep mcp --setup` prints the `claude mcp add plainkeep -- <abs>/plainkeep mcp` line. Hidden/read-class (like
 __complete), so the guardrail runs it freely.
 """
 from __future__ import annotations
@@ -28,14 +28,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import manifest, output, paths  # noqa: E402
 
 PROTOCOL_VERSION = "2024-11-05"          # echoed back to the client if it doesn't pin its own
-SERVER_NAME = "ops"
+SERVER_NAME = "plainkeep"
 
 
-def _ops_bin() -> str:
-    return str(paths.OPS_HOME / "ops")
+def _dispatcher_bin() -> str:
+    return str(paths.PLAINKEEP_HOME / "plainkeep")
 
 
-# ── tool generation (from the ops surface = ops.json/3) ─────────────────────────────────────────
+# ── tool generation (from the plainkeep surface = plainkeep.json/3) ────────────────────────────
 def _tool(cmd: dict) -> dict:
     """One MCP tool from a cmd.json dict: description = summary (+hints), inputSchema from args."""
     desc = cmd.get("summary", "")
@@ -94,10 +94,10 @@ def _call(mid, params: dict) -> dict:
     cmds = {c["verb"]: c for c in manifest.load_cmds()}
     cmd = cmds.get(name)
     argv = _argv_from(cmd, arguments)
-    proc = subprocess.run([_ops_bin(), name, *argv, "--json"], capture_output=True, text=True)
+    proc = subprocess.run([_dispatcher_bin(), name, *argv, "--json"], capture_output=True, text=True)
     out, err = proc.stdout.strip(), proc.stderr.strip()
     if proc.returncode == output.EXIT_CONFIRM:
-        rerun = " ".join(["ops", name, *argv, "--yes"])
+        rerun = " ".join(["plainkeep", name, *argv, "--yes"])
         payload = {"ops_confirm_needed": True, "verb": name, "rerun": rerun,
                    "detail": out or err or "this call is confirm-class — re-run with --yes"}
         return _result(mid, _text_result(json.dumps(payload, ensure_ascii=False), is_error=True))
@@ -116,7 +116,7 @@ def handle(msg: dict) -> dict | None:
         return _result(mid, {
             "protocolVersion": params.get("protocolVersion") or PROTOCOL_VERSION,
             "capabilities": {"tools": {"listChanged": False}},
-            "serverInfo": {"name": SERVER_NAME, "version": manifest._ops_version()},
+            "serverInfo": {"name": SERVER_NAME, "version": manifest._engine_version()},
         })
     if method and method.startswith("notifications/"):
         return None
@@ -152,7 +152,7 @@ def serve() -> int:
 
 
 def _setup_line() -> str:
-    return f"claude mcp add ops -- {_ops_bin()} mcp"
+    return f"claude mcp add plainkeep -- {_dispatcher_bin()} mcp"
 
 
 def main(argv: list[str]) -> int:

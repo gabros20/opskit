@@ -1,11 +1,11 @@
-// Render an ops --json result for a human. The envelope's error.hint / exit-3 re-run / exit-4
+// Render a plainkeep --json result for a human. The envelope's error.hint / exit-3 re-run / exit-4
 // did-you-mean ARE the UX ("refusals teach") — we surface them verbatim, never flatten to "failed".
 // Rule: NEVER print raw JSON. Every shape has a human rendering — arrays of objects become tables,
 // nested objects become indented key/value blocks, long strings wrap. The TUI exists so you can SEE
 // what's going on; a JSON blob is the agent surface leaking through.
 import pc from "picocolors";
-import type { RunResult } from "./ops.js";
-import { EXIT } from "./ops.js";
+import type { RunResult } from "./plainkeep.js";
+import { EXIT } from "./plainkeep.js";
 import { groupVerbs, type Manifest } from "./contract.js";
 
 const MAX_ROWS = 50;
@@ -56,7 +56,7 @@ export function renderResult(res: RunResult): void {
   else if (env?.ok) console.log(pc.green("  ✓ done"));
 }
 
-// --- ops help: the verb catalog, grouped exactly like the main palette ---
+// --- plainkeep help: the verb catalog, grouped exactly like the main palette ---
 function renderHelp(data: Manifest & { ops_version?: string }): void {
   const groups = groupVerbs(data);
   const total = data.verbs.filter((v) => !v.hidden).length;

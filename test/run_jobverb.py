@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""run_jobverb.py — exercises the `ops job` verb: list (with legality flags), run <name>
-(manual fallback), apply (render launchd plists, skipping non-schedulable jobs). Temp OPS_HOME."""
+"""run_jobverb.py — exercises the `plainkeep job` verb: list (with legality flags), run <name>
+(manual fallback), apply (render launchd plists, skipping non-schedulable jobs). Temp PLAINKEEP_HOME."""
 from __future__ import annotations
 import json
 import os
@@ -16,9 +16,9 @@ results = []
 REGISTRY = {
     "external_allowlist": [],
     "jobs": {
-        "index":       {"command": "ops index",      "schedule": {"interval_minutes": 60}, "risk": "read"},
-        "consolidate": {"command": "ops consolidate", "schedule": {"daily": "02:30"},       "risk": "safe_write"},
-        "danger":      {"command": "ops capture x",   "schedule": {"daily": "09:00"},       "risk": "confirm"},
+        "index":       {"command": "plainkeep index",      "schedule": {"interval_minutes": 60}, "risk": "read"},
+        "consolidate": {"command": "plainkeep consolidate", "schedule": {"daily": "02:30"},       "risk": "safe_write"},
+        "danger":      {"command": "plainkeep capture x",   "schedule": {"daily": "09:00"},       "risk": "confirm"},
     },
 }
 
@@ -28,7 +28,7 @@ def check(name, cond, detail=""):
 
 
 def run(home, *args):
-    env = {**os.environ, "OPS_HOME": str(home)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home)}
     return subprocess.run([sys.executable, str(REPO / "bin" / "job" / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 
@@ -41,10 +41,10 @@ def main() -> int:
             "---\ntype: note\nupdated: 2026-06-20\n---\n# Alpha\nretrieval and ranking\n")
         (h / "jobs").mkdir()
         (h / "jobs" / "registry.json").write_text(json.dumps(REGISTRY), encoding="utf-8")
-        # `ops job run` now re-enters the DISPATCHER (Task 9, "one door") instead of calling the
-        # verb's run.py directly — so the temp OPS_HOME needs a real dispatcher tree. Symlink the
-        # engine `ops` + `bin` in; `job run index`/`consolidate` then pass the guardrail like any call.
-        os.symlink(REPO / "ops", h / "ops")
+        # `plainkeep job run` now re-enters the DISPATCHER (Task 9, "one door") instead of calling the
+        # verb's run.py directly — so the temp PLAINKEEP_HOME needs a real dispatcher tree. Symlink the
+        # engine `plainkeep` + `bin` in; `job run index`/`consolidate` then pass the guardrail like any call.
+        os.symlink(REPO / "plainkeep", h / "plainkeep")
         os.symlink(REPO / "bin", h / "bin")
 
         r = run(h, "list")
@@ -52,7 +52,7 @@ def main() -> int:
         check("job list flags a non-schedulable job", "danger" in r.stdout and "not schedulable" in r.stdout, r.stdout)
 
         r = run(h, "run", "index")
-        check("job run index builds the index (rc 0)", r.returncode == 0 and (h / ".index" / "ops.sqlite").exists(), r.stdout + r.stderr)
+        check("job run index builds the index (rc 0)", r.returncode == 0 and (h / ".index" / "plainkeep.sqlite").exists(), r.stdout + r.stderr)
 
         r = run(h, "run", "consolidate")
         j = "\n".join(p.read_text() for p in (h / "journal").rglob("*.md")) if (h / "journal").exists() else ""
@@ -63,11 +63,11 @@ def main() -> int:
 
         r = run(h, "apply")
         ld = h / "jobs" / "launchd"
-        check("job apply renders schedulable plists", (ld / "com.ops.index.plist").exists() and (ld / "com.ops.consolidate.plist").exists(), r.stdout + r.stderr)
-        check("job apply skips non-schedulable", not (ld / "com.ops.danger.plist").exists() and "skipped" in r.stdout, r.stdout)
-        if (ld / "com.ops.index.plist").exists():
-            pl = (ld / "com.ops.index.plist").read_text()
-            check("plist is well-formed launchd", "StartInterval" in pl and "com.ops.index" in pl and "OPS_HOME" in pl, pl[:200])
+        check("job apply renders schedulable plists", (ld / "com.plainkeep.index.plist").exists() and (ld / "com.plainkeep.consolidate.plist").exists(), r.stdout + r.stderr)
+        check("job apply skips non-schedulable", not (ld / "com.plainkeep.danger.plist").exists() and "skipped" in r.stdout, r.stdout)
+        if (ld / "com.plainkeep.index.plist").exists():
+            pl = (ld / "com.plainkeep.index.plist").read_text()
+            check("plist is well-formed launchd", "StartInterval" in pl and "com.plainkeep.index" in pl and "PLAINKEEP_HOME" in pl, pl[:200])
         r = run(h, "run", "nope")
         check("job run rejects an unknown job name", r.returncode == 2, r.stdout + r.stderr)
 

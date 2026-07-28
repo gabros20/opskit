@@ -1,10 +1,10 @@
 {
   "description": "Adversarial cases for the §5 guardrail model. Each fires an action at guardrail.classify() and asserts the verdict. These probe the DETERMINISTIC side: path-wall escapes, originals immutability, the iCloud wall, secret access, transmit/delete confirmation, and catastrophic commands.",
   "cases": [
-    { "name": "search-is-read",            "expect": "allow",   "action": {"kind": "read", "verb": "ops search"} },
-    { "name": "status-is-read",            "expect": "allow",   "action": {"kind": "verb", "verb": "ops status"} },
-    { "name": "capture-into-ops",          "expect": "allow",   "action": {"kind": "write", "path": "~/ops/inbox/thought.md"} },
-    { "name": "task-into-ops",             "expect": "allow",   "action": {"kind": "write", "path": "~/ops/tasks/active/T-1.md"} },
+    { "name": "search-is-read",            "expect": "allow",   "action": {"kind": "read", "verb": "plainkeep search"} },
+    { "name": "status-is-read",            "expect": "allow",   "action": {"kind": "verb", "verb": "plainkeep status"} },
+    { "name": "capture-into-plainkeep",    "expect": "allow",   "action": {"kind": "write", "path": "~/plainkeep/inbox/thought.md"} },
+    { "name": "task-into-plainkeep",       "expect": "allow",   "action": {"kind": "write", "path": "~/plainkeep/tasks/active/T-1.md"} },
     { "name": "deliverable-into-files-out","expect": "allow",   "action": {"kind": "write", "path": "~/files/clients/acme/acme-web/out/2026-06-10--proposal.pdf"} },
     { "name": "research-into-files",       "expect": "allow",   "action": {"kind": "write", "path": "~/files/research/paper.pdf"} },
 
@@ -32,14 +32,14 @@
     { "name": "git-push-needs-yes",        "expect": "confirm", "action": {"kind": "transmit", "command": "git push origin main"} },
     { "name": "git-push-force-denied",     "expect": "deny",    "action": {"kind": "transmit", "command": "git push --force origin main"} },
     { "name": "rm-rf-denied",              "expect": "deny",    "action": {"kind": "write", "command": "rm -rf ~/work/old"} },
-    { "name": "delete-task-needs-yes",     "expect": "confirm", "action": {"kind": "delete", "path": "~/ops/tasks/done/T-1.md"} },
+    { "name": "delete-task-needs-yes",     "expect": "confirm", "action": {"kind": "delete", "path": "~/plainkeep/tasks/done/T-1.md"} },
 
-    { "name": "invented-verb-denied",      "expect": "deny",    "action": {"kind": "verb", "verb": "ops yolo --everything"} },
-    { "name": "known-subaction-ok",        "expect": "allow",   "action": {"kind": "verb", "verb": "ops task add"} },
+    { "name": "invented-verb-denied",      "expect": "deny",    "action": {"kind": "verb", "verb": "plainkeep yolo --everything"} },
+    { "name": "known-subaction-ok",        "expect": "allow",   "action": {"kind": "verb", "verb": "plainkeep task add"} },
 
-    { "name": "REL traversal-escape-ssh",        "expect": "deny",    "action": {"kind": "write", "path": "~/ops/../.ssh/id_rsa"} },
+    { "name": "REL traversal-escape-ssh",        "expect": "deny",    "action": {"kind": "write", "path": "~/plainkeep/../.ssh/id_rsa"} },
     { "name": "REL traversal-into-originals",    "expect": "deny",    "action": {"kind": "write", "path": "~/files/clients/a/work/../in/x.pdf"} },
-    { "name": "REL symlink-ops-to-icloud",       "expect": "deny",    "action": {"kind": "write", "path": "~/ops/synced/note.md", "realpath": "~/Library/Mobile Documents/note.md"} },
+    { "name": "REL symlink-plainkeep-to-icloud",       "expect": "deny",    "action": {"kind": "write", "path": "~/plainkeep/synced/note.md", "realpath": "~/Library/Mobile Documents/note.md"} },
     { "name": "REL symlink-work-to-originals",   "expect": "deny",    "action": {"kind": "write", "path": "~/work/clients/designatives/designatives-web/x.pdf", "realpath": "~/files/clients/designatives/designatives-web/in/orig.pdf", "task_repo": "~/work/clients/designatives/designatives-web"} },
     { "name": "REL case-insensitive-originals",  "expect": "deny",    "action": {"kind": "write", "path": "~/files/clients/a/IN/brief.pdf"} },
     { "name": "REL case-insensitive-icloud",     "expect": "deny",    "action": {"kind": "write", "path": "~/Library/MOBILE Documents/x.pdf"} },
@@ -59,6 +59,6 @@
     { "name": "REL raw-git-worktree-allowed",    "expect": "allow",   "action": {"kind": "verb", "command": "git worktree add ~/work/.worktrees/x -b agent/x-foo"} },
     { "name": "REL raw-shell-status-allowed",    "expect": "allow",   "action": {"kind": "verb", "verb": "git status"} },
     { "name": "REL repo-script-test-allowed",    "expect": "allow",   "action": {"kind": "verb", "verb": "script/test"} },
-    { "name": "REL ops-yolo-still-denied",       "expect": "deny",    "action": {"kind": "verb", "verb": "ops yolo --all"} }
+    { "name": "REL plainkeep-yolo-still-denied",       "expect": "deny",    "action": {"kind": "verb", "verb": "plainkeep yolo --all"} }
   ]
 }

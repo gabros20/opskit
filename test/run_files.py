@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""run_files.py — exercises `ops files ingest` (work material filed + shadow note; personal/legal
-proposed-not-moved) and `ops files open`, against temp ~/ops + ~/files."""
+"""run_files.py — exercises `plainkeep files ingest` (work material filed + shadow note; personal/legal
+proposed-not-moved) and `plainkeep files open`, against temp ~/plainkeep + ~/files."""
 from __future__ import annotations
 import os
 import subprocess
@@ -18,7 +18,7 @@ def check(name, cond, detail=""):
 
 
 def run(ops, roots, *args, extra=None):
-    env = {**os.environ, "OPS_HOME": str(ops), "OPS_ROOTS_HOME": str(roots), **(extra or {})}
+    env = {**os.environ, "PLAINKEEP_HOME": str(ops), "PLAINKEEP_ROOTS_HOME": str(roots), **(extra or {})}
     return subprocess.run([sys.executable, str(REPO / "bin" / "files" / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 
@@ -43,7 +43,7 @@ def main() -> int:
               and not (ops / "wiki" / "files" / "cap-note.md").exists())
         check("shadow note points at the moved file", str(filed) in shadow.read_text())
 
-        r = run(ops, roots, "open", "acme-brief", extra={"OPS_NO_OPEN": "1"})
+        r = run(ops, roots, "open", "acme-brief", extra={"PLAINKEEP_NO_OPEN": "1"})
         check("files open resolves the path from the shadow note", str(filed) in r.stdout, r.stdout)
 
     # ---- routing into a hub + bidirectional linking + de-dup + management (issue #1 gap A) ----

@@ -1,5 +1,5 @@
 {
-  "schema": "ops.json/3",
+  "schema": "plainkeep.json/3",
   "ops_version": "4.0.0-dev",
   "api_version": "1.0",
   "json_envelope": 1,
@@ -13,7 +13,7 @@
     {
       "verb": "archive",
       "summary": "retire a dead ~/work repo: git-bundle all history into ~/work/archive/<year>/, mark hub archived",
-      "usage": "ops archive <slug>",
+      "usage": "plainkeep archive <slug>",
       "risk": "safe_write",
       "args": [
         {
@@ -46,7 +46,7 @@
     {
       "verb": "backup",
       "summary": "commit/push nag (bare); restic family + git-bundle net: init|status|run|drill|bundle",
-      "usage": "ops backup [status | run [--target local|cloud] --yes | drill --yes | bundle [--dry-run] | init --yes]",
+      "usage": "plainkeep backup [status | run [--target local|cloud] --yes | drill --yes | bundle [--dry-run] | init --yes]",
       "risk": "safe_write",
       "args": [
         {
@@ -65,7 +65,7 @@
         "~/files/backups/bundles/",
         "journal/"
       ],
-      "hints": "Bare `ops backup` is the UNCHANGED read-only commit/push nag (exit 1 = at risk; never pushes for you). Subcommands add the restic durability floor (auto-detected; degrades with an install hint): init (human-run once, --yes, writes .backup/config.json with op:// REFERENCES + renders the launchd plist), status (snapshot age per target, exit 1 if stale >48h or unconfigured), run [--target local|cloud] (cloud is --yes ALWAYS; the scheduled cloud push runs from launchd DIRECTLY with an append-only B2 key, outside this verb), drill (--yes; restore latest snapshot to tmp and diff), bundle (git bundle --all of ~/ops + every ~/work repo into ~/files/backups/bundles/ with retention). Common mistake: expecting bare backup to run restic \u2014 it only nags; use `ops backup run`.",
+      "hints": "Bare `plainkeep backup` is the UNCHANGED read-only commit/push nag (exit 1 = at risk; never pushes for you). Subcommands add the restic durability floor (auto-detected; degrades with an install hint): init (human-run once, --yes, writes .backup/config.json with op:// REFERENCES + renders the launchd plist), status (snapshot age per target, exit 1 if stale >48h or unconfigured), run [--target local|cloud] (cloud is --yes ALWAYS; the scheduled cloud push runs from launchd DIRECTLY with an append-only B2 key, outside this verb), drill (--yes; restore latest snapshot to tmp and diff), bundle (git bundle --all of ~/plainkeep + every ~/work repo into ~/files/backups/bundles/ with retention). Common mistake: expecting bare backup to run restic \u2014 it only nags; use `plainkeep backup run`.",
       "output": {
         "mode": "scalar",
         "fields": {
@@ -81,7 +81,7 @@
       "actions": [
         {
           "name": "nag",
-          "summary": "read-only commit/push nag (bare `ops backup`; exit 1 = at risk)",
+          "summary": "read-only commit/push nag (bare `plainkeep backup`; exit 1 = at risk)",
           "risk": "read",
           "default": true,
           "args": []
@@ -119,7 +119,7 @@
         },
         {
           "name": "bundle",
-          "summary": "rotated `git bundle --all` of ~/ops + every ~/work repo",
+          "summary": "rotated `git bundle --all` of ~/plainkeep + every ~/work repo",
           "risk": "safe_write",
           "dry_run": true,
           "args": []
@@ -140,7 +140,7 @@
               "name": "--cloud-repo",
               "type": "string",
               "required": false,
-              "help": "cloud restic repo (e.g. b2:bucket:ops)"
+              "help": "cloud restic repo (e.g. b2:bucket:plainkeep)"
             },
             {
               "name": "--password-ref",
@@ -169,7 +169,7 @@
     {
       "verb": "bookmark",
       "summary": "save a URL as a wiki note (type: bookmark); best-effort title fetch; --archive snapshots to ~/files",
-      "usage": "ops bookmark <url> [--note \"<text>\"] [--no-fetch] [--archive]",
+      "usage": "plainkeep bookmark <url> [--note \"<text>\"] [--no-fetch] [--archive]",
       "risk": "safe_write",
       "args": [
         {
@@ -197,7 +197,7 @@
         "journal/",
         "~/files/bookmarks/ (with --archive)"
       ],
-      "hints": "Save a URL as a wiki bookmark note (title fetched best-effort). Body text is extracted via trafilatura when installed (optional dep; pip install trafilatura), else a crude zero-dependency tag-strip. --archive additionally snapshots the fetched page HTML into ~/files/bookmarks/ against link-rot (skipped if the page wasn't reachable). Any http(s) URL is accepted as a generic link/article \u2014 a tweet or video URL is saved the same way, there is no special x.com/YouTube parsing (see `ops files extract` for transcript extraction of an already-ingested media file). Common mistake: --archive without a reachable page \u2014 the HTML snapshot is skipped.",
+      "hints": "Save a URL as a wiki bookmark note (title fetched best-effort). Body text is extracted via trafilatura when installed (optional dep; pip install trafilatura), else a crude zero-dependency tag-strip. --archive additionally snapshots the fetched page HTML into ~/files/bookmarks/ against link-rot (skipped if the page wasn't reachable). Any http(s) URL is accepted as a generic link/article \u2014 a tweet or video URL is saved the same way, there is no special x.com/YouTube parsing (see `plainkeep files extract` for transcript extraction of an already-ingested media file). Common mistake: --archive without a reachable page \u2014 the HTML snapshot is skipped.",
       "output": {
         "mode": "scalar",
         "fields": {
@@ -215,7 +215,7 @@
     {
       "verb": "capture",
       "summary": "thought -> inbox (also: pipe stdin)",
-      "usage": "ops capture \"<text>\"",
+      "usage": "plainkeep capture \"<text>\"",
       "risk": "safe_write",
       "args": [
         {
@@ -229,7 +229,7 @@
         "inbox/",
         "journal/"
       ],
-      "hints": "Zero-decision dump of a thought into inbox/ for later triage. Common mistake: using it for an actionable to-do \u2014 use `ops task add` instead.",
+      "hints": "Zero-decision dump of a thought into inbox/ for later triage. Common mistake: using it for an actionable to-do \u2014 use `plainkeep task add` instead.",
       "output": {
         "mode": "scalar",
         "fields": {
@@ -244,7 +244,7 @@
     {
       "verb": "close",
       "summary": "daily close: summarize the day into the journal, flag loose ends",
-      "usage": "ops close [--automated] [--dry-run]",
+      "usage": "plainkeep close [--automated] [--dry-run]",
       "risk": "safe_write",
       "dry_run": true,
       "reads": [
@@ -272,7 +272,7 @@
     {
       "verb": "complete",
       "summary": "structured completion candidates for the next word (the TUI/agent completion contract)",
-      "usage": "ops complete [<typed word>...] [--json]",
+      "usage": "plainkeep complete [<typed word>...] [--json]",
       "risk": "read",
       "args": [
         {
@@ -286,7 +286,7 @@
         "tasks/"
       ],
       "writes": [],
-      "hints": "The completion contract: given the words already typed after `ops`, emit the candidates for the NEXT word as structured rows {value, description, kind} \u2014 kind is verb|action|enum|<provider> (note-slug|task-id|hub|note-type|status|layer). Same brain as zsh tab-completion (`ops __complete`), derived live from each verb's cmd.json actions[]/args (no hardcoded tables). Use --json for the machine rows; without it, one `value  description` per line. Common mistake: passing the word being completed \u2014 pass only the words BEFORE it (e.g. `ops complete task move` lists statuses).",
+      "hints": "The completion contract: given the words already typed after `plainkeep`, emit the candidates for the NEXT word as structured rows {value, description, kind} \u2014 kind is verb|action|enum|<provider> (note-slug|task-id|hub|note-type|status|layer). Same brain as zsh tab-completion (`plainkeep __complete`), derived live from each verb's cmd.json actions[]/args (no hardcoded tables). Use --json for the machine rows; without it, one `value  description` per line. Common mistake: passing the word being completed \u2014 pass only the words BEFORE it (e.g. `plainkeep complete task move` lists statuses).",
       "output": {
         "mode": "rows",
         "fields": {
@@ -301,7 +301,7 @@
     {
       "verb": "consolidate",
       "summary": "nightly dream-lite pass: wiki orphans/stale + day digest into the journal",
-      "usage": "ops consolidate [--automated]",
+      "usage": "plainkeep consolidate [--automated]",
       "risk": "safe_write",
       "reads": [
         "wiki/",
@@ -332,11 +332,11 @@
     {
       "verb": "doctor",
       "summary": "self-check: tools, folders, manifest, adapters, secrets, index (--init creates folders)",
-      "usage": "ops doctor [--init]",
+      "usage": "plainkeep doctor [--init]",
       "risk": "safe_write",
       "reads": [
         "bin/",
-        "ops.json",
+        "plainkeep.json",
         "AGENTS.md",
         "CLAUDE.md",
         "skills/",
@@ -359,7 +359,7 @@
     {
       "verb": "enrich",
       "summary": "generate {description, keywords} for a note's derived text, written to its frontmatter",
-      "usage": "ops enrich <slug> [--reenrich] | --all [--reenrich]",
+      "usage": "plainkeep enrich <slug> [--reenrich] | --all [--reenrich]",
       "risk": "safe_write",
       "args": [
         {
@@ -383,7 +383,7 @@
         "wiki/ (description:/keywords:/enrich_key: frontmatter)",
         "journal/"
       ],
-      "hints": "Generate a description + keywords for one note (source: its .extract.md if it has one, else its own body) and write them to the note's frontmatter \u2014 never to the .extract.md, which --reextract rewrites. Idempotent via an enrich_key: hash of (model, text); a plain re-run on unchanged text is a no-op, --reenrich forces. --all sweeps every note lacking a current key, sequentially, under one warm model load. Auto-wired (best-effort) into `files extract` and `bookmark` unless OPS_ENRICH=off. Common mistake: expecting meta on the .extract.md \u2014 it lives on the shadow/primary note.",
+      "hints": "Generate a description + keywords for one note (source: its .extract.md if it has one, else its own body) and write them to the note's frontmatter \u2014 never to the .extract.md, which --reextract rewrites. Idempotent via an enrich_key: hash of (model, text); a plain re-run on unchanged text is a no-op, --reenrich forces. --all sweeps every note lacking a current key, sequentially, under one warm model load. Auto-wired (best-effort) into `files extract` and `bookmark` unless PLAINKEEP_ENRICH=off. Common mistake: expecting meta on the .extract.md \u2014 it lives on the shadow/primary note.",
       "output": {
         "mode": "rows",
         "fields": {
@@ -400,7 +400,7 @@
     {
       "verb": "files",
       "summary": "binary assets: ingest [<path>] [--client|--project|--area <slug>|--research] [--extract] | extract <slug> | distill <slug> | link <file> <hub> | list | open <slug>",
-      "usage": "ops files ingest [<path>] [--client|--project|--area <slug> | --research] [--extract] | extract <slug> [--reextract] [--heavy] [--lang <x>] [--diarize] [--describe] | distill <slug> | link <file> <hub> | list [--hub <slug>] | open <slug>",
+      "usage": "plainkeep files ingest [<path>] [--client|--project|--area <slug> | --research] [--extract] | extract <slug> [--reextract] [--heavy] [--lang <x>] [--diarize] [--describe] | distill <slug> | link <file> <hub> | list [--hub <slug>] | open <slug>",
       "risk": "safe_write",
       "args": [
         {
@@ -420,7 +420,7 @@
         "wiki/ (hub links)",
         "journal/"
       ],
-      "hints": "The binary-assets plane: ingest routes a file into ~/files + writes a wiki shadow note; extract emits a SIBLING derived note wiki/files/<slug>.extract.md (type extract|transcript, derived_from/source_sha256/tool) from the source bytes via an auto-detected media tier: pdf -> markdown, audio/video/URL -> transcript, image -> OCR/VLM description, txt/md -> plain text. Each tier is an optional dep (pymupdf4llm/docling, mlx-whisper/faster-whisper/parakeet-mlx, yt-dlp, ocrmac/tesseract) that degrades to a one-line install hint instead of crashing; a URL source needs a shadow note whose path: is already the URL (no ingest <url> support yet). distill compiles that extract into 1-N author:agent/status:draft concept notes in wiki/notes/ (typed JSON payload with an agent, heading-outline fallback without; promote via `ops triage drafts`). Same-bytes+same-tool re-run is a no-op; --reextract forces. Common mistake: expecting the binary in git \u2014 only the plaintext shadow + extract notes are tracked; and expecting a transcript without the tier's dep installed (it degrades with an install hint).",
+      "hints": "The binary-assets plane: ingest routes a file into ~/files + writes a wiki shadow note; extract emits a SIBLING derived note wiki/files/<slug>.extract.md (type extract|transcript, derived_from/source_sha256/tool) from the source bytes via an auto-detected media tier: pdf -> markdown, audio/video/URL -> transcript, image -> OCR/VLM description, txt/md -> plain text. Each tier is an optional dep (pymupdf4llm/docling, mlx-whisper/faster-whisper/parakeet-mlx, yt-dlp, ocrmac/tesseract) that degrades to a one-line install hint instead of crashing; a URL source needs a shadow note whose path: is already the URL (no ingest <url> support yet). distill compiles that extract into 1-N author:agent/status:draft concept notes in wiki/notes/ (typed JSON payload with an agent, heading-outline fallback without; promote via `plainkeep triage drafts`). Same-bytes+same-tool re-run is a no-op; --reextract forces. Common mistake: expecting the binary in git \u2014 only the plaintext shadow + extract notes are tracked; and expecting a transcript without the tier's dep installed (it degrades with an install hint).",
       "output": {
         "mode": "rows",
         "fields": {
@@ -600,16 +600,16 @@
     },
     {
       "verb": "help",
-      "summary": "list verbs / usage for one (rendered from ops.json)",
-      "usage": "ops help [verb]",
+      "summary": "list verbs / usage for one (rendered from plainkeep.json)",
+      "usage": "plainkeep help [verb]",
       "risk": "read",
       "reads": [
         "bin/*/cmd.json"
       ],
       "writes": [
-        "ops.json"
+        "plainkeep.json"
       ],
-      "hints": "The surface itself: verbs, capabilities, per-verb I/O contract. Read this first; never invent a verb. Common mistake: hardcoding a verb list instead of reading ops.json.",
+      "hints": "The surface itself: verbs, capabilities, per-verb I/O contract. Read this first; never invent a verb. Common mistake: hardcoding a verb list instead of reading plainkeep.json.",
       "output": {
         "mode": "scalar",
         "fields": {
@@ -625,8 +625,8 @@
     },
     {
       "verb": "index",
-      "summary": "rebuild the search index over wiki (FTS5 + graph; +LanceDB if OPS_VECTORS=1); --changed = mtime fast path; --manifest regenerates ops.json",
-      "usage": "ops index [--changed] [--manifest]",
+      "summary": "rebuild the search index over wiki (FTS5 + graph; +LanceDB if PLAINKEEP_VECTORS=1); --changed = mtime fast path; --manifest regenerates plainkeep.json",
+      "usage": "plainkeep index [--changed] [--manifest]",
       "risk": "safe_write",
       "reads": [
         "wiki/",
@@ -634,9 +634,9 @@
       ],
       "writes": [
         ".index/",
-        "ops.json"
+        "plainkeep.json"
       ],
-      "hints": "Rebuild the FTS5 + graph search index over wiki (+vectors if OPS_VECTORS). `--changed` is the fast path after external Obsidian edits (reindex only files touched since the last build). Common mistake: searching before indexing \u2014 an empty index returns no hits.",
+      "hints": "Rebuild the FTS5 + graph search index over wiki (+vectors if PLAINKEEP_VECTORS). `--changed` is the fast path after external Obsidian edits (reindex only files touched since the last build). Common mistake: searching before indexing \u2014 an empty index returns no hits.",
       "output": {
         "mode": "scalar",
         "fields": {
@@ -650,7 +650,7 @@
     {
       "verb": "invoice",
       "summary": "DRAFT an invoice for a client (reads tax-formula.md; computes VAT; never sends)",
-      "usage": "ops invoice <client> --amount <net> [--desc \"<text>\"]",
+      "usage": "plainkeep invoice <client> --amount <net> [--desc \"<text>\"]",
       "risk": "draft_only",
       "args": [
         {
@@ -691,7 +691,7 @@
     {
       "verb": "job",
       "summary": "list | run <name> | apply \u2014 scheduler-neutral jobs (\u00a715); apply renders launchd plists",
-      "usage": "ops job [list|run <name>|apply]",
+      "usage": "plainkeep job [list|run <name>|apply]",
       "risk": "safe_write",
       "args": [
         {
@@ -737,7 +737,7 @@
               "name": "name",
               "type": "string",
               "required": true,
-              "help": "the job name from `ops job list`"
+              "help": "the job name from `plainkeep job list`"
             }
           ]
         },
@@ -755,7 +755,7 @@
     {
       "verb": "models",
       "summary": "download/offload/test surface for the model layer: list|status|stop|pull|test per stage (stt, ocr, vlm, enrich, embed, rerank)",
-      "usage": "ops models list | status | stop [--all] [<model>] | pull [--stage <s>|--all] --yes | test <stage> [--model <m>] [--input <file>] --yes",
+      "usage": "plainkeep models list | status | stop [--all] [<model>] | pull [--stage <s>|--all] --yes | test <stage> [--model <m>] [--input <file>] --yes",
       "risk": "safe_write",
       "args": [
         {
@@ -764,11 +764,11 @@
         }
       ],
       "reads": [
-        "OPS_OCR / OPS_VLM / OPS_ENRICH_MODEL / OPS_EMBED_MODEL / OPS_RERANK_MODEL env",
+        "PLAINKEEP_OCR / PLAINKEEP_VLM / PLAINKEEP_ENRICH_MODEL / PLAINKEEP_EMBED_MODEL / PLAINKEEP_RERANK_MODEL env",
         "ollama (CLI, if installed)"
       ],
       "writes": [
-        "ollama's local model store (pull only; outside ~/ops)"
+        "ollama's local model store (pull only; outside ~/plainkeep)"
       ],
       "hints": "Per-stage model management, env-config-driven (proposal docs/design/proposals/2026-07-07-search-enrichment-pipeline.md \u00a72.1). `list` shows each stage's configured model, runtime, and whether it's pulled/available \u2014 pure probes, never loads a model. `status` is `ollama ps` (resident models). `stop [--all]` unloads a resident model (`ollama stop`) \u2014 free of --yes, it just reloads on next use. `pull [--stage <s>|--all]` and `test <stage> [--model <m>] [--input <file>]` both self-gate: without --yes they refuse with EXIT_CONFIRM(3) and print the exact re-run, because both can pull gigabytes; test then runs the stage's configured (or --model override) model on a sample/--input and prints output + timing, so you can A/B a candidate before adopting it by setting its env var. stt/rerank are pip-managed runtimes, not ollama models \u2014 pull skips them with a note. Common mistake: expecting `pull`/`test` to run without --yes \u2014 they never do, by design.",
       "output": {
@@ -879,7 +879,7 @@
     {
       "verb": "new",
       "summary": "scaffold a project (wiki hub + ~/work repo), client (wiki hub + ~/files tree), or verb (bin/<name>/ stub)",
-      "usage": "ops new project \"<name>\" [--kind labs|products|tools] | new client \"<name>\" | new verb <name> [--risk <class>] [--summary \"<text>\"]",
+      "usage": "plainkeep new project \"<name>\" [--kind labs|products|tools] | new client \"<name>\" | new verb <name> [--risk <class>] [--summary \"<text>\"]",
       "risk": "safe_write",
       "args": [
         {
@@ -901,7 +901,7 @@
         "~/work/",
         "~/files/clients/",
         "bin/ (new verb)",
-        "ops.json",
+        "plainkeep.json",
         "journal/"
       ],
       "hints": "Scaffold a project (wiki hub + ~/work repo), client (hub + ~/files tree), or verb. Common mistake: a slug that collides \u2014 slugs are globally unique across the three roots.",
@@ -998,7 +998,7 @@
     {
       "verb": "open",
       "summary": "resolve & open anything: task id | wiki slug | files asset | search top hit",
-      "usage": "ops open <target> [--edit|--reveal|--obsidian]",
+      "usage": "plainkeep open <target> [--edit|--reveal|--obsidian]",
       "risk": "read",
       "args": [
         {
@@ -1012,7 +1012,7 @@
         ".index/"
       ],
       "writes": [],
-      "hints": "One resolver for every addressable thing (task id \u2192 wiki slug \u2192 files shadow \u2192 search top hit). Default PRINTS the path \u2014 never launches a GUI. --edit ($EDITOR), --reveal (Finder open -R), --obsidian (obsidian:// URI via wiki open). Bare `ops open` with fzf = fuzzy picker with preview.",
+      "hints": "One resolver for every addressable thing (task id \u2192 wiki slug \u2192 files shadow \u2192 search top hit). Default PRINTS the path \u2014 never launches a GUI. --edit ($EDITOR), --reveal (Finder open -R), --obsidian (obsidian:// URI via wiki open). Bare `plainkeep open` with fzf = fuzzy picker with preview.",
       "output": {
         "mode": "scalar",
         "fields": {
@@ -1028,7 +1028,7 @@
     {
       "verb": "organize",
       "summary": "self-organization loop: scan -> review -> apply typed ops (proposal queue, never direct edits)",
-      "usage": "ops organize scan [--dry-run] | review [--accept|--reject|--defer <ids|all>] [--dry-run|--yes] | apply [--yes|--dry-run] [--safe-only] [--max-ops N] [--max-lines N]",
+      "usage": "plainkeep organize scan [--dry-run] | review [--accept|--reject|--defer <ids|all>] [--dry-run|--yes] | apply [--yes|--dry-run] [--safe-only] [--max-ops N] [--max-lines N]",
       "risk": "safe_write",
       "args": [
         {
@@ -1046,7 +1046,7 @@
         "wiki/ (apply only, one git commit per op)",
         "journal/"
       ],
-      "hints": "The self-organization loop. scan does ZERO-LLM candidate generation into a typed proposal queue inbox/organize/<date>.jsonl (CLOSED op catalog: add_link, refresh_hub, normalize_tag, fix_frontmatter, retitle, flag_duplicate, propose_merge; validated at write AND read time). A model (OPS_AGENT) only RANKS confidences; with none, heuristics. review appends accept/reject/defer status lines (audit ledger, latest wins) and shows the exact diff each op would produce. apply (needs --yes, NEVER schedulable; apply --dry-run previews the exact replay and writes nothing) deterministically replays APPROVED ops only, one commit per op, with an edit budget (20 ops / 300 lines, flags may only lower it) and protected paths (conventions/index/hubs/pinned) review-only; retitle/propose_merge/deletions never auto-apply. --safe-only applies only the four additive primitives above 0.8. Common mistake: expecting apply to run a model (it never does) or to touch a protected path.",
+      "hints": "The self-organization loop. scan does ZERO-LLM candidate generation into a typed proposal queue inbox/organize/<date>.jsonl (CLOSED op catalog: add_link, refresh_hub, normalize_tag, fix_frontmatter, retitle, flag_duplicate, propose_merge; validated at write AND read time). A model (PLAINKEEP_AGENT) only RANKS confidences; with none, heuristics. review appends accept/reject/defer status lines (audit ledger, latest wins) and shows the exact diff each op would produce. apply (needs --yes, NEVER schedulable; apply --dry-run previews the exact replay and writes nothing) deterministically replays APPROVED ops only, one commit per op, with an edit budget (20 ops / 300 lines, flags may only lower it) and protected paths (conventions/index/hubs/pinned) review-only; retitle/propose_merge/deletions never auto-apply. --safe-only applies only the four additive primitives above 0.8. Common mistake: expecting apply to run a model (it never does) or to touch a protected path.",
       "output": {
         "mode": "rows",
         "fields": {
@@ -1140,7 +1140,7 @@
     {
       "verb": "orient",
       "summary": "one-call session bootstrap: journal tail, tasks, inbox, proposals, index/backup age, git, recent notes",
-      "usage": "ops orient [--json|--line]",
+      "usage": "plainkeep orient [--json|--line]",
       "risk": "read",
       "reads": [
         "journal/",
@@ -1152,7 +1152,7 @@
       "writes": [
         ".cache/orient.line"
       ],
-      "hints": "Read-only session bootstrap for humans and agents in one call. --json = the full envelope; --line = a \u226460-char string cached (short TTL, OPS_ORIENT_TTL) for a starship/tmux prompt hook. Common mistake: confusing it with `ops start`, which writes the journal.",
+      "hints": "Read-only session bootstrap for humans and agents in one call. --json = the full envelope; --line = a \u226460-char string cached (short TTL, PLAINKEEP_ORIENT_TTL) for a starship/tmux prompt hook. Common mistake: confusing it with `plainkeep start`, which writes the journal.",
       "output": {
         "mode": "scalar",
         "fields": {
@@ -1175,7 +1175,7 @@
     {
       "verb": "plugin",
       "summary": "install/list/trust/update/remove plugin packs (untrusted until you trust them)",
-      "usage": "ops plugin add <owner/repo|path>[@tag] --yes | list | trust <name> --yes | update <name> --yes | remove <name> --yes",
+      "usage": "plainkeep plugin add <owner/repo|path>[@tag] --yes | list | trust <name> --yes | update <name> --yes | remove <name> --yes",
       "risk": "safe_write",
       "reads": [
         "plugins",
@@ -1197,7 +1197,7 @@
           "default": "-"
         }
       ],
-      "hints": "Installs a pack under plugins/<name>/, but its verbs are capped at confirm until `ops plugin trust <name> --yes` \u2014 self-declared risk never takes effect at install. add/update/remove/trust need --yes; list is read-only. Common mistake: expecting a freshly added pack to run at its declared risk.",
+      "hints": "Installs a pack under plugins/<name>/, but its verbs are capped at confirm until `plainkeep plugin trust <name> --yes` \u2014 self-declared risk never takes effect at install. add/update/remove/trust need --yes; list is read-only. Common mistake: expecting a freshly added pack to run at its declared risk.",
       "output": {
         "mode": "rows",
         "fields": {
@@ -1226,7 +1226,7 @@
               "type": "string",
               "required": true,
               "help": "owner/repo, a local path, optionally @tag",
-              "example": "acme/ops-pack@v1"
+              "example": "acme/example-pack@v1"
             }
           ]
         },
@@ -1276,7 +1276,7 @@
     {
       "verb": "repo",
       "summary": "~/work fleet: health | clone <slug>|--all | adopt <path> --kind <k> | nuke-modules --stale <days>",
-      "usage": "ops repo <action> [args]",
+      "usage": "plainkeep repo <action> [args]",
       "risk": "safe_write",
       "args": [
         {
@@ -1390,7 +1390,7 @@
     {
       "verb": "search",
       "summary": "ranked file#heading hits (keyword + graph [+ vectors/rerank])",
-      "usage": "ops search \"<query>\"",
+      "usage": "plainkeep search \"<query>\"",
       "risk": "read",
       "args": [
         {
@@ -1409,7 +1409,7 @@
       "writes": [
         ".logs/queries.jsonl"
       ],
-      "hints": "Ranked file#heading hits with an FTS5 snippet excerpt (keyword + graph, +vectors if OPS_VECTORS). `--author human` excludes agent + derived material; `--author agent` keeps only agent notes (provenance planes). `--open` jumps to the top hit via `ops open`; bare `ops search` in a tty with fzf opens a live search session. Common mistake: running before `ops index`, or too narrow a query \u2014 broaden and reindex.",
+      "hints": "Ranked file#heading hits with an FTS5 snippet excerpt (keyword + graph, +vectors if PLAINKEEP_VECTORS). `--author human` excludes agent + derived material; `--author agent` keeps only agent notes (provenance planes). `--open` jumps to the top hit via `plainkeep open`; bare `plainkeep search` in a tty with fzf opens a live search session. Common mistake: running before `plainkeep index`, or too narrow a query \u2014 broaden and reindex.",
       "output": {
         "mode": "rows",
         "fields": {
@@ -1425,7 +1425,7 @@
     {
       "verb": "setup",
       "summary": "layered installer dashboard and idempotent setup runner",
-      "usage": "ops setup [<layer> [--yes] | --all [--yes] | --wizard]",
+      "usage": "plainkeep setup [<layer> [--yes] | --all [--yes] | --wizard]",
       "risk": "safe_write",
       "args": [
         {
@@ -1457,7 +1457,7 @@
         "~/work",
         "Python package index / configured pip indexes (external, confirm-gated)",
         "Ollama daemon and model registry (external/local, confirm-gated)",
-        "template repo GitHub release assets via the gh CLI (ops-ui binary, confirm-gated)"
+        "template repo GitHub release assets via the gh CLI (plainkeep-ui binary, confirm-gated)"
       ],
       "writes": [
         "wiki/",
@@ -1467,9 +1467,9 @@
         ".obsidian/",
         "Python environment / site-packages (pip install, confirm-gated)",
         "~/.ollama/models (model pulls, confirm-gated)",
-        ".local/bin/ (ops-ui binary, sha256-verified, confirm-gated)"
+        ".local/bin/ (plainkeep-ui binary, sha256-verified, confirm-gated)"
       ],
-      "hints": "Bare `ops setup` is a read-only layered dashboard. `ops setup <layer>` advances one layer idempotently. `ops setup --wizard` is a guided, interactive first-run: one skippable prompt per layer with safe defaults (skeleton and the terminal UI on; search/models/automation off), interactive-only (needs a tty; not with --json/--dry-run \u2014 those exit 2 pointing at `ops setup --all --yes` / `ops setup --json`). Search and model layers can install Python packages and pull Ollama models into external stores, and the ui layer downloads the compiled ops-ui binary (sha256-verified, via the authenticated gh CLI) into .local/bin, so they require `--yes`; backups is a human handoff and is never included in `--all`. `--dry-run` previews any advance (single layer or `--all`) without installing/writing and needs no `--yes`.",
+      "hints": "Bare `plainkeep setup` is a read-only layered dashboard. `plainkeep setup <layer>` advances one layer idempotently. `plainkeep setup --wizard` is a guided, interactive first-run: one skippable prompt per layer with safe defaults (skeleton and the terminal UI on; search/models/automation off), interactive-only (needs a tty; not with --json/--dry-run \u2014 those exit 2 pointing at `plainkeep setup --all --yes` / `plainkeep setup --json`). Search and model layers can install Python packages and pull Ollama models into external stores, and the ui layer downloads the compiled plainkeep-ui binary (sha256-verified, via the authenticated gh CLI) into .local/bin, so they require `--yes`; backups is a human handoff and is never included in `--all`. `--dry-run` previews any advance (single layer or `--all`) without installing/writing and needs no `--yes`.",
       "dry_run": true,
       "output": {
         "mode": "rows",
@@ -1489,7 +1489,7 @@
     {
       "verb": "share",
       "summary": "capability-URL share: publish a note (or tag collection) as one unguessable link; browser gets HTML, <url>.md is raw markdown for agents",
-      "usage": "ops share <slug> [--expires 7d] [--gist] [--dry-run|--yes] | collection <tag> | list | pull <url> | revoke <id> --yes | init",
+      "usage": "plainkeep share <slug> [--expires 7d] [--gist] [--dry-run|--yes] | collection <tag> | list | pull <url> | revoke <id> --yes | init",
       "risk": "safe_write",
       "args": [
         {
@@ -1505,7 +1505,7 @@
         ".share/",
         "journal/"
       ],
-      "hints": "Share a note or `collection <tag>` as ONE self-contained OPSX bundle (raw markdown + rendered HTML), published PLAINTEXT to a Cloudflare Worker+KV under a 24-char unguessable token (~124 bits) -- no encryption, no key. Secrecy = link secrecy + TTL, same trust model as a secret gist; the worker can technically read published content (accepted tradeoff, see ADR-008). ONE link for everyone: the bare URL renders HTML in a browser; append `.md` (or paste the printed `agents:` line) and any chat/coding agent's fetch tool gets raw wiki markdown -- content negotiation also serves markdown to non-browser Accept headers on the bare URL. `ops share pull <url>` fetches + unpacks the same markdown locally. Legacy encrypted links from the old zero-knowledge model return 410 -- re-publish. Transmitting subactions (share/collection/revoke) self-gate --yes -> EXIT_CONFIRM(3) because a PUT is a transmission; `list` and `pull` are free reads. `--dry-run` renders locally and stops before the PUT. `--gist` = secret gist fallback (same trust model, hosted by GitHub). `ops share init` deploys the worker and provisions the `X-Publish-Token` (`--yes` runs `wrangler deploy` + `wrangler secret put PUBLISH_TOKEN`). Common mistake: expecting it to send the link \u2014 output is a DRAFT link, the human sends it.",
+      "hints": "Share a note or `collection <tag>` as ONE self-contained OPSX bundle (raw markdown + rendered HTML), published PLAINTEXT to a Cloudflare Worker+KV under a 24-char unguessable token (~124 bits) -- no encryption, no key. Secrecy = link secrecy + TTL, same trust model as a secret gist; the worker can technically read published content (accepted tradeoff, see ADR-008). ONE link for everyone: the bare URL renders HTML in a browser; append `.md` (or paste the printed `agents:` line) and any chat/coding agent's fetch tool gets raw wiki markdown -- content negotiation also serves markdown to non-browser Accept headers on the bare URL. `plainkeep share pull <url>` fetches + unpacks the same markdown locally. Legacy encrypted links from the old zero-knowledge model return 410 -- re-publish. Transmitting subactions (share/collection/revoke) self-gate --yes -> EXIT_CONFIRM(3) because a PUT is a transmission; `list` and `pull` are free reads. `--dry-run` renders locally and stops before the PUT. `--gist` = secret gist fallback (same trust model, hosted by GitHub). `plainkeep share init` deploys the worker and provisions the `X-Publish-Token` (`--yes` runs `wrangler deploy` + `wrangler secret put PUBLISH_TOKEN`). Common mistake: expecting it to send the link \u2014 output is a DRAFT link, the human sends it.",
       "output": {
         "mode": "rows",
         "fields": {
@@ -1522,7 +1522,7 @@
       "actions": [
         {
           "name": "publish",
-          "summary": "publish a note as one unguessable capability URL (invoked as `ops share <slug>`, no keyword)",
+          "summary": "publish a note as one unguessable capability URL (invoked as `plainkeep share <slug>`, no keyword)",
           "risk": "confirm",
           "dry_run": true,
           "default": true,
@@ -1533,7 +1533,7 @@
               "required": true,
               "complete": "note-slug",
               "help": "the note slug to publish",
-              "example": "the-ops-loop"
+              "example": "the-plainkeep-loop"
             },
             {
               "name": "--expires",
@@ -1624,7 +1624,7 @@
               "name": "id",
               "type": "string",
               "required": true,
-              "help": "the share id from `ops share list`"
+              "help": "the share id from `plainkeep share list`"
             }
           ]
         },
@@ -1648,7 +1648,7 @@
     {
       "verb": "start",
       "summary": "daily start: today's journal, carry-forward open tasks, dashboard",
-      "usage": "ops start [--dry-run]",
+      "usage": "plainkeep start [--dry-run]",
       "risk": "safe_write",
       "dry_run": true,
       "reads": [
@@ -1676,7 +1676,7 @@
     {
       "verb": "status",
       "summary": "dashboard: active/waiting tasks, inbox, last index, repo state",
-      "usage": "ops status",
+      "usage": "plainkeep status",
       "risk": "read",
       "reads": [
         "tasks/",
@@ -1685,11 +1685,11 @@
         ".index/"
       ],
       "writes": [],
-      "hints": "One-screen dashboard: tasks, inbox, index freshness, git state. Read-class. Common mistake: confusing it with `ops start` (which writes the journal).",
+      "hints": "One-screen dashboard: tasks, inbox, index freshness, git state. Read-class. Common mistake: confusing it with `plainkeep start` (which writes the journal).",
       "output": {
         "mode": "scalar",
         "fields": {
-          "ops_home": "string",
+          "plainkeep_home": "string",
           "active": "int",
           "waiting": "int",
           "inbox": "int",
@@ -1704,7 +1704,7 @@
     {
       "verb": "sweep",
       "summary": "decay Desktop/Downloads: untouched 7d \u2192 _swept/YYYY-MM/, 60d in _swept \u2192 Trash",
-      "usage": "ops sweep [--dry-run]",
+      "usage": "plainkeep sweep [--dry-run]",
       "risk": "safe_write",
       "reads": [
         "~/Desktop",
@@ -1716,7 +1716,7 @@
         "~/.Trash",
         "journal/"
       ],
-      "hints": "Decay Desktop/Downloads: untouched 7d \u2192 _swept/, 60d in _swept \u2192 Trash (never deletes outright). Common mistake: expecting rescue by reopening \u2014 rescue is `ops files ingest`.",
+      "hints": "Decay Desktop/Downloads: untouched 7d \u2192 _swept/, 60d in _swept \u2192 Trash (never deletes outright). Common mistake: expecting rescue by reopening \u2014 rescue is `plainkeep files ingest`.",
       "output": {
         "mode": "rows",
         "fields": {
@@ -1733,7 +1733,7 @@
     {
       "verb": "task",
       "summary": "list | add \"<title>\" | show <id> | move <id> <status> | done <id>",
-      "usage": "ops task <action> [args]",
+      "usage": "plainkeep task <action> [args]",
       "risk": "safe_write",
       "args": [
         {
@@ -1848,7 +1848,7 @@
     {
       "verb": "triage",
       "summary": "propose filing of inbox/ items into tasks or wiki; human approves | drafts: promote agent-drafted notes",
-      "usage": "ops triage [--dry-run|--yes] | drafts [--dry-run|--yes]",
+      "usage": "plainkeep triage [--dry-run|--yes] | drafts [--dry-run|--yes]",
       "risk": "safe_write",
       "args": [
         {
@@ -1867,7 +1867,7 @@
         "journal/",
         "wiki/conventions.md"
       ],
-      "hints": "Propose filing of inbox/ items into a task or note; the human approves. `ops triage drafts` pages agent-drafted notes (author:agent, status:draft) from `ops files distill` as a promotion queue: accept -> active, reject -> delete, one git commit each. --json lists proposals/drafts without acting. Common mistake: expecting it to auto-file without --yes.",
+      "hints": "Propose filing of inbox/ items into a task or note; the human approves. `plainkeep triage drafts` pages agent-drafted notes (author:agent, status:draft) from `plainkeep files distill` as a promotion queue: accept -> active, reject -> delete, one git commit each. --json lists proposals/drafts without acting. Common mistake: expecting it to auto-file without --yes.",
       "output": {
         "mode": "rows",
         "fields": {
@@ -1881,7 +1881,7 @@
       "actions": [
         {
           "name": "propose",
-          "summary": "page inbox/ items and file each (interactive; `ops triage`, no keyword). --json lists proposals without acting; use `decide` to apply headless",
+          "summary": "page inbox/ items and file each (interactive; `plainkeep triage`, no keyword). --json lists proposals without acting; use `decide` to apply headless",
           "risk": "safe_write",
           "dry_run": true,
           "tty": true,
@@ -1897,7 +1897,7 @@
               "name": "item",
               "type": "string",
               "required": true,
-              "help": "the inbox item filename (from `ops triage --json`)",
+              "help": "the inbox item filename (from `plainkeep triage --json`)",
               "example": "cap-2026-07-24-note.md"
             },
             {
@@ -1927,15 +1927,15 @@
     },
     {
       "verb": "ui",
-      "summary": "launch the ops terminal UI (ops-ui) \u2014 the ops.json/3 contract-driven frontend",
-      "usage": "ops ui [args passed through to ops-ui]",
+      "summary": "launch the plainkeep terminal UI (plainkeep-ui) \u2014 the plainkeep.json/3 contract-driven frontend",
+      "usage": "plainkeep ui [args passed through to plainkeep-ui]",
       "risk": "read",
       "tty": true,
       "reads": [
-        "PATH (locates the ops-ui binary)"
+        "PATH (locates the plainkeep-ui binary)"
       ],
       "writes": [],
-      "hints": "Entry shim for the terminal UI: execs the installed `ops-ui` binary (found on PATH, or via OPS_UI_BIN), handing it the terminal \u2014 the TUI itself composes verbs over `ops <verb> --json` + `ops complete`. When ops-ui isn't installed it prints a blocked-style install hint and exits cleanly (never a crash). Common mistake: expecting `ops ui --json` to stream data \u2014 it launches an interactive UI (tty:true); drive ops programmatically with `ops <verb> --json` instead.",
+      "hints": "Entry shim for the terminal UI: execs the installed `plainkeep-ui` binary (found on PATH, or via PLAINKEEP_UI_BIN), handing it the terminal \u2014 the TUI itself composes verbs over `plainkeep <verb> --json` + `plainkeep complete`. When plainkeep-ui isn't installed it prints a blocked-style install hint and exits cleanly (never a crash). Common mistake: expecting `plainkeep ui --json` to stream data \u2014 it launches an interactive UI (tty:true); drive plainkeep programmatically with `plainkeep <verb> --json` instead.",
       "output": {
         "mode": "scalar",
         "fields": {
@@ -1950,7 +1950,7 @@
     {
       "verb": "week",
       "summary": "weekly review: shipped/stalled, repo health, sweep done/ -> done/<year>/",
-      "usage": "ops week [--dry-run]",
+      "usage": "plainkeep week [--dry-run]",
       "risk": "safe_write",
       "dry_run": true,
       "reads": [
@@ -1978,7 +1978,7 @@
     {
       "verb": "wiki",
       "summary": "open <slug> [--obsidian] | edit | new <type> <name> | backlinks | stale | orphans | canvas <hub|#tag> | list",
-      "usage": "ops wiki <action> [args]",
+      "usage": "plainkeep wiki <action> [args]",
       "risk": "safe_write",
       "args": [
         {
@@ -1994,7 +1994,7 @@
         "wiki/",
         "journal/"
       ],
-      "hints": "Navigate/grow the wiki: open/edit/new/backlinks/stale/orphans/canvas/list. `open --obsidian` (or OPS_OPEN=obsidian) opens the note in Obsidian via a local obsidian:// URI. `canvas <hub|#tag>` writes a deterministic wiki/canvas/<slug>.canvas (JSON Canvas). Common mistake: a duplicate slug on `new` \u2014 slugs are unique.",
+      "hints": "Navigate/grow the wiki: open/edit/new/backlinks/stale/orphans/canvas/list. `open --obsidian` (or PLAINKEEP_OPEN=obsidian) opens the note in Obsidian via a local obsidian:// URI. `canvas <hub|#tag>` writes a deterministic wiki/canvas/<slug>.canvas (JSON Canvas). Common mistake: a duplicate slug on `new` \u2014 slugs are unique.",
       "output": {
         "mode": "rows",
         "fields": {
@@ -2016,7 +2016,7 @@
               "required": true,
               "complete": "note-slug",
               "help": "the note slug ([[wikilink]] basename)",
-              "example": "the-ops-loop"
+              "example": "the-plainkeep-loop"
             },
             {
               "name": "--obsidian",
@@ -2038,7 +2038,7 @@
               "required": true,
               "complete": "note-slug",
               "help": "the note slug to edit",
-              "example": "the-ops-loop"
+              "example": "the-plainkeep-loop"
             }
           ]
         },
@@ -2075,7 +2075,7 @@
               "required": true,
               "complete": "note-slug",
               "help": "the target note slug",
-              "example": "the-ops-loop"
+              "example": "the-plainkeep-loop"
             }
           ]
         },
@@ -2111,7 +2111,7 @@
               "required": true,
               "complete": "note-slug",
               "help": "a hub note slug, or a #tag (all tagged notes)",
-              "example": "the-ops-loop"
+              "example": "the-plainkeep-loop"
             },
             {
               "name": "--depth",

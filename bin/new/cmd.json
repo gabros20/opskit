@@ -1,7 +1,7 @@
 {
   "verb": "new",
   "summary": "scaffold a project (wiki hub + ~/work repo), client (wiki hub + ~/files tree), or verb (bin/<name>/ stub)",
-  "usage": "ops new project \"<name>\" [--kind labs|products|tools] | new client \"<name>\" | new verb <name> [--risk <class>] [--summary \"<text>\"]",
+  "usage": "plainkeep new project \"<name>\" [--kind labs|products|tools] | new client \"<name>\" | new verb <name> [--risk <class>] [--summary \"<text>\"]",
   "risk": "safe_write",
   "args": [
     {
@@ -23,7 +23,7 @@
     "~/work/",
     "~/files/clients/",
     "bin/ (new verb)",
-    "ops.json",
+    "plainkeep.json",
     "journal/"
   ],
   "hints": "Scaffold a project (wiki hub + ~/work repo), client (hub + ~/files tree), or verb. Common mistake: a slug that collides \u2014 slugs are globally unique across the three roots.",

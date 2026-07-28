@@ -17,20 +17,20 @@ lives in `docs/design/PERSONAL_OS_DESIGN.md` §10.1.
 Allowed `type`: `client | project | area | person | tool | note | runbook | skill | decision |
 meeting | research | prediction | bookmark`.
 
-Auto-generated meta (optional, written by `ops enrich`): `description` (single line, one-to-two
+Auto-generated meta (optional, written by `plainkeep enrich`): `description` (single line, one-to-two
 sentences, `fm_field`-readable) and `keywords` (a **block list** — `- keyword` lines, read via
-`_fm_block`, never inline `[a, b]`; an inline flow list is exactly what `ops doctor`'s frontmatter-churn
+`_fm_block`, never inline `[a, b]`; an inline flow list is exactly what `plainkeep doctor`'s frontmatter-churn
 check flags). Frontmatter already leads every note, so both fields are keyword- and vector-searchable
 for free.
 
 The type registry is **data-driven** — the authoritative list (and each type's target folder and
 per-type body template) lives in `templates/wiki/` (`types.json` + `<type>.md`). Adding a note type is
 config, not code: add an entry to `types.json` (and optionally a `<type>.md` template), and it's
-immediately usable by `ops wiki new <type>` and tab-completion. See `bin/lib/notetype.py`.
+immediately usable by `plainkeep wiki new <type>` and tab-completion. See `bin/lib/notetype.py`.
 
 ## Images & binaries
-The wiki is **plaintext-only** (`ops doctor` enforces it — no binaries tracked under `wiki/`). So
-images, PDFs, and other binaries live in `~/files`, referenced by a **shadow note** (`ops files
+The wiki is **plaintext-only** (`plainkeep doctor` enforces it — no binaries tracked under `wiki/`). So
+images, PDFs, and other binaries live in `~/files`, referenced by a **shadow note** (`plainkeep files
 ingest`). For images, the shadow note embeds the file with `![title](path)` so an editor that resolves
 the path previews it inline; the terminal renderer shows a `🖼` reference. Bytes never enter git.
 
@@ -51,16 +51,16 @@ never loses history.
 
 ## Provenance planes
 Every note lives in exactly one of three planes, so a machine (or the graph) can never mistake
-derived or drafted material for the user's own settled thought (`ops doctor` flags violations, and
-`ops search --author human` excludes everything but the first plane):
+derived or drafted material for the user's own settled thought (`plainkeep doctor` flags violations, and
+`plainkeep search --author human` excludes everything but the first plane):
 
 1. **Human note** — authored by you. No `author:`, no `derived_from:`. The default plane.
-2. **Derived note** — mechanically extracted from a binary/URL (`ops files extract`). Lives beside
+2. **Derived note** — mechanically extracted from a binary/URL (`plainkeep files extract`). Lives beside
    its shadow in `wiki/files/<slug>.extract.md`, `type: extract|transcript`, and carries the
    provenance triple `derived_from: "[[<slug>]]"`, `source_sha256:`, `tool: <name> <version>`. It
    never masquerades as source truth and never folds into the shadow note.
 3. **Agent concept note** — compiled by an agent from derived material. Carries `author: agent`,
-   `source: "[[…]]"`, and a `status:` gate (`draft` until you promote it via `ops triage`).
+   `source: "[[…]]"`, and a `status:` gate (`draft` until you promote it via `plainkeep triage`).
 
 Rules doctor enforces: a note with `tool:`/`source_sha256:` MUST have `derived_from:`; an
 `author: agent` note MUST have a `status:`; a `derived_from:` note MUST live in `wiki/files/`.

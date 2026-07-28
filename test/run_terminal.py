@@ -2,13 +2,13 @@
 """
 run_terminal.py — terminal ergonomics (proposal Part 3.4) + the Raycast frontend (Part 3.3).
 Offline, stdlib only. Covers:
-  1. `ops open` resolution ORDER on a fixture vault: task id → wiki slug → files asset (shadow-note
+  1. `plainkeep open` resolution ORDER on a fixture vault: task id → wiki slug → files asset (shadow-note
      `path:` field) → search top-hit fallback; --json envelope; not-found (4); --reveal path;
-  2. `ops orient` all three renders (human dashboard, --json envelope, --line ≤60-char cached) +
+  2. `plainkeep orient` all three renders (human dashboard, --json envelope, --line ≤60-char cached) +
      JSON envelope validity + the .cache/orient.line TTL cache;
-  3. `ops search` FTS5 snippet() present in human + --json rows; --open jumps via ops open; bare
+  3. `plainkeep search` FTS5 snippet() present in human + --json rows; --open jumps via plainkeep open; bare
      non-tty search keeps the usage error (2);
-  4. `frontends/raycast/*.sh` pass `bash -n` and reference only `ops` (no python/lib import).
+  4. `frontends/raycast/*.sh` pass `bash -n` and reference only `plainkeep` (no python/lib import).
 """
 from __future__ import annotations
 import json
@@ -22,7 +22,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 BIN = REPO / "bin"
-OPS = REPO / "ops"
+PLAINKEEP = REPO / "plainkeep"
 PY = sys.executable
 GREEN, RED, DIM, BOLD, RESET = "\033[32m", "\033[31m", "\033[2m", "\033[1m", "\033[0m"
 results = []
@@ -55,7 +55,7 @@ def envelope_ok(objs, verb):
 
 
 def main() -> int:
-    # ---- 4. raycast scripts: bash -n + reference only `ops` ----
+    # ---- 4. raycast scripts: bash -n + reference only `plainkeep` ----
     ray = sorted((REPO / "frontends" / "raycast").glob("*.sh"))
     check("raycast: 4-6 script commands present", 4 <= len(ray) <= 6, [p.name for p in ray])
     for sh in ray:
@@ -63,7 +63,7 @@ def main() -> int:
         check(f"raycast: {sh.name} passes bash -n", rc.returncode == 0, rc.stderr)
         text = sh.read_text(encoding="utf-8")
         code = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
-        check(f"raycast: {sh.name} invokes ops", re.search(r'"\$OPS"|\$\{OPS', code) is not None, code[:120])
+        check(f"raycast: {sh.name} invokes plainkeep", re.search(r'"\$PLAINKEEP"|\$\{PLAINKEEP', code) is not None, code[:120])
         check(f"raycast: {sh.name} no python/lib import",
               "python" not in code and "bin/lib" not in code and "import" not in code, code[:120])
         check(f"raycast: {sh.name} has @raycast.title", "@raycast.title" in text)
@@ -75,13 +75,13 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory() as td:
         h = Path(td)
-        env = {**os.environ, "OPS_HOME": str(h), "OPS_ROOTS_HOME": str(h), "OPS_NO_OPEN": "1"}
-        # the `ops` dispatcher ties bin/ to OPS_HOME (run_mcp.py pattern) — mirror the engine into the
-        # fixture vault so dispatcher re-entry (`ops open`, search `--open`) is exercised honestly.
+        env = {**os.environ, "PLAINKEEP_HOME": str(h), "PLAINKEEP_ROOTS_HOME": str(h), "PLAINKEEP_NO_OPEN": "1"}
+        # the `plainkeep` dispatcher ties bin/ to PLAINKEEP_HOME (run_mcp.py pattern) — mirror the engine into the
+        # fixture vault so dispatcher re-entry (`plainkeep open`, search `--open`) is exercised honestly.
         shutil.copytree(BIN, h / "bin")
-        shutil.copy2(OPS, h / "ops"); os.chmod(h / "ops", 0o755)
+        shutil.copy2(PLAINKEEP, h / "plainkeep"); os.chmod(h / "plainkeep", 0o755)
         (h / "VERSION").write_text((REPO / "VERSION").read_text(encoding="utf-8"), encoding="utf-8")
-        home_ops = h / "ops"
+        home_bin = h / "plainkeep"
         # seed: a wiki note, a task, a files asset (shadow note), a search-only note
         note(h, "notes/alpha-widget.md", "Alpha Widget", "the alpha widget doc")
         note(h, "notes/gamma-doc.md", "Gamma Doc", "gamma content about frobnication")
@@ -135,22 +135,22 @@ def main() -> int:
         check("open unknown -> not-found(4)", r.returncode == 4 and objs and objs[0]["ok"] is False
               and objs[0]["error"]["code"] == 4, f"rc={r.returncode} {r.stdout[:160]}")
 
-        # --reveal prints the binary path (OPS_NO_OPEN suppresses the Finder call)
+        # --reveal prints the binary path (PLAINKEEP_NO_OPEN suppresses the Finder call)
         r = run(env, "open", "paper", "--reveal")
         check("open --reveal prints the binary path", r.stdout.strip().endswith("paper.pdf"), r.stdout[:160])
 
-        # bare `ops open` non-tty (no fzf/tty) -> usage(2)
+        # bare `plainkeep open` non-tty (no fzf/tty) -> usage(2)
         r = run(env, "open")
         check("bare open non-tty -> usage(2)", r.returncode == 2, f"rc={r.returncode} {r.stderr[:120]}")
 
         # dispatcher path: guardrail classes `open` as read (runs freely, exit 0)
-        d = subprocess.run([str(home_ops), "open", "alpha-widget"], capture_output=True, text=True, env=env)
+        d = subprocess.run([str(home_bin), "open", "alpha-widget"], capture_output=True, text=True, env=env)
         check("dispatcher runs open (guardrail: read)", d.returncode == 0
               and d.stdout.strip().endswith("alpha-widget.md"), d.stdout + d.stderr)
 
         # ---- 2. orient: three renders ----
         r = run(env, "orient")
-        check("orient human dashboard renders", "ops orient" in r.stdout and "tasks:" in r.stdout, r.stdout[:200])
+        check("orient human dashboard renders", "plainkeep orient" in r.stdout and "tasks:" in r.stdout, r.stdout[:200])
         check("orient dashboard lists the active task", tid in r.stdout, r.stdout[:300])
 
         r = run(env, "orient", "--json")
@@ -174,10 +174,10 @@ def main() -> int:
         check("orient --line writes the cache", cache.exists() and cache.read_text().strip() == line, str(cache))
         # cache TTL: a poisoned cache value is served while fresh (proves it reads the cache, cheap)
         cache.write_text("CACHED-SENTINEL\n", encoding="utf-8")
-        r2 = run({**env, "OPS_ORIENT_TTL": "60"}, "orient", "--line")
+        r2 = run({**env, "PLAINKEEP_ORIENT_TTL": "60"}, "orient", "--line")
         check("orient --line serves the fresh cache (TTL)", r2.stdout.strip() == "CACHED-SENTINEL", r2.stdout)
         # TTL=0 disables the cache -> recompute
-        r3 = run({**env, "OPS_ORIENT_TTL": "0"}, "orient", "--line")
+        r3 = run({**env, "PLAINKEEP_ORIENT_TTL": "0"}, "orient", "--line")
         check("orient --line TTL=0 recomputes (ignores cache)", r3.stdout.strip() != "CACHED-SENTINEL", r3.stdout)
 
         # ---- 3. search snippets + --open + bare non-tty ----
@@ -193,7 +193,7 @@ def main() -> int:
         r = run(env, "search", "frobnication")  # human
         check("search human shows the snippet excerpt", "frobnication" in r.stdout.lower(), r.stdout[:200])
 
-        # --open jumps to the top hit via `ops open` (prints its resolved path)
+        # --open jumps to the top hit via `plainkeep open` (prints its resolved path)
         r = run(env, "search", "frobnication", "--open")
         check("search --open jumps to the top hit", "gamma-doc.md" in r.stdout, r.stdout[:160])
 

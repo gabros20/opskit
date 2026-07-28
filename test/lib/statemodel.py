@@ -5,7 +5,7 @@ Four areas that quietly break reliable systems:
   1. Task status conflict — the folder is the status; frontmatter is a mirror. §7.2: "folder
      wins on conflict." A drift between them must be detectable (consolidate/doctor reports it).
   2. System-of-record — the index/cache is DERIVED from files; it must rebuild to exactly match
-     the files, discarding any DB-only drift (§10.2: "rm -rf .index && ops index").
+     the files, discarding any DB-only drift (§10.2: "rm -rf .index && plainkeep index").
   3. Journal append — the journal is shared cross-driver memory (§8). Writes must be atomic
      appends; a read-modify-write loses entries when two drivers run concurrently.
   4. Restore order — §14.2: auth must exist before any private clone/restore; the ordered
@@ -60,9 +60,9 @@ def line_count(content: str) -> int:
 RESTORE_DEPS = {
     "toolchain": set(),
     "auth": {"toolchain"},               # 1Password / SSH key (Brewfile installed it)
-    "clone_ops": {"auth"},               # private remote needs auth
-    "doctor_init": {"clone_ops"},        # creates ~/work + ~/files skeleton
-    "clone_work": {"auth", "clone_ops"}, # registry lives in ops
+    "clone_plainkeep": {"auth"},         # private remote needs auth
+    "doctor_init": {"clone_plainkeep"},  # creates ~/work + ~/files skeleton
+    "clone_work": {"auth", "clone_plainkeep"}, # registry lives in plainkeep
     "restic_restore": {"auth", "doctor_init"},  # bucket key in 1Password; ~/files skeleton exists
 }
 

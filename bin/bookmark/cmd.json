@@ -1,7 +1,7 @@
 {
   "verb": "bookmark",
   "summary": "save a URL as a wiki note (type: bookmark); best-effort title fetch; --archive snapshots to ~/files",
-  "usage": "ops bookmark <url> [--note \"<text>\"] [--no-fetch] [--archive]",
+  "usage": "plainkeep bookmark <url> [--note \"<text>\"] [--no-fetch] [--archive]",
   "risk": "safe_write",
   "args": [
     {
@@ -29,7 +29,7 @@
     "journal/",
     "~/files/bookmarks/ (with --archive)"
   ],
-  "hints": "Save a URL as a wiki bookmark note (title fetched best-effort). Body text is extracted via trafilatura when installed (optional dep; pip install trafilatura), else a crude zero-dependency tag-strip. --archive additionally snapshots the fetched page HTML into ~/files/bookmarks/ against link-rot (skipped if the page wasn't reachable). Any http(s) URL is accepted as a generic link/article \u2014 a tweet or video URL is saved the same way, there is no special x.com/YouTube parsing (see `ops files extract` for transcript extraction of an already-ingested media file). Common mistake: --archive without a reachable page \u2014 the HTML snapshot is skipped.",
+  "hints": "Save a URL as a wiki bookmark note (title fetched best-effort). Body text is extracted via trafilatura when installed (optional dep; pip install trafilatura), else a crude zero-dependency tag-strip. --archive additionally snapshots the fetched page HTML into ~/files/bookmarks/ against link-rot (skipped if the page wasn't reachable). Any http(s) URL is accepted as a generic link/article \u2014 a tweet or video URL is saved the same way, there is no special x.com/YouTube parsing (see `plainkeep files extract` for transcript extraction of an already-ingested media file). Common mistake: --archive without a reachable page \u2014 the HTML snapshot is skipped.",
   "output": {
     "mode": "scalar",
     "fields": {

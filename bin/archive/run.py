@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops archive <slug> — retire a dead ~/work repo (§4.1, §14). git-bundles the WHOLE repo (all history,
+plainkeep archive <slug> — retire a dead ~/work repo (§4.1, §14). git-bundles the WHOLE repo (all history,
 one file) into ~/work/archive/<year>/<slug>.bundle, marks its wiki hub status: archived, and removes
 the working tree. The bundle is a complete, restorable repo (`git clone <bundle>`), so nothing is lost.
 """
@@ -31,7 +31,7 @@ def main(argv):
     dry = "--dry-run" in argv
     argv = [a for a in argv if a != "--dry-run"]
     if not argv:
-        output.fail(output.EXIT_USAGE, "usage: ops archive <slug>", verb="archive")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep archive <slug>", verb="archive")
     slug = argv[0]
     repo = _find_repo(slug)
     if not repo:

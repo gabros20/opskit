@@ -1,6 +1,6 @@
 # Changelog
 
-Notable changes to the ops platform, newest first. Format follows
+Notable changes to the plainkeep platform, newest first. Format follows
 [Keep a Changelog](https://keepachangelog.com). The *why* behind load-bearing decisions lives in the
 ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what changed*.
 
@@ -26,6 +26,16 @@ ADR log ([`docs/DECISIONS.md`](docs/DECISIONS.md)); this file records *what chan
   `bin/ui/version.txt`, and `ui/src/version.ts`.
 
 ### Changed
+- **Renamed: `opskit` → `plainkeep`, full consistency** (ADR-012). `opskit` collided with 40+
+  same-named GitHub repos, was squatted on npm and PyPI, and read as DevOps tooling on sight — not a
+  cosmetic problem, so the rename goes all the way through rather than stopping at the brand: the
+  `ops <verb>` CLI dispatcher is now `plainkeep <verb>`; the vault folder is `~/plainkeep`; every
+  `OPS_*` environment variable and same-named constant is now `PLAINKEEP_*` (`OPS_HOME` →
+  `PLAINKEEP_HOME`, `OPS_VECTORS` → `PLAINKEEP_VECTORS`, and so on, no exceptions); the machine
+  contract file is `plainkeep.json` (contract phrase `ops.json/3` → `plainkeep.json/3`); and the
+  terminal UI binary is `plainkeep-ui`, released as `ui-v0.2.0` with `plainkeep-ui-*` assets.
+  Existing vaults migrate by hand — see "Migrating an existing `~/ops` vault" in
+  [`docs/setup.md`](docs/setup.md). GitHub redirects the old repo URLs.
 - **Repo renamed: `personal-operating-system` → `opskit`** (ADR-011). The template is the *kit* —
   engine + TUI + funnel — not anyone's data; GitHub redirects the old URLs, and
   `script/get`/`script/setup` now point at `gabros20/opskit` (`script/get.sh.sha256` regenerated).

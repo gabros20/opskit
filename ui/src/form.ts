@@ -1,5 +1,5 @@
-// Generate a Clack prompt sequence from an action's args schema, then build the argv for `ops`.
-// This is the heart of "no flags to memorize": the form comes from ops.json/3, not hardcoded.
+// Generate a Clack prompt sequence from an action's args schema, then build the argv for `plainkeep`.
+// This is the heart of "no flags to memorize": the form comes from plainkeep.json/3, not hardcoded.
 import * as p from "@clack/prompts";
 import { complete, type Action, type Arg, type Verb } from "./contract.js";
 

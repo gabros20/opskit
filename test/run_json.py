@@ -2,10 +2,10 @@
 """
 run_json.py — the machine-contract suite (proposal Part 1.1/1.2/0.5), offline + stdlib only:
   1. every non-hidden verb's cmd.json declares an `output` block and `hints` (the I/O contract lives
-     in ops.json, so a third party never imports lib);
+     in plainkeep.json, so a third party never imports lib);
   2. the declared `dry_run` verbs actually declare it;
-  3. ops.json/3 top-level shape (schema/ops_version/api_version/json_envelope/capabilities) + the
-     ops.json/3 additions: every verb's `group`, and well-formed `actions[]` on compound verbs;
+  3. plainkeep.json/3 top-level shape (schema/ops_version/api_version/json_envelope/capabilities) + the
+     plainkeep.json/3 additions: every verb's `group`, and well-formed `actions[]` on compound verbs;
   4. `--json` round-trips: each read-class verb, run against a fixture world, emits the frozen
      envelope and every field its cmd.json `output` block declares;
   5. `--dry-run` on a mutating verb emits a valid envelope and writes NOTHING.
@@ -102,19 +102,19 @@ def main() -> int:
     for v in sorted(DRY):
         check(f"{v}: declares dry_run", _cmd(v).get("dry_run") is True)
 
-    # --- ops.json/3 top-level shape ---
+    # --- plainkeep.json/3 top-level shape ---
     with tempfile.TemporaryDirectory() as td:
-        env0 = {**os.environ, "OPS_HOME": td, "OPS_ROOTS_HOME": td}
-        run(env0, "help")  # regenerates ops.json into the temp OPS_HOME
-        doc = json.loads((Path(td) / "ops.json").read_text(encoding="utf-8"))
+        env0 = {**os.environ, "PLAINKEEP_HOME": td, "PLAINKEEP_ROOTS_HOME": td}
+        run(env0, "help")  # regenerates plainkeep.json into the temp PLAINKEEP_HOME
+        doc = json.loads((Path(td) / "plainkeep.json").read_text(encoding="utf-8"))
     for key in ("schema", "ops_version", "api_version", "json_envelope", "capabilities", "verbs"):
-        check(f"ops.json top-level: {key}", key in doc)
-    check("ops.json schema is ops.json/3", doc.get("schema") == "ops.json/3")
+        check(f"plainkeep.json top-level: {key}", key in doc)
+    check("plainkeep.json schema is plainkeep.json/3", doc.get("schema") == "plainkeep.json/3")
     caps = doc.get("capabilities", {})
     check("capabilities keys present", all(k in caps for k in ("vectors", "rerank", "agent", "plugins")))
     check("every verb tagged source=engine", all(v.get("source") == "engine" for v in doc.get("verbs", [])))
 
-    # --- ops.json/3: every verb carries a display `group`; declared `actions[]` are well-formed ---
+    # --- plainkeep.json/3: every verb carries a display `group`; declared `actions[]` are well-formed ---
     ARG_TYPES = {"string", "int", "enum", "slug", "path", "flag"}
     RISK_ENUM = {"read", "safe_write", "draft_only", "confirm", "deny"}
     COMPLETE_PROVIDERS = {"note-slug", "asset-slug", "task-id", "hub", "note-type", "status", "layer"}
@@ -154,7 +154,7 @@ def main() -> int:
     for v in dverbs:
         if "actions" in v:
             ok, why = _actions_wellformed(v)
-            check(f"{v['verb']}: actions[] well-formed (ops.json/3)", ok, why)
+            check(f"{v['verb']}: actions[] well-formed (plainkeep.json/3)", ok, why)
             ndefault = sum(1 for a in v["actions"] if a.get("default"))
             check(f"{v['verb']}: at most one default action", ndefault <= 1, f"{ndefault} defaults")
     # every compound verb (wave 1 + wave 2) carries a non-empty actions[]
@@ -170,9 +170,9 @@ def main() -> int:
         check(f"{v}: has a default:true action (tokenless default)",
               any(a.get("default") for a in acts), str([a["name"] for a in acts]))
 
-    # --- the completion contract verb (ops complete): visible, read-class, right output shape ---
+    # --- the completion contract verb (plainkeep complete): visible, read-class, right output shape ---
     comp = by_verb.get("complete")
-    check("complete: verb present in ops.json/3", isinstance(comp, dict), "missing")
+    check("complete: verb present in plainkeep.json/3", isinstance(comp, dict), "missing")
     if comp:
         check("complete: risk read", comp.get("risk") == "read", str(comp.get("risk")))
         cfields = comp.get("output", {}).get("fields", {})
@@ -182,11 +182,11 @@ def main() -> int:
 
     # --- live --json round-trip against a seeded fixture world ---
     with tempfile.TemporaryDirectory() as td:
-        ops = Path(td) / "ops"
+        plainkeep_home = Path(td) / "plainkeep"
         roots = Path(td) / "roots"
-        ops.mkdir(); roots.mkdir()
-        env = {**os.environ, "OPS_HOME": str(ops), "OPS_ROOTS_HOME": str(roots),
-               "OPS_NO_OPEN": "1"}
+        plainkeep_home.mkdir(); roots.mkdir()
+        env = {**os.environ, "PLAINKEEP_HOME": str(plainkeep_home), "PLAINKEEP_ROOTS_HOME": str(roots),
+               "PLAINKEEP_NO_OPEN": "1"}
         # seed content
         run(env, "wiki", "new", "note", "Alpha Note About Testing")
         run(env, "task", "add", "Fix the alpha widget")
@@ -194,8 +194,8 @@ def main() -> int:
         png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 64)
         run(env, "files", "ingest", str(png))
         # jobs registry (user-owned; copy the repo's for the fixture)
-        (ops / "jobs").mkdir(parents=True, exist_ok=True)
-        (ops / "jobs" / "registry.json").write_text(
+        (plainkeep_home / "jobs").mkdir(parents=True, exist_ok=True)
+        (plainkeep_home / "jobs" / "registry.json").write_text(
             (REPO / "jobs" / "registry.json").read_text(encoding="utf-8"), encoding="utf-8")
         mkrepo(roots / "work" / "labs" / "demo")
         run(env, "index")
@@ -218,27 +218,27 @@ def main() -> int:
             r = run(env, verb, *args, "--json")
             validate_rows(f"{verb} {' '.join(args)}".strip(), r, verb, [], check_fields=False)
 
-        # OPS_JSON env toggles JSON too (no --json flag)
-        r = run({**env, "OPS_JSON": "1"}, "status")
-        validate_scalar("status via OPS_JSON=1", r, "status", list(_cmd("status")["output"]["fields"]))
+        # PLAINKEEP_JSON env toggles JSON too (no --json flag)
+        r = run({**env, "PLAINKEEP_JSON": "1"}, "status")
+        validate_scalar("status via PLAINKEEP_JSON=1", r, "status", list(_cmd("status")["output"]["fields"]))
 
         # --dry-run emits a valid envelope AND writes nothing
-        before = len(list((ops / "tasks" / "active").glob("T-*.md")))
+        before = len(list((plainkeep_home / "tasks" / "active").glob("T-*.md")))
         r = run(env, "task", "add", "Should not persist", "--dry-run", "--json")
         objs = parse_ndjson(r.stdout) if r.stdout.strip() else []
         check("task add --dry-run: ok envelope",
               len(objs) == 1 and objs[0].get("ok") is True and objs[0]["data"].get("dry_run") is True, r.stdout[:200])
-        after = len(list((ops / "tasks" / "active").glob("T-*.md")))
+        after = len(list((plainkeep_home / "tasks" / "active").glob("T-*.md")))
         check("task add --dry-run writes nothing", before == after, f"{before} -> {after}")
 
-        inbox_before = len(list((ops / "inbox").glob("cap-*.md")))
+        inbox_before = len(list((plainkeep_home / "inbox").glob("cap-*.md")))
         r = run(env, "capture", "ephemeral", "--dry-run", "--json")
         check("capture --dry-run writes nothing",
-              len(list((ops / "inbox").glob("cap-*.md"))) == inbox_before, r.stdout[:160])
+              len(list((plainkeep_home / "inbox").glob("cap-*.md"))) == inbox_before, r.stdout[:160])
 
         # the daily/weekly verbs (start/close/week) now honour --dry-run: valid envelope, no journal write
         def _journal_md():
-            jd = ops / "journal"
+            jd = plainkeep_home / "journal"
             return len(list(jd.rglob("*.md"))) if jd.exists() else 0
         for verb in ("start", "close", "week"):
             before = _journal_md()
@@ -269,19 +269,19 @@ def main() -> int:
               len(srows) > 1 and all(row.get("status") in SETUP_STATUS_ENUM for row in srows[1:]),
               f"rc={r.returncode} {r.stdout[:200]}")
 
-        # ui shim (Wave 3): with ops-ui absent, a blocked-style envelope (installed:false, next hint),
-        # exits cleanly — never a crash. Point OPS_UI_BIN at a nonexistent path so `_resolve` short-
+        # ui shim (Wave 3): with plainkeep-ui absent, a blocked-style envelope (installed:false, next hint),
+        # exits cleanly — never a crash. Point PLAINKEEP_UI_BIN at a nonexistent path so `_resolve` short-
         # circuits on the override and never consults the host PATH — deterministic even the day
-        # ops-ui is installed globally (the host-sensitive-path CI lesson).
-        r = run({**env, "OPS_UI_BIN": "/nonexistent/ops-ui"}, "ui", "--json")
+        # plainkeep-ui is installed globally (the host-sensitive-path CI lesson).
+        r = run({**env, "PLAINKEEP_UI_BIN": "/nonexistent/plainkeep-ui"}, "ui", "--json")
         uobjs = parse_ndjson(r.stdout) if r.stdout.strip() else []
-        check("ui --json (ops-ui absent): blocked envelope, clean exit",
+        check("ui --json (plainkeep-ui absent): blocked envelope, clean exit",
               r.returncode == 0 and len(uobjs) == 1 and uobjs[0].get("ok") is True
               and uobjs[0]["data"].get("installed") is False
               and uobjs[0]["data"].get("status") == "blocked"
               and bool(uobjs[0]["data"].get("next")), r.stdout[:200])
 
-    print(f"{BOLD}Machine contract: --json envelope + ops.json/3 + dry-run — {len(results)} checks{RESET}\n")
+    print(f"{BOLD}Machine contract: --json envelope + plainkeep.json/3 + dry-run — {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
     for name, ok, detail in results:
         mark = f"{GREEN}PASS{RESET}" if ok else f"{RED}FAIL{RESET}"

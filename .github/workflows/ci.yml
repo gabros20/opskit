@@ -46,7 +46,7 @@ jobs:
       - name: git identity (suites create temp repos)
         run: |
           git config --global user.email "ci@example.com"
-          git config --global user.name "ops-ci"
+          git config --global user.name "plainkeep-ci"
           git config --global init.defaultBranch main
       - name: run offline test suites
         run: |
@@ -59,7 +59,7 @@ jobs:
   ui:
     # The TS terminal UI (ui/, ADR-011). Typecheck + compile smoke: the same `bun build --compile`
     # the release workflow ships must produce a binary that honors the non-TTY contract (exit 2,
-    # pointing at `ops <verb> --json`) — that's testable headlessly without an ops vault.
+    # pointing at `plainkeep <verb> --json`) — that's testable headlessly without a plainkeep vault.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,9 +75,9 @@ jobs:
       - name: compile smoke + non-TTY contract
         working-directory: ui
         run: |
-          bun build --compile src/index.ts --outfile /tmp/ops-ui
+          bun build --compile src/index.ts --outfile /tmp/plainkeep-ui
           set +e
-          out="$(/tmp/ops-ui </dev/null 2>&1)"
+          out="$(/tmp/plainkeep-ui </dev/null 2>&1)"
           code=$?
           set -e
           echo "$out"

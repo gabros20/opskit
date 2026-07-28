@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops doctor [--init] — self-check (§14.4): tools, folder structure, manifest↔bin consistency, agent
+plainkeep doctor [--init] — self-check (§14.4): tools, folder structure, manifest↔bin consistency, agent
 adapters, no tracked secrets/binaries, index freshness. --init creates any missing skeleton folders.
 Exit 1 if any check FAILs (WARN does not fail).
 """
@@ -80,19 +80,19 @@ def main(argv):
     # 1. tools
     for t in ("git", "python3", "sqlite3"):
         (ok if shutil.which(t) else (warn if t == "sqlite3" else fail))(f"tool: {t} {'present' if shutil.which(t) else 'MISSING'}")
-    vectors_requested = os.environ.get("OPS_VECTORS", "").lower() in ("1", "true", "yes", "on")
+    vectors_requested = os.environ.get("PLAINKEEP_VECTORS", "").lower() in ("1", "true", "yes", "on")
     for mod, why in (("lancedb", "stage-2 vectors"), ("fastembed", "stage-3 rerank")):
         try:
             __import__(mod); ok(f"optional: {mod} present ({why})")
         except Exception:
-            # A missing optional dep is normally fine — but if OPS_VECTORS=1 and lancedb can't
-            # import, `ops index` will silently fall back to keyword-only. That mismatch is a
+            # A missing optional dep is normally fine — but if PLAINKEEP_VECTORS=1 and lancedb can't
+            # import, `plainkeep index` will silently fall back to keyword-only. That mismatch is a
             # misconfiguration worth calling out loudly, with the exact remedy.
             if mod == "lancedb" and vectors_requested:
-                warn("OPS_VECTORS=1 but lancedb is NOT importable by this python3 (`which python3`) — "
-                     "`ops index` falls back to keyword-only. Fix: install requirements.txt into THIS "
-                     "interpreter and put $OPS_HOME/.venv/bin first on PATH (in an agent terminal, in "
-                     "its shell init) — see docs/agent-terminal-search.md; or unset OPS_VECTORS.")
+                warn("PLAINKEEP_VECTORS=1 but lancedb is NOT importable by this python3 (`which python3`) — "
+                     "`plainkeep index` falls back to keyword-only. Fix: install requirements.txt into THIS "
+                     "interpreter and put $PLAINKEEP_HOME/.venv/bin first on PATH (in an agent terminal, in "
+                     "its shell init) — see docs/agent-terminal-search.md; or unset PLAINKEEP_VECTORS.")
             else:
                 warn(f"optional: {mod} not installed ({why} disabled)")
 
@@ -111,20 +111,20 @@ def main(argv):
     (ok if shutil.which("tesseract") else warn)(
         "optional: tesseract present (OCR fallback)" if shutil.which("tesseract")
         else "optional: tesseract not on PATH (OCR fallback disabled)")
-    vlm_requested = os.environ.get("OPS_VLM", "").strip().lower()
+    vlm_requested = os.environ.get("PLAINKEEP_VLM", "").strip().lower()
     if vlm_requested and vlm_requested != "none":
         try:
             __import__("mlx_vlm"); has_mlx_vlm = True
         except Exception:
             has_mlx_vlm = False
         if not has_mlx_vlm and not shutil.which("ollama"):
-            warn(f"OPS_VLM={os.environ['OPS_VLM']} but neither mlx-vlm nor ollama is available — "
-                 "`ops files extract --describe` will skip Layer 3 entirely. Fix: install mlx-vlm "
-                 "(Apple Silicon) or run ollama (any host); or unset OPS_VLM.")
+            warn(f"PLAINKEEP_VLM={os.environ['PLAINKEEP_VLM']} but neither mlx-vlm nor ollama is available — "
+                 "`plainkeep files extract --describe` will skip Layer 3 entirely. Fix: install mlx-vlm "
+                 "(Apple Silicon) or run ollama (any host); or unset PLAINKEEP_VLM.")
 
     # search enrichment (docs/design/proposals/2026-07-07-search-enrichment-pipeline.md): auto-wired
-    # into `files extract`/`bookmark` unless OPS_ENRICH=off, so a soft probe here mirrors OPS_VLM's.
-    enrich_requested = os.environ.get("OPS_ENRICH", "").strip().lower()
+    # into `files extract`/`bookmark` unless PLAINKEEP_ENRICH=off, so a soft probe here mirrors PLAINKEEP_VLM's.
+    enrich_requested = os.environ.get("PLAINKEEP_ENRICH", "").strip().lower()
     if enrich_requested != "off":
         try:
             from lib import enrichlib
@@ -136,11 +136,11 @@ def main(argv):
         else:
             warn("enrich model/Ollama not reachable — `files extract`/`bookmark` auto-enrich will "
                  "fall back to the stdlib keyword floor (no description, no LLM keywords). Fix: run "
-                 "ollama and pull the configured OPS_ENRICH_MODEL; or set OPS_ENRICH=off.")
+                 "ollama and pull the configured PLAINKEEP_ENRICH_MODEL; or set PLAINKEEP_ENRICH=off.")
 
     # 2. folders
     for d in REQUIRED_DIRS:
-        p = paths.OPS_HOME / d
+        p = paths.PLAINKEEP_HOME / d
         if p.is_dir():
             ok(f"folder: {d}/")
         elif init:
@@ -148,7 +148,7 @@ def main(argv):
             (p / ".gitkeep").touch()
             ok(f"folder: {d}/ (created)")
         else:
-            fail(f"folder: {d}/ MISSING (run: ops doctor --init)")
+            fail(f"folder: {d}/ MISSING (run: plainkeep doctor --init)")
 
     # 2a. Obsidian config pack (Part 3.1): with --init, seed .obsidian/ from templates/obsidian/.
     # .obsidian/ is USER-OWNED (never in engine.txt); refuse-don't-overwrite keeps a customized
@@ -156,8 +156,8 @@ def main(argv):
     # This runs BEFORE the setup-layer status below so --init seeds .obsidian/ (and the skeleton dirs
     # above) before that status is computed and reported (checking first made every first
     # `doctor --init` on a fresh clone fail itself).
-    pack = paths.OPS_HOME / "templates" / "obsidian"
-    dest = paths.OPS_HOME / ".obsidian"
+    pack = paths.PLAINKEEP_HOME / "templates" / "obsidian"
+    dest = paths.PLAINKEEP_HOME / ".obsidian"
     if pack.is_dir():
         srcs = sorted(pack.glob("*.json"))
         if init:
@@ -172,7 +172,7 @@ def main(argv):
                 copied += 1
             ok(f"obsidian: config pack (.obsidian/: {copied} copied, {kept} kept)")
         elif not (dest / "app.json").exists():
-            warn("obsidian: config pack not installed (run: ops doctor --init to seed .obsidian/)")
+            warn("obsidian: config pack not installed (run: plainkeep doctor --init to seed .obsidian/)")
         else:
             ok("obsidian: .obsidian/ config present")
 
@@ -194,7 +194,7 @@ def main(argv):
         else:
             warn(msg)
 
-    # 3. manifest <-> bin  (hidden verbs, e.g. __complete, are intentionally absent from ops.json)
+    # 3. manifest <-> bin  (hidden verbs, e.g. __complete, are intentionally absent from plainkeep.json)
     def _hidden(v):
         f = BIN / v / "cmd.json"
         try:
@@ -204,37 +204,37 @@ def main(argv):
     verbs_on_disk = {p.parent.name for p in BIN.glob("*/run.py") if not _hidden(p.parent.name)}
     for v in sorted(verbs_on_disk):
         if not (BIN / v / "cmd.json").exists():
-            warn(f"verb '{v}' has run.py but no cmd.json (won't show in ops help)")
-    opsjson = paths.OPS_HOME / "ops.json"
-    if opsjson.exists():
+            warn(f"verb '{v}' has run.py but no cmd.json (won't show in plainkeep help)")
+    manifest_json = paths.PLAINKEEP_HOME / "plainkeep.json"
+    if manifest_json.exists():
         try:
-            man = {c["verb"] for c in json.loads(opsjson.read_text())["verbs"]}
+            man = {c["verb"] for c in json.loads(manifest_json.read_text())["verbs"]}
             missing = verbs_on_disk - man
-            ok("ops.json parses and matches bin/" if not missing else f"ops.json stale: missing {missing} (run: ops help)")
+            ok("plainkeep.json parses and matches bin/" if not missing else f"plainkeep.json stale: missing {missing} (run: plainkeep help)")
             if missing:
-                warn(f"ops.json missing verbs: {missing}")
+                warn(f"plainkeep.json missing verbs: {missing}")
         except Exception as e:
-            fail(f"ops.json does not parse: {e}")
+            fail(f"plainkeep.json does not parse: {e}")
     else:
-        warn("ops.json not generated yet (run: ops help)")
+        warn("plainkeep.json not generated yet (run: plainkeep help)")
 
     # 4. agent adapters
-    agents, claude, skill = (paths.OPS_HOME / "AGENTS.md", paths.OPS_HOME / "CLAUDE.md",
-                             paths.OPS_HOME / "skills" / "operate-ops" / "SKILL.md")
+    agents, claude, skill = (paths.PLAINKEEP_HOME / "AGENTS.md", paths.PLAINKEEP_HOME / "CLAUDE.md",
+                             paths.PLAINKEEP_HOME / "skills" / "operate-plainkeep" / "SKILL.md")
     (ok if agents.exists() else fail)(f"adapter: AGENTS.md {'present' if agents.exists() else 'MISSING'}")
     (ok if (claude.exists() and "@AGENTS.md" in claude.read_text()) else fail)(
         "adapter: CLAUDE.md bridges @AGENTS.md" if claude.exists() else "adapter: CLAUDE.md MISSING")
-    (ok if skill.exists() else fail)(f"adapter: skills/operate-ops/SKILL.md {'present' if skill.exists() else 'MISSING'}")
+    (ok if skill.exists() else fail)(f"adapter: skills/operate-plainkeep/SKILL.md {'present' if skill.exists() else 'MISSING'}")
 
     # per-agent adapters: warn if absent (a vault may not use every agent), FAIL if present-but-broken
-    cdx_cfg, cdx_sk = paths.OPS_HOME / ".codex" / "config.toml", paths.OPS_HOME / ".codex" / "skills"
+    cdx_cfg, cdx_sk = paths.PLAINKEEP_HOME / ".codex" / "config.toml", paths.PLAINKEEP_HOME / ".codex" / "skills"
     if cdx_cfg.exists() or cdx_sk.is_symlink() or cdx_sk.exists():
         (ok if cdx_cfg.exists() else warn)(".codex/config.toml" + ("" if cdx_cfg.exists() else " MISSING"))
-        (ok if (cdx_sk / "operate-ops").exists() else fail)(".codex/skills → skills/ resolves"
-            if (cdx_sk / "operate-ops").exists() else ".codex/skills symlink is BROKEN")
+        (ok if (cdx_sk / "operate-plainkeep").exists() else fail)(".codex/skills → skills/ resolves"
+            if (cdx_sk / "operate-plainkeep").exists() else ".codex/skills symlink is BROKEN")
     else:
         warn(".codex/ adapter not set up (Codex & Grok read AGENTS.md natively regardless)")
-    cl_set, cl_sk = paths.OPS_HOME / ".claude" / "settings.json", paths.OPS_HOME / ".claude" / "skills"
+    cl_set, cl_sk = paths.PLAINKEEP_HOME / ".claude" / "settings.json", paths.PLAINKEEP_HOME / ".claude" / "skills"
     if cl_set.exists() or cl_sk.is_symlink() or cl_sk.exists():
         try:
             json.loads(cl_set.read_text()); ok(".claude/settings.json parses")
@@ -242,17 +242,17 @@ def main(argv):
             warn(".claude/settings.json MISSING")
         except Exception as e:
             fail(f".claude/settings.json is INVALID json: {e}")
-        (ok if (cl_sk / "operate-ops").exists() else fail)(".claude/skills → skills/ resolves"
-            if (cl_sk / "operate-ops").exists() else ".claude/skills symlink is BROKEN")
+        (ok if (cl_sk / "operate-plainkeep").exists() else fail)(".claude/skills → skills/ resolves"
+            if (cl_sk / "operate-plainkeep").exists() else ".claude/skills symlink is BROKEN")
     else:
-        warn(".claude/ adapter not set up (add it to lock Claude Code to the ops surface)")
+        warn(".claude/ adapter not set up (add it to lock Claude Code to the plainkeep surface)")
 
     # 5. no tracked secrets / binaries in wiki
     tracked = paths.git("ls-files").splitlines()
     if tracked:
         env = [t for t in tracked if Path(t).name.startswith(".env") or t.endswith(".env")]
         (fail if env else ok)(f"no tracked .env files" if not env else f"SECRET RISK: tracked {env}")
-        # .canvas (JSON Canvas) and .base (Obsidian Bases) are plaintext view layers ops emits (Part 3)
+        # .canvas (JSON Canvas) and .base (Obsidian Bases) are plaintext view layers plainkeep emits (Part 3)
         wiki_bin = [t for t in tracked if t.startswith("wiki/")
                     and not t.endswith((".md", ".gitkeep", ".canvas", ".base"))]
         (fail if wiki_bin else ok)("wiki is plaintext-only" if not wiki_bin else f"binaries tracked in wiki: {wiki_bin}")
@@ -260,22 +260,22 @@ def main(argv):
         warn("not a git repo (or nothing tracked) — skipped secret/binary scan")
 
     # 6. index
-    db = paths.OPS_HOME / ".index" / "ops.sqlite"
-    (ok if db.exists() else warn)("index built" if db.exists() else "index not built (run: ops index)")
+    db = paths.PLAINKEEP_HOME / ".index" / "plainkeep.sqlite"
+    (ok if db.exists() else warn)("index built" if db.exists() else "index not built (run: plainkeep index)")
 
     # 7. sync-wall (Part 0.4): a .git tree must NEVER live under iCloud/Dropbox/Syncthing
-    ops_real = _real(paths.OPS_HOME)
-    if guardrail.under_sync_dir(ops_real):
-        fail(f"~/ops resolves under a cloud-sync tree ({ops_real}) — never sync a .git (data loss)")
+    home_real = _real(paths.PLAINKEEP_HOME)
+    if guardrail.under_sync_dir(home_real):
+        fail(f"~/plainkeep resolves under a cloud-sync tree ({home_real}) — never sync a .git (data loss)")
     else:
-        ok("~/ops is not under a cloud-sync tree")
+        ok("~/plainkeep is not under a cloud-sync tree")
     if paths.WORK_ROOT.is_dir():
         synced = [g for g in _find_git_dirs(paths.WORK_ROOT) if guardrail.under_sync_dir(_real(g))]
         (fail if synced else ok)(
             f"{len(synced)} work repo .git under a cloud-sync tree: {synced[:3]}" if synced
             else "no ~/work repo .git is under a cloud-sync tree")
 
-    # 7b. durability: prefer >=2 push remotes on ~/ops (a second off-machine mirror)
+    # 7b. durability: prefer >=2 push remotes on ~/plainkeep (a second off-machine mirror)
     remotes = paths.git("remote", "-v")
     if remotes.strip():
         push = {}
@@ -288,13 +288,13 @@ def main(argv):
             else f"only {len(push)} push remote(s) — add a second off-machine mirror for durability")
 
     # 8. frontmatter round-trip: notes Obsidian's Properties normalizer would churn (Part 0.4)
-    wiki = paths.OPS_HOME / "wiki"
+    wiki = paths.PLAINKEEP_HOME / "wiki"
     if wiki.is_dir():
         churn = []
         for md in wiki.rglob("*.md"):
             why = _fm_churn(md)
             if why:
-                churn.append(f"{md.relative_to(paths.OPS_HOME)}: {why}")
+                churn.append(f"{md.relative_to(paths.PLAINKEEP_HOME)}: {why}")
             if len(churn) >= 50:
                 break
         if churn:
@@ -313,7 +313,7 @@ def main(argv):
                 text = md.read_text(encoding="utf-8")
             except Exception:
                 continue
-            rel = md.relative_to(paths.OPS_HOME)
+            rel = md.relative_to(paths.PLAINKEEP_HOME)
             for tg in paths.fm_list(text, "tags"):
                 if tg and not tag_re.match(tg):
                     bad_tags.append(f"{rel}: '{tg}'")
@@ -339,7 +339,7 @@ def main(argv):
     # points to its source (derived_from + source_sha256/tool) and lives beside its shadow in
     # wiki/files/; an agent concept note carries a status gate. Violations are WARN (surfaced, never
     # a hard fail) — this is the poisoned-memory antidote made checkable.
-    files_dir = paths.OPS_HOME / "wiki" / "files"
+    files_dir = paths.PLAINKEEP_HOME / "wiki" / "files"
     if wiki.is_dir():
         prov = []
         for md in wiki.rglob("*.md"):
@@ -347,7 +347,7 @@ def main(argv):
                 fm = paths.frontmatter(md)
             except Exception:
                 continue
-            rel = md.relative_to(paths.OPS_HOME)
+            rel = md.relative_to(paths.PLAINKEEP_HOME)
             derived = fm.get("derived_from")
             if (fm.get("tool") or fm.get("source_sha256")) and not derived:
                 prov.append(f"{rel}: has tool:/source_sha256 but no derived_from (a derived note must point to its source)")
@@ -363,9 +363,9 @@ def main(argv):
             ok("provenance planes consistent (derived/agent notes well-formed)")
 
     # 11. jobs registry (Part 4.4): only read/safe_write verbs may be scheduled — a confirm/deny-class
-    # verb in the registry is a data-loss/transmit risk (e.g. `ops organize apply` must NEVER be
-    # scheduled; the weekly `ops organize scan` is safe_write and fine). WARN-only.
-    reg = paths.OPS_HOME / "jobs" / "registry.json"
+    # verb in the registry is a data-loss/transmit risk (e.g. `plainkeep organize apply` must NEVER be
+    # scheduled; the weekly `plainkeep organize scan` is safe_write and fine). WARN-only.
+    reg = paths.PLAINKEEP_HOME / "jobs" / "registry.json"
     if reg.exists():
         try:
             jobs = json.loads(reg.read_text(encoding="utf-8")).get("jobs", {})
@@ -374,7 +374,7 @@ def main(argv):
         offenders = []
         for name, job in jobs.items():
             toks = str(job.get("command", "")).split()
-            verb = toks[1] if len(toks) > 1 and toks[0] == "ops" else None
+            verb = toks[1] if len(toks) > 1 and toks[0] == "plainkeep" else None
             vr = guardrail.risk_of(verb) if verb else None
             if job.get("risk") not in ("read", "safe_write") or vr in ("confirm", "deny"):
                 offenders.append(f"{name} ({job.get('command')})")

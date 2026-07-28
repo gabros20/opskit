@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""run_enrich_pipeline.py — integration suite for `ops enrich` wired into `files extract` and
-`bookmark` (search-enrichment proposal §5). Drives the verbs as subprocesses under OPS_ENRICH_FAKE=1
-(no models, no network) against a temp OPS_HOME + OPS_ROOTS_HOME, reusing the 1x1 PNG fixture from
+"""run_enrich_pipeline.py — integration suite for `plainkeep enrich` wired into `files extract` and
+`bookmark` (search-enrichment proposal §5). Drives the verbs as subprocesses under PLAINKEEP_ENRICH_FAKE=1
+(no models, no network) against a temp PLAINKEEP_HOME + PLAINKEEP_ROOTS_HOME, reusing the 1x1 PNG fixture from
 test/run_files_image.py."""
 from __future__ import annotations
 import base64
@@ -26,9 +26,9 @@ def check(name, cond, detail=""):
 
 
 def run(verb, *args, home, roots=None, extra=None):
-    env = {**os.environ, "OPS_HOME": str(home), "OPS_ENRICH_FAKE": "1", "OPS_IMAGE_FAKE": "1"}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home), "PLAINKEEP_ENRICH_FAKE": "1", "PLAINKEEP_IMAGE_FAKE": "1"}
     if roots:
-        env["OPS_ROOTS_HOME"] = str(roots)
+        env["PLAINKEEP_ROOTS_HOME"] = str(roots)
     if extra:
         env.update(extra)
     return subprocess.run([sys.executable, str(REPO / "bin" / verb / "run.py"), *args],
@@ -59,7 +59,7 @@ def main() -> int:
         check(".extract.md note has NO enrich meta (meta lives on the shadow, not the extract)",
               "description:" not in efm and "enrich_key:" not in efm, efm)
 
-        # ---------- `ops enrich <slug>` re-run is a no-op (same key); --reenrich forces ----------
+        # ---------- `plainkeep enrich <slug>` re-run is a no-op (same key); --reenrich forces ----------
         key1 = next(ln.split(":", 1)[1].strip() for ln in sfm.splitlines() if ln.startswith("enrich_key:"))
         r = run("enrich", "pic", "--json", home=ops, roots=roots)
         check("re-run enrich pic exits 0", r.returncode == 0, r.stdout + r.stderr)
@@ -81,7 +81,7 @@ def main() -> int:
         r = run("enrich", "no-such-slug", home=ops, roots=roots)
         check("enrich of an unknown slug -> exit 4 (not-found)", r.returncode == 4, r.stdout + r.stderr)
 
-        # ---------- `ops bookmark --no-fetch` gets enriched meta on its own note ----------
+        # ---------- `plainkeep bookmark --no-fetch` gets enriched meta on its own note ----------
         r = run("bookmark", "https://example.com/some-page", "--no-fetch",
                 "--note", "hello world this is a note body for enrichment testing purposes here",
                 home=ops, roots=roots)
@@ -94,17 +94,17 @@ def main() -> int:
               "keywords:\n- fake\n- enrich" in bfm and "keywords: [" not in bfm, bfm)
         check("bookmark note gets enrich_key", "enrich_key:" in bfm, bfm)
 
-        # ---------- OPS_ENRICH=off suppresses the auto-wiring hook ----------
+        # ---------- PLAINKEEP_ENRICH=off suppresses the auto-wiring hook ----------
         r = run("bookmark", "https://example.com/other-page", "--no-fetch",
                 "--note", "another note body, long enough to matter for enrichment guards here",
-                home=ops, roots=roots, extra={"OPS_ENRICH": "off"})
-        check("bookmark (OPS_ENRICH=off) exits 0", r.returncode == 0, r.stdout + r.stderr)
+                home=ops, roots=roots, extra={"PLAINKEEP_ENRICH": "off"})
+        check("bookmark (PLAINKEEP_ENRICH=off) exits 0", r.returncode == 0, r.stdout + r.stderr)
         other = ops / "wiki" / "bookmarks" / "other-page.md"
         ofm = other.read_text() if other.exists() else ""
-        check("OPS_ENRICH=off: no enrich_key written by the auto-wiring hook",
+        check("PLAINKEEP_ENRICH=off: no enrich_key written by the auto-wiring hook",
               "enrich_key:" not in ofm, ofm)
 
-        # ---------- `ops enrich --all` sweeps every eligible note, including the un-enriched one ----------
+        # ---------- `plainkeep enrich --all` sweeps every eligible note, including the un-enriched one ----------
         r = run("enrich", "--all", "--json", home=ops, roots=roots)
         check("enrich --all exits 0", r.returncode == 0, r.stdout + r.stderr)
         alines = r.stdout.splitlines()
@@ -120,7 +120,7 @@ def main() -> int:
         ofm2 = other.read_text()
         check("--all wrote enrich meta onto the previously-off note", "enrich_key:" in ofm2, ofm2)
 
-    print(f"\n{BOLD}Enrichment pipeline wiring (files extract + bookmark + ops enrich) "
+    print(f"\n{BOLD}Enrichment pipeline wiring (files extract + bookmark + plainkeep enrich) "
           f"— {len(results)} checks{RESET}\n")
     passed = sum(1 for _, ok, _ in results if ok)
     for name, ok, detail in results:

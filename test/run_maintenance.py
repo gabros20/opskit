@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""run_maintenance.py — exercises `ops backup` (commit/push freshness nag) and `ops consolidate`
+"""run_maintenance.py — exercises `plainkeep backup` (commit/push freshness nag) and `plainkeep consolidate`
 (nightly dream-lite digest). Sets up a real temp git repo + bare remote for backup."""
 from __future__ import annotations
 import os
@@ -24,7 +24,7 @@ def git(home, *a):
 
 
 def run(home, verb, *args):
-    env = {**os.environ, "OPS_HOME": str(home)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home)}
     return subprocess.run([sys.executable, str(REPO / "bin" / verb / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 

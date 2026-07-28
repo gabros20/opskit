@@ -1,20 +1,20 @@
-"""paths.py — shared filesystem roots + small helpers for the ops verbs."""
+"""paths.py — shared filesystem roots + small helpers for the plainkeep verbs."""
 from __future__ import annotations
 import os
 import re
 from datetime import date, datetime
 from pathlib import Path
 
-OPS_HOME = Path(os.environ.get("OPS_HOME", Path(__file__).resolve().parents[2]))
-INBOX = OPS_HOME / "inbox"
-TASKS = OPS_HOME / "tasks"
-JOURNAL = OPS_HOME / "journal"
-WIKI = OPS_HOME / "wiki"
-BIN = OPS_HOME / "bin"
+PLAINKEEP_HOME = Path(os.environ.get("PLAINKEEP_HOME", Path(__file__).resolve().parents[2]))
+INBOX = PLAINKEEP_HOME / "inbox"
+TASKS = PLAINKEEP_HOME / "tasks"
+JOURNAL = PLAINKEEP_HOME / "journal"
+WIKI = PLAINKEEP_HOME / "wiki"
+BIN = PLAINKEEP_HOME / "bin"
 TASK_STATUSES = ("inbox", "active", "waiting", "done")
 
-# The sibling roots (§2) — never inside ~/ops. OPS_ROOTS_HOME lets tests redirect them off real ~/.
-ROOTS_HOME = Path(os.environ.get("OPS_ROOTS_HOME") or os.environ.get("HOME") or Path.home())
+# The sibling roots (§2) — never inside ~/plainkeep. PLAINKEEP_ROOTS_HOME lets tests redirect them off real ~/.
+ROOTS_HOME = Path(os.environ.get("PLAINKEEP_ROOTS_HOME") or os.environ.get("HOME") or Path.home())
 WORK_ROOT = ROOTS_HOME / "work"
 FILES_ROOT = ROOTS_HOME / "files"
 WORK_KINDS = ("products", "labs", "tools")   # clients/ is nested <client>/<project>; archive/ is special
@@ -57,7 +57,7 @@ def append_journal(line: str) -> Path:
 def git(*args) -> str:
     import subprocess
     try:
-        return subprocess.run(["git", "-C", str(OPS_HOME), *args],
+        return subprocess.run(["git", "-C", str(PLAINKEEP_HOME), *args],
                               capture_output=True, text=True, timeout=10).stdout
     except Exception:
         return ""

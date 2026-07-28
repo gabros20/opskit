@@ -1,22 +1,23 @@
-# opskit — a personal operating system (`~/ops`)
+# plainkeep — a personal operating system (`~/plainkeep`)
 
-**opskit turns a folder of Markdown files into a system that runs your knowledge, tasks, and
+**plainkeep turns a folder of Markdown files into a system that runs your knowledge, tasks, and
 work — operable by you, by schedules, and by AI agents, all through one command.**
 
-Everything is plaintext in your own git repo. One `ops <verb>` command is the only door: it knows
-where things go, a guardrail classifies every call before it runs, and nothing leaves your machine
-without you. No server, no cloud, no lock-in — you can grep your notes or walk away at any time.
+Everything is plaintext in your own git repo. One `plainkeep <verb>` command is the only door: it
+knows where things go, a guardrail classifies every call before it runs, and nothing leaves your
+machine without you. No server, no cloud, no lock-in — you can grep your notes or walk away at any
+time.
 
 There are two faces, one door:
 
-- **Humans** run `ops ui` — a guided terminal UI. Point-and-pick menus, forms generated from the
-  machine contract, nothing to memorize.
-- **Agents and scripts** run `ops <verb> --json` — a frozen JSON envelope and a strict exit-code
-  protocol.
+- **Humans** run `plainkeep ui` — a guided terminal UI. Point-and-pick menus, forms generated from
+  the machine contract, nothing to memorize.
+- **Agents and scripts** run `plainkeep <verb> --json` — a frozen JSON envelope and a strict
+  exit-code protocol.
 
 Both go through the same dispatcher, so the guardrail and the logs see every action identically.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · verbs generated (see [`ops.json`](ops.json)) · offline test suites in CI · macOS / Linux · Python 3.10+ + git · zero required deps
+[![License: MIT](https://img.shields.io/badge/License-MIT-C96442.svg)](LICENSE) · verbs generated (see [`plainkeep.json`](plainkeep.json)) · offline test suites in CI · macOS / Linux · Python 3.10+ + git · zero required deps
 
 > [!TIP]
 > Want the 2-minute tour first? Open [`docs/how-it-works.html`](docs/how-it-works.html) in a
@@ -24,32 +25,32 @@ Both go through the same dispatcher, so the guardrail and the logs see every act
 
 ## Quick start
 
-This repo is a **template, not your data**. The installer clones your own copy to `~/ops` and wires
-the machine:
+This repo is a **template, not your data**. The installer clones your own copy to `~/plainkeep` and
+wires the machine:
 
 ```sh
 # 1. Download the installer, verify it, read it
 curl --proto '=https' --tlsv1.2 -fsSL \
-  https://raw.githubusercontent.com/gabros20/opskit/main/script/get -o get.sh
+  https://raw.githubusercontent.com/gabros20/plainkeep/main/script/get -o get.sh
 shasum -a 256 get.sh        # compare against script/get.sh.sha256 in the repo
 
-# 2. Install (lean vault, non-interactive, no sudo; refuses to overwrite an existing ~/ops)
+# 2. Install (lean vault, non-interactive, no sudo; refuses to overwrite an existing ~/plainkeep)
 sh get.sh
 
 # 3. Finish with the guided first-run
-ops setup --wizard
+plainkeep setup --wizard
 ```
 
 The wizard walks the optional layers with safe defaults: vault skeleton and the terminal UI **on**;
 semantic search, local models, and scheduled jobs **off** until you opt in. Prefer flags?
-`ops setup --all --yes` does the same non-interactively.
+`plainkeep setup --all --yes` does the same non-interactively.
 
 Then try it:
 
 ```sh
-ops ui                                 # the guided terminal UI
-ops capture "an idea worth keeping"    # a thought → inbox/
-ops orient                             # where am I? tasks, journal, inbox, health
+plainkeep ui                                 # the guided terminal UI
+plainkeep capture "an idea worth keeping"    # a thought → inbox/
+plainkeep orient                             # where am I? tasks, journal, inbox, health
 ```
 
 Not ready to commit? `sh get.sh --demo` installs a throwaway vault with example notes into a tmp
@@ -62,18 +63,18 @@ one-line install hint when missing.
 
 ## How your files are organized
 
-Four roots, separated by location. Siblings sit *next to* `~/ops`, never inside it — that keeps the
-knowledge repo small and fast, and the safety wall is rooted in this layout:
+Four roots, separated by location. Siblings sit *next to* `~/plainkeep`, never inside it — that
+keeps the knowledge repo small and fast, and the safety wall is rooted in this layout:
 
 | Root | Holds | In git? |
 |---|---|---|
-| `~/ops` | knowledge (wiki), tasks, journal, the verbs, your plugins | ✅ your own repo |
+| `~/plainkeep` | knowledge (wiki), tasks, journal, the verbs, your plugins | ✅ your own repo |
 | `~/work` | code — each project its own repo (`products/ labs/ tools/ clients/`) | each separately |
 | `~/files` | binary assets — client docs, PDFs, datasets | ❌ (restic backup) |
-| `~/dotfiles` | machine config; puts `ops` on PATH | ✅ separately |
+| `~/dotfiles` | machine config; puts `plainkeep` on PATH | ✅ separately |
 
-Inside `~/ops`, everything is a Markdown file. Indexes and embeddings are disposable caches rebuilt
-from the text — never the source of truth.
+Inside `~/plainkeep`, everything is a Markdown file. Indexes and embeddings are disposable caches
+rebuilt from the text — never the source of truth.
 
 ## Daily use
 
@@ -81,8 +82,8 @@ The rhythm is five verbs — `start` → `capture` / `triage` / `task` → `clos
 Fridays. Everything else is discoverable:
 
 ```sh
-ops help                      # the whole surface, grouped, with summaries
-ops ui                        # or just point-and-pick
+plainkeep help                      # the whole surface, grouped, with summaries
+plainkeep ui                        # or just point-and-pick
 ```
 
 | Group | Verbs |
@@ -97,28 +98,28 @@ ops ui                        # or just point-and-pick
 
 You never memorize paths or formats — the verb owns placement. And you never memorize flags either:
 
-- **`ops ui`** generates its menus and forms from the machine contract, so every verb, action, and
-  argument is a guided pick.
+- **`plainkeep ui`** generates its menus and forms from the machine contract, so every verb,
+  action, and argument is a guided pick.
 - **Tab-completion (zsh)** completes verbs with summaries, plus your *actual* note slugs and task
   IDs, pulled live from your content.
 - **`--dry-run`** on any mutating verb prints what would happen and writes nothing — it counts as a
   read, so no `--yes` needed.
-- **`fzf` (optional)** turns bare `ops search` / `ops open` into live fuzzy pickers.
+- **`fzf` (optional)** turns bare `plainkeep search` / `plainkeep open` into live fuzzy pickers.
 
 ## Using it with AI agents
 
-Point any capable agent at `~/ops` and it drives the same system behind the same guardrail:
+Point any capable agent at `~/plainkeep` and it drives the same system behind the same guardrail:
 
-- **The contract it reads:** [`AGENTS.md`](AGENTS.md) (the open standard), with the detailed manual
-  in [`skills/operate-ops/SKILL.md`](skills/operate-ops/SKILL.md). `CLAUDE.md` bridges for Claude
-  Code.
+- **The contract it reads:** [`AGENTS.md`](AGENTS.md) (the open standard), with the detailed
+  manual in [`skills/operate-plainkeep/SKILL.md`](skills/operate-plainkeep/SKILL.md). `CLAUDE.md`
+  bridges for Claude Code.
 - **The contract it parses:** every verb speaks `--json` with one frozen envelope, and exit codes
   are a protocol (`0` ok · `2` usage · `3` needs `--yes` · `4` not found · `5` denied). Refusals
   carry the exact corrected command — a refusal teaches the next call. The generated
-  [`ops.json`](ops.json) describes the full surface: args, schemas, risk classes, per-action
-  grammar, completion providers. Spec: [`docs/machine-contract.md`](docs/machine-contract.md).
-- **The transport:** `ops mcp` is a stateless MCP stdio server whose tool list is generated from
-  `ops.json`. Register it with `ops mcp --setup`.
+  [`plainkeep.json`](plainkeep.json) describes the full surface: args, schemas, risk classes,
+  per-action grammar, completion providers. Spec: [`docs/machine-contract.md`](docs/machine-contract.md).
+- **The transport:** `plainkeep mcp` is a stateless MCP stdio server whose tool list is generated
+  from `plainkeep.json`. Register it with `plainkeep mcp --setup`.
 
 An agent never gets more power than you do: same guardrail, same logs, same confirm gates.
 
@@ -143,25 +144,27 @@ one `git revert` away.
 Three local search stages, no server. Keyword works out of the box; the semantic stages are opt-in:
 
 ```sh
-ops index                                  # build/refresh (SQLite FTS5 + wikilink graph)
-ops search "how do I stop a runaway agent" # ranked file#heading hits with snippets
+plainkeep index                                  # build/refresh (SQLite FTS5 + wikilink graph)
+plainkeep search "how do I stop a runaway agent" # ranked file#heading hits with snippets
 ```
 
-Enable vectors (`OPS_VECTORS=1`, local embeddings + LanceDB) and reranking (`OPS_RERANK=1`) via
-`ops setup search --yes`. The index is disposable: `rm -rf .index && ops index` rebuilds it.
+Enable vectors (`PLAINKEEP_VECTORS=1`, local embeddings + LanceDB) and reranking
+(`PLAINKEEP_RERANK=1`) via `plainkeep setup search --yes`. The index is disposable:
+`rm -rf .index && plainkeep index` rebuilds it.
 
 ## Extending it
 
 Your verbs live in `plugins/`, never in the engine — updates can't overwrite them:
 
 ```sh
-ops new verb standup                   # scaffold your own verb (run.py + cmd.json)
-ops plugin add you/ops-pomodoro --yes  # install a pack
-ops plugin trust ops-pomodoro --yes    # lift its trust ceiling (capped at confirm until you do)
+plainkeep new verb standup                   # scaffold your own verb (run.py + cmd.json)
+plainkeep plugin add you/plainkeep-pomodoro --yes  # install a pack
+plainkeep plugin trust plainkeep-pomodoro --yes    # lift its trust ceiling (capped at confirm until you do)
 ```
 
-A plugin verb appears in `ops help`, `ops.json`, completion, `ops ui`, and MCP automatically, and
-the guardrail gates it identically. How to write one: [`docs/plugins.md`](docs/plugins.md).
+A plugin verb appears in `plainkeep help`, `plainkeep.json`, completion, `plainkeep ui`, and MCP
+automatically, and the guardrail gates it identically. How to write one:
+[`docs/plugins.md`](docs/plugins.md).
 
 ## Staying current
 
@@ -171,8 +174,8 @@ the guardrail gates it identically. How to write one: [`docs/plugins.md`](docs/p
 
 `script/update` 3-way-merges only the engine files (listed in `script/engine.txt`): unmodified
 files fast-forward, locally patched ones merge, conflicts get markers. When an update expects a
-newer terminal UI, `ops setup` shows "update available" and `ops setup ui --yes` fetches the exact
-pinned release.
+newer terminal UI, `plainkeep setup` shows "update available" and `plainkeep setup ui --yes`
+fetches the exact pinned release.
 
 ## More
 
@@ -190,14 +193,14 @@ pinned release.
 ## Project layout
 
 ```
-ops                  # the dispatcher: ops <verb> (symlinked onto PATH by setup)
-ops.json             # GENERATED — the machine contract
+plainkeep            # the dispatcher: plainkeep <verb> (symlinked onto PATH by setup)
+plainkeep.json       # GENERATED — the machine contract
 AGENTS.md  CLAUDE.md # the agent contract
 bin/                 # engine verbs (lib/ = shared code + the frozen plugin SDK)
 ui/                  # the terminal UI source (ships to vaults as a compiled binary)
 plugins/             # YOUR verbs + installed packs — never touched by updates
 frontends/raycast/   # zero-build Raycast script commands
-skills/operate-ops/  # the operating manual any agent loads
+skills/operate-plainkeep/  # the operating manual any agent loads
 wiki/ tasks/ journal/ inbox/   # your content
 templates/ jobs/ script/ docs/ test/
 ```

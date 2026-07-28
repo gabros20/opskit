@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops files ingest [<path>] [--client|--project|--area <slug> | --research] [--extract]
+plainkeep files ingest [<path>] [--client|--project|--area <slug> | --research] [--extract]
         | extract <slug> [--reextract] [--heavy] [--lang <x>] [--diarize] [--describe]
         | link <file> <hub> | list [--hub <slug>] | open <slug>  — the binary-assets plane (§9).
 
@@ -21,12 +21,12 @@ extract  (proposal Part 4.1) emits a SIBLING derived note wiki/files/<slug>.extr
   Same-bytes + same-tool re-run is an idempotent no-op; --reextract forces. `ingest --extract` chains.
 
 distill  (proposal Part 4.2) reads a derived extract note (wiki/files/<slug>.extract.md) and produces
-  1-N interlinked concept notes in wiki/notes/ (the Iron Law shape). WITH an agent (OPS_AGENT) the
+  1-N interlinked concept notes in wiki/notes/ (the Iron Law shape). WITH an agent (PLAINKEEP_AGENT) the
   model returns a TYPED JSON payload [{title, summary, wikilinks[]}] — never file text; the verb
   validates (unique slugs vs the whole vault, resolvable wikilinks — unresolvable dropped with a
   warning) and writes deterministically via the notetype templates with provenance frontmatter
-  author: agent, source: "[[<slug>.extract]]", status: draft. WITHOUT one (OPS_AGENT=none): a
-  deterministic heading-outline fallback (split the extract by ## headings). `ops triage drafts`
+  author: agent, source: "[[<slug>.extract]]", status: draft. WITHOUT one (PLAINKEEP_AGENT=none): a
+  deterministic heading-outline fallback (split the extract by ## headings). `plainkeep triage drafts`
   then pages the agent-drafted notes as a promotion queue (accept -> active, reject -> delete).
 
 link  attaches an already-ingested asset to a hub note after the fact.
@@ -108,14 +108,14 @@ STT_RUNTIMES = ("parakeet", "mlx-whisper", "faster-whisper", "whisper-cli")
 
 
 def _tier_audio(src: Path, opts: dict):
-    """ASR cascade. OPS_STT_MODEL overrides the hardcoded model id of whichever backend runs
-    (kept as its default); OPS_STT_RUNTIME pins one backend instead of cascading through all
+    """ASR cascade. PLAINKEEP_STT_MODEL overrides the hardcoded model id of whichever backend runs
+    (kept as its default); PLAINKEEP_STT_RUNTIME pins one backend instead of cascading through all
     (search-enrichment proposal §2, S1 — the one real hardcoding retrofit)."""
     if not shutil.which("ffmpeg"):
         return (None, "audio", "audio extraction needs ffmpeg — install: brew install ffmpeg")
     lang = opts.get("lang")
-    model = os.environ.get("OPS_STT_MODEL")
-    runtime = os.environ.get("OPS_STT_RUNTIME", "auto").strip().lower()
+    model = os.environ.get("PLAINKEEP_STT_MODEL")
+    runtime = os.environ.get("PLAINKEEP_STT_RUNTIME", "auto").strip().lower()
     if runtime not in ("auto", *STT_RUNTIMES):
         runtime = "auto"
 
@@ -152,8 +152,8 @@ def _tier_audio(src: Path, opts: dict):
             return out.stdout.strip()
         return (f"{binname} (system)", "transcript", run)
     if runtime != "auto":
-        return (None, "audio", f"OPS_STT_RUNTIME={runtime} pinned but that backend isn't available — "
-                "check its optional dep is installed, or unset OPS_STT_RUNTIME for auto-detect")
+        return (None, "audio", f"PLAINKEEP_STT_RUNTIME={runtime} pinned but that backend isn't available — "
+                "check its optional dep is installed, or unset PLAINKEEP_STT_RUNTIME for auto-detect")
     return (None, "audio",
             "no ASR backend — install: pip install parakeet-mlx (Apple Silicon) or mlx-whisper/faster-whisper")
 
@@ -258,7 +258,7 @@ def _extract_one(slug: str, opts: dict, dry: bool = False) -> dict:
     shadow = paths.WIKI / "files" / f"{slug}.md"
     if not shadow.exists():
         return {"slug": slug, "status": "no-shadow",
-                "message": f"no shadow note wiki/files/{slug}.md (see `ops files list`)"}
+                "message": f"no shadow note wiki/files/{slug}.md (see `plainkeep files list`)"}
     src_str = paths.fm_field(shadow, "path")
     if not src_str:
         return {"slug": slug, "status": "no-path", "message": "shadow note has no path:"}
@@ -276,7 +276,7 @@ def _extract_one(slug: str, opts: dict, dry: bool = False) -> dict:
     ntype, run = second, third
     sha = hashlib.sha256(src_str.encode()).hexdigest() if is_url else _sha256(src)
     dest = _extract_note_path(slug)
-    rel = str(dest.relative_to(paths.OPS_HOME))
+    rel = str(dest.relative_to(paths.PLAINKEEP_HOME))
     if dest.exists() and not opts.get("reextract") \
             and paths.fm_field(dest, "source_sha256") == sha and paths.fm_field(dest, "tool") == tool:
         return {"slug": slug, "status": "unchanged", "note": rel, "tool": tool, "sha256": sha}
@@ -296,7 +296,7 @@ def _extract_one(slug: str, opts: dict, dry: bool = False) -> dict:
         else:
             vlm = (cap, desc, vbackend)
     _write_extract(slug, sha, tool, ntype, text, shadow, vlm=vlm)
-    if os.environ.get("OPS_ENRICH", "").strip().lower() != "off":
+    if os.environ.get("PLAINKEEP_ENRICH", "").strip().lower() != "off":
         try:
             enrichverb.enrich_note(slug)  # best-effort — an enrich failure must never fail the extract
         except Exception:
@@ -425,7 +425,7 @@ def cmd_ingest(argv, dry=False, extract=False):
     dest_dir, hub_slug, hub_note, rest = _parse_route(argv)
     if hub_slug and hub_note is None:
         output.fail(output.EXIT_UNEXPECTED,
-                    f"{YEL}no wiki hub '{hub_slug}'{RESET} — create it first (e.g. `ops new client {hub_slug}`), "
+                    f"{YEL}no wiki hub '{hub_slug}'{RESET} — create it first (e.g. `plainkeep new client {hub_slug}`), "
                     f"then re-run. Nothing ingested.", verb="files")
 
     if rest:
@@ -478,7 +478,7 @@ def cmd_ingest(argv, dry=False, extract=False):
         shutil.move(str(src), str(dest))
         note = _shadow(dest, src.name, sha, hub_slug)
         paths.append_journal(f"files ingest {src.name} -> {dest}" + (f" [[{hub_slug}]]" if hub_slug else ""))
-        events.append(f"  {GREEN}filed{RESET}: {src.name} -> ~/files/{where}/  ({note.relative_to(paths.OPS_HOME)})")
+        events.append(f"  {GREEN}filed{RESET}: {src.name} -> ~/files/{where}/  ({note.relative_to(paths.PLAINKEEP_HOME)})")
         rows.append({"action": "file", "name": src.name, "dest": f"~/files/{where}/",
                      "slug": note.stem})
         filed += 1
@@ -513,12 +513,12 @@ def cmd_ingest(argv, dry=False, extract=False):
 
 def cmd_link(argv):
     if len(argv) < 2:
-        output.fail(output.EXIT_USAGE, "usage: ops files link <file-slug> <hub-slug>", verb="files")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep files link <file-slug> <hub-slug>", verb="files")
     file_slug, hub_slug = argv[0], argv[1]
     shadow = paths.WIKI / "files" / f"{file_slug}.md"
     if not shadow.exists():
         output.fail(output.EXIT_UNEXPECTED,
-                    f"no shadow note: wiki/files/{file_slug}.md (see `ops files list`)", verb="files")
+                    f"no shadow note: wiki/files/{file_slug}.md (see `plainkeep files list`)", verb="files")
     hub = _hub_note(hub_slug)
     if hub is None:
         output.fail(output.EXIT_UNEXPECTED, f"no wiki hub '{hub_slug}'", verb="files")
@@ -549,7 +549,7 @@ def cmd_list(argv):
 
     def render(rs):
         if not rs:
-            return "no assets yet (ingest one: `ops files ingest <path> --client <slug>`)."
+            return "no assets yet (ingest one: `plainkeep files ingest <path> --client <slug>`)."
         out = [f"{len(rs)} asset(s)" + (f" under [[{hub_filter}]]" if hub_filter else "") + ":"]
         for r in rs:
             tag = f"  {CYAN}[[{r['hub']}]]{RESET}" if r["hub"] else f"  {DIM}(unlinked){RESET}"
@@ -561,7 +561,7 @@ def cmd_list(argv):
 
 def cmd_open(argv):
     if not argv:
-        output.fail(output.EXIT_USAGE, "usage: ops files open <slug>", verb="files")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep files open <slug>", verb="files")
     note = paths.WIKI / "files" / f"{argv[0]}.md"
     if not note.exists():
         output.fail(output.EXIT_UNEXPECTED, f"no shadow note: wiki/files/{argv[0]}.md", verb="files")
@@ -571,7 +571,7 @@ def cmd_open(argv):
 
     def render(_):
         print(target)
-        if not os.environ.get("OPS_NO_OPEN") and sys.platform == "darwin" and Path(target).exists():
+        if not os.environ.get("PLAINKEEP_NO_OPEN") and sys.platform == "darwin" and Path(target).exists():
             subprocess.run(["open", "-R", target], check=False)
 
     return output.emit({"slug": argv[0], "path": target}, "files", human=render)
@@ -618,7 +618,7 @@ def _agent_concepts(body: str):
 
 
 def _outline_concepts(body: str, fallback_title: str) -> list:
-    """OPS_AGENT=none deterministic path: split the extract by `## headings` into concept notes."""
+    """PLAINKEEP_AGENT=none deterministic path: split the extract by `## headings` into concept notes."""
     concepts, cur, buf = [], None, []
     for ln in body.splitlines():
         m = re.match(r"^#{2,6}\s+(.*)$", ln)
@@ -648,12 +648,12 @@ def cmd_distill(argv, dry=False):
     rest = list(argv)
     slugs = [a for a in rest if not a.startswith("-")]
     if not slugs:
-        output.fail(output.EXIT_USAGE, "usage: ops files distill <slug> [--redistill]", verb="files")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep files distill <slug> [--redistill]", verb="files")
     slug = slugs[0]
     extract = _extract_note_path(slug)
     if not extract.exists():
         output.fail(output.EXIT_NOT_FOUND,
-                    f"no extract note wiki/files/{slug}.extract.md — run `ops files extract {slug}` first",
+                    f"no extract note wiki/files/{slug}.extract.md — run `plainkeep files extract {slug}` first",
                     verb="files")
     body = _strip_frontmatter(extract.read_text(encoding="utf-8"))
     shadow = paths.WIKI / "files" / f"{slug}.md"
@@ -666,7 +666,7 @@ def cmd_distill(argv, dry=False):
         concepts = _outline_concepts(body, fallback_title)
     if not concepts:
         output.fail(output.EXIT_UNEXPECTED,
-                    f"nothing to distill from {extract.relative_to(paths.OPS_HOME)} (empty extract)",
+                    f"nothing to distill from {extract.relative_to(paths.PLAINKEEP_HOME)} (empty extract)",
                     verb="files")
 
     # unique slugs vs the WHOLE vault AND within this batch (Iron Law: the verb owns placement)
@@ -692,7 +692,7 @@ def cmd_distill(argv, dry=False):
 
     dest_dir = paths.WIKI / "notes"
     rows = [{"slug": c["slug"], "title": c["title"],
-             "note": str((dest_dir / f"{c['slug']}.md").relative_to(paths.OPS_HOME)),
+             "note": str((dest_dir / f"{c['slug']}.md").relative_to(paths.PLAINKEEP_HOME)),
              "links": c["wikilinks"], "status": "would-write" if dry else "written"}
             for c in concepts]
     if not dry:
@@ -715,7 +715,7 @@ def cmd_distill(argv, dry=False):
             out.append(f"  {r['slug']:<30} {DIM}{r['title'][:34]:<34}{RESET}{link}")
         for w in warnings:
             out.append(f"  {YEL}note{RESET} {w}")
-        out.append("\n  promote drafts:  ops triage drafts   (accept -> active, reject -> delete)"
+        out.append("\n  promote drafts:  plainkeep triage drafts   (accept -> active, reject -> delete)"
                    + ("  (dry run — nothing written)" if dry else ""))
         return "\n".join(out)
 
@@ -732,7 +732,7 @@ def cmd_extract(argv, dry=False):
     slugs = [a for a in rest if not a.startswith("-")]
     if not slugs:
         output.fail(output.EXIT_USAGE,
-                    "usage: ops files extract <slug> [--reextract] [--heavy] [--lang <x>] "
+                    "usage: plainkeep files extract <slug> [--reextract] [--heavy] [--lang <x>] "
                     "[--diarize] [--describe]", verb="files")
     res = _extract_one(slugs[0], opts, dry)
     if res["status"] in ("no-shadow", "no-path", "source-missing"):
@@ -778,7 +778,7 @@ def main(argv):
     if action == "open":
         return cmd_open(argv[1:])
     output.fail(output.EXIT_USAGE,
-                "usage: ops files ingest [<path>] [--client|--project|--area <slug> | --research] "
+                "usage: plainkeep files ingest [<path>] [--client|--project|--area <slug> | --research] "
                 "[--extract] | extract <slug> [--reextract] [--heavy] [--lang <x>] [--diarize] "
                 "[--describe] | distill <slug> | link <file> <hub> | list [--hub <slug>] | "
                 "open <slug>", verb="files")

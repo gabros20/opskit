@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-ops open <target> [--edit|--reveal|--obsidian] [--json] — one read-class resolver for every
+plainkeep open <target> [--edit|--reveal|--obsidian] [--json] — one read-class resolver for every
 addressable thing (proposal Part 3.4). Resolution order: task id → wiki slug → files asset
 (shadow-note `path:` field) → search top hit. Default prints the resolved path (never surprise-
 launches a GUI); `--edit` opens $EDITOR, `--reveal` reveals in Finder (macOS `open -R`), `--obsidian`
-delegates to `ops wiki open --obsidian`. Bare `ops open` with a tty + fzf → fuzzy picker with preview.
+delegates to `plainkeep wiki open --obsidian`. Bare `plainkeep open` with a tty + fzf → fuzzy picker with preview.
 Keeps `wiki open`/`files open`/`task show` untouched (never removes a spelling).
 """
 import os
@@ -75,9 +75,9 @@ def _pick() -> str | None:
     items = _addressable()
     if not items:
         return None
-    ops = paths.OPS_HOME / "ops"
-    preview = (f'p="$("{ops}" open {{}} 2>/dev/null)"; [ -f "$p" ] && '
-               f'(command -v glow >/dev/null && OPS_RENDER=plain glow -p "$p" || cat "$p") || echo "$p"')
+    pk = paths.PLAINKEEP_HOME / "plainkeep"
+    preview = (f'p="$("{pk}" open {{}} 2>/dev/null)"; [ -f "$p" ] && '
+               f'(command -v glow >/dev/null && PLAINKEEP_RENDER=plain glow -p "$p" || cat "$p") || echo "$p"')
     return render.fzf_pick(items, preview=preview, prompt="open> ")
 
 
@@ -91,7 +91,7 @@ def main(argv):
         target = _pick() or ""
         if not target:
             output.fail(output.EXIT_USAGE,
-                        "usage: ops open <task-id|slug|query> [--edit|--reveal|--obsidian]", verb="open")
+                        "usage: plainkeep open <task-id|slug|query> [--edit|--reveal|--obsidian]", verb="open")
 
     res = _resolve(target)
     if not res:
@@ -103,13 +103,13 @@ def main(argv):
         if not res["wiki_slug"]:
             output.fail(output.EXIT_USAGE,
                         f"--obsidian opens a note; '{target}' resolved to a {res['kind']}", verb="open")
-        cmd = [str(paths.OPS_HOME / "ops"), "wiki", "open", res["wiki_slug"], "--obsidian"]
+        cmd = [str(paths.PLAINKEEP_HOME / "plainkeep"), "wiki", "open", res["wiki_slug"], "--obsidian"]
         if output.json_mode():
             cmd.append("--json")
         return subprocess.run(cmd).returncode
 
     if edit:
-        editor = os.environ.get("OPS_EDITOR") or os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
+        editor = os.environ.get("PLAINKEEP_EDITOR") or os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
         try:
             return subprocess.run([*editor.split(), str(res["edit"])]).returncode
         except FileNotFoundError:
@@ -122,7 +122,7 @@ def main(argv):
         def do_reveal(_):
             p = res["reveal"]
             print(str(p))
-            if not os.environ.get("OPS_NO_OPEN") and sys.platform == "darwin" and Path(p).exists():
+            if not os.environ.get("PLAINKEEP_NO_OPEN") and sys.platform == "darwin" and Path(p).exists():
                 subprocess.run(["open", "-R", str(p)], check=False)
         return output.emit(data, "open", human=do_reveal)
 

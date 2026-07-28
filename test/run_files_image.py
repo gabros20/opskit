@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""run_files_image.py — offline suite for imagelib wired into `ops files` (bin/files/run.py):
+"""run_files_image.py — offline suite for imagelib wired into `plainkeep files` (bin/files/run.py):
 metadata on ingest, OCR via imagelib.read_text, and --describe via imagelib.describe. Runs entirely
-with OPS_IMAGE_FAKE=1 (no real models) against a temp ~/ops + ~/files, reusing the 1x1 PNG fixture
+with PLAINKEEP_IMAGE_FAKE=1 (no real models) against a temp ~/plainkeep + ~/files, reusing the 1x1 PNG fixture
 bytes from test/run_image_backend.py."""
 from __future__ import annotations
 import base64
@@ -26,15 +26,15 @@ def check(name, cond, detail=""):
 
 
 def _have_pillow() -> bool:
-    spec = importlib.util.spec_from_file_location("ops_imagelib_probe", REPO / "bin" / "lib" / "imagelib.py")
+    spec = importlib.util.spec_from_file_location("plainkeep_imagelib_probe", REPO / "bin" / "lib" / "imagelib.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod.have_pillow()
 
 
 def run(ops, roots, *args, extra=None):
-    env = {**os.environ, "OPS_HOME": str(ops), "OPS_ROOTS_HOME": str(roots),
-          "OPS_IMAGE_FAKE": "1", **(extra or {})}
+    env = {**os.environ, "PLAINKEEP_HOME": str(ops), "PLAINKEEP_ROOTS_HOME": str(roots),
+          "PLAINKEEP_IMAGE_FAKE": "1", **(extra or {})}
     return subprocess.run([sys.executable, str(REPO / "bin" / "files" / "run.py"), *args],
                           capture_output=True, text=True, env=env)
 

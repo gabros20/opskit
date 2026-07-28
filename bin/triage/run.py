@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-ops triage [--dry-run|--yes] | drafts [--dry-run|--yes] — PROPOSE filing of inbox/ items into a task
+plainkeep triage [--dry-run|--yes] | drafts [--dry-run|--yes] — PROPOSE filing of inbox/ items into a task
 or a wiki note; the human approves (§4.1, §10). Interactive by default; --dry-run shows proposals
 only; --yes accepts all.
 
 Classification here is the deterministic pure-shell fallback (no agent required). When an agent is
-wired (OPS_AGENT), it would improve the proposal — but the system works without it.
+wired (PLAINKEEP_AGENT), it would improve the proposal — but the system works without it.
 On an override (you pick differently than proposed), it offers to record a one-line rule in
 wiki/conventions.md ## Filing rules — the plaintext learning loop.
 
-`ops triage drafts` (proposal Part 4.2) pages the agent-drafted concept notes (`author: agent`,
-`status: draft`) that `ops files distill` produced as a PROMOTION queue: accept -> status active,
+`plainkeep triage drafts` (proposal Part 4.2) pages the agent-drafted concept notes (`author: agent`,
+`status: draft`) that `plainkeep files distill` produced as a PROMOTION queue: accept -> status active,
 reject -> delete, one git commit each — the human is the gate on machine-authored knowledge.
 """
 import re
@@ -105,16 +105,16 @@ def cmd_drafts(argv, dry, yes, js):
     if js:
         rows = [{"slug": p.stem, "title": paths.fm_field(p, "title") or p.stem,
                  "source": paths.fm_field(p, "source"),
-                 "path": str(p.relative_to(paths.OPS_HOME))} for p in notes]
+                 "path": str(p.relative_to(paths.PLAINKEEP_HOME))} for p in notes]
         return output.emit_rows(rows, "triage", header={"drafts": len(notes)})
     if not notes:
-        print("no agent-drafted notes to promote (run `ops files distill <slug>` first).")
+        print("no agent-drafted notes to promote (run `plainkeep files distill <slug>` first).")
         return 0
     print(f"triage drafts: {len(notes)} agent-drafted note(s) awaiting promotion\n")
     for p in notes:
         title = paths.fm_field(p, "title") or p.stem
         src = paths.fm_field(p, "source")
-        rel = str(p.relative_to(paths.OPS_HOME))
+        rel = str(p.relative_to(paths.PLAINKEEP_HOME))
         print(f"• {p.stem}: \"{title}\"" + (f"  from {src}" if src else ""))
         if dry:
             continue
@@ -143,21 +143,21 @@ def cmd_decide(argv):
     """Non-interactive: apply ONE decision to ONE inbox item (the JSON/agent apply path). The
     interactive/list flows can't be driven headless, so a frontend calls this per item."""
     if len(argv) < 2:
-        output.fail(output.EXIT_USAGE, "usage: ops triage decide <item> task|note|skip", verb="triage")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep triage decide <item> task|note|skip", verb="triage")
     item, decision = argv[0], argv[1].lower()
     if decision not in ("task", "note", "skip"):
         output.fail(output.EXIT_USAGE, "decision must be one of task|note|skip", verb="triage")
     cands = [q for q in items() if q.name == item or q.stem == item]
     p = cands[0] if cands else None
     if not p or not p.exists():
-        output.fail(output.EXIT_NOT_FOUND, f"no inbox item '{item}' (see `ops triage --json`)", verb="triage")
+        output.fail(output.EXIT_NOT_FOUND, f"no inbox item '{item}' (see `plainkeep triage --json`)", verb="triage")
     if decision == "skip":
         return output.emit({"item": p.name, "decision": "skip", "filed": None}, "triage",
                            human=lambda _: f"skipped {p.name}")
     text = parse_item(p)
     new = make_task(text) if decision == "task" else make_note(text)
     p.unlink()
-    filed = str(new.relative_to(paths.OPS_HOME))
+    filed = str(new.relative_to(paths.PLAINKEEP_HOME))
     paths.append_journal(f"triaged {p.name} -> {filed} (decide {decision})")
     return output.emit({"item": p.name, "decision": decision, "filed": filed}, "triage",
                        human=lambda _: f"filed {p.name} -> {filed}")
@@ -166,14 +166,14 @@ def cmd_decide(argv):
 def cmd_drafts_decide(argv):
     """Non-interactive: apply ONE decision to ONE agent-drafted note (the JSON/agent promote path)."""
     if len(argv) < 2:
-        output.fail(output.EXIT_USAGE, "usage: ops triage drafts decide <slug> accept|reject|skip", verb="triage")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep triage drafts decide <slug> accept|reject|skip", verb="triage")
     slug, decision = argv[0], argv[1].lower()
     if decision not in ("accept", "reject", "skip"):
         output.fail(output.EXIT_USAGE, "decision must be one of accept|reject|skip", verb="triage")
     p = next((q for q in _draft_notes() if q.stem == slug), None)
     if not p:
-        output.fail(output.EXIT_NOT_FOUND, f"no agent-draft '{slug}' (see `ops triage drafts --json`)", verb="triage")
-    rel = str(p.relative_to(paths.OPS_HOME))
+        output.fail(output.EXIT_NOT_FOUND, f"no agent-draft '{slug}' (see `plainkeep triage drafts --json`)", verb="triage")
+    rel = str(p.relative_to(paths.PLAINKEEP_HOME))
     if decision == "skip":
         return output.emit({"slug": slug, "decision": "skip"}, "triage", human=lambda _: f"skipped {slug}")
     if decision == "reject":
@@ -234,8 +234,8 @@ def main(argv):
             continue
         new = make_task(text) if choice == "task" else make_note(text)
         p.unlink()
-        paths.append_journal(f"triaged {p.name} -> {new.relative_to(paths.OPS_HOME)}")
-        print(f"    filed -> {new.relative_to(paths.OPS_HOME)}")
+        paths.append_journal(f"triaged {p.name} -> {new.relative_to(paths.PLAINKEEP_HOME)}")
+        print(f"    filed -> {new.relative_to(paths.PLAINKEEP_HOME)}")
         if (not yes) and choice != kind:  # override -> offer to learn the rule (§10)
             if input("    record a filing rule for next time? [y/N] ").strip().lower() == "y":
                 record_rule(f"items like \"{title[:40]}\" -> {choice}")

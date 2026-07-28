@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-ops enrich <slug> [--reenrich] | --all [--reenrich] — generate {description, keywords} for a note's
+plainkeep enrich <slug> [--reenrich] | --all [--reenrich] — generate {description, keywords} for a note's
 derived text (search-enrichment proposal §5) and write it to the note's frontmatter.
 
 Source text: wiki/files/<slug>.extract.md body if it exists (the durable working-memory buffer from
-`ops files extract`), else the note's own body (bookmarks/wiki notes). Meta lands on the PRIMARY
+`plainkeep files extract`), else the note's own body (bookmarks/wiki notes). Meta lands on the PRIMARY
 note — wiki/files/<slug>.md for a file, the note itself otherwise — NEVER on the .extract.md sibling
 (--reextract rewrites it from a fixed template every run and would clobber meta written there).
 
 Idempotent: skipped when the note's `enrich_key:` already matches `enrichlib.idem_key(text)`;
 --reenrich forces a re-run. --all walks every note lacking a current key, sequentially, under one
-warm OPS_ENRICH_KEEP_ALIVE for the batch (a multi-GB model shouldn't reload per note).
+warm PLAINKEEP_ENRICH_KEEP_ALIVE for the batch (a multi-GB model shouldn't reload per note).
 
 `enrich_note()` is also the wiring point `files extract`/`bookmark` call after writing their own
 note — best-effort, non-fatal, same idempotency/guards as this CLI path.
@@ -57,7 +57,7 @@ def _source_text(slug: str, note: Path) -> str:
 def _stamp(note: Path, meta: dict) -> None:
     """Splice/replace description:/keywords:/enrich_key: into the note's frontmatter (mirrors
     share/run.py:_stamp_frontmatter). keywords is ALWAYS a YAML block list — an inline `[a, b]` is
-    exactly what `ops doctor`'s frontmatter-churn check flags (wiki/conventions.md)."""
+    exactly what `plainkeep doctor`'s frontmatter-churn check flags (wiki/conventions.md)."""
     lines = note.read_text(encoding="utf-8").splitlines()
     if not lines or lines[0].strip() != "---":
         return
@@ -85,7 +85,7 @@ def _stamp(note: Path, meta: dict) -> None:
 
 def enrich_note(slug: str, reenrich: bool = False) -> dict:
     """Enrich one note by slug. Pure status dict, never raises — the shared entry point for both
-    `ops enrich <slug>` and the best-effort hooks in `files extract`/`bookmark`."""
+    `plainkeep enrich <slug>` and the best-effort hooks in `files extract`/`bookmark`."""
     note = _target_note(slug)
     if note is None:
         return {"slug": slug, "status": "no-note", "message": f"no note for slug '{slug}'"}
@@ -93,14 +93,14 @@ def enrich_note(slug: str, reenrich: bool = False) -> dict:
     key = enrichlib.idem_key(text)
     if not reenrich and paths.fm_field(note, "enrich_key") == key:
         return {"slug": slug, "status": "unchanged",
-                "note": str(note.relative_to(paths.OPS_HOME)), "enrich_key": key}
+                "note": str(note.relative_to(paths.PLAINKEEP_HOME)), "enrich_key": key}
     try:
         meta = enrichlib.enrich(text)
         _stamp(note, meta)
     except Exception as e:  # best-effort callers (files/bookmark) must never fail on this
         return {"slug": slug, "status": "enrich-failed", "message": str(e)}
     paths.append_journal(f"enrich {slug} <- {meta['backend']}")
-    return {"slug": slug, "status": "enriched", "note": str(note.relative_to(paths.OPS_HOME)),
+    return {"slug": slug, "status": "enriched", "note": str(note.relative_to(paths.PLAINKEEP_HOME)),
             "backend": meta["backend"], "enrich_key": meta["key"]}
 
 
@@ -113,17 +113,17 @@ def _all_slugs() -> list[str]:
 
 
 def cmd_all(reenrich: bool) -> list[dict]:
-    """Sequential batch under one warm OPS_ENRICH_KEEP_ALIVE (proposal §5 QA R6) — left warm
+    """Sequential batch under one warm PLAINKEEP_ENRICH_KEEP_ALIVE (proposal §5 QA R6) — left warm
     afterward rather than force-stopped."""
-    prior = os.environ.get("OPS_ENRICH_KEEP_ALIVE")
-    os.environ.setdefault("OPS_ENRICH_KEEP_ALIVE", BATCH_KEEP_ALIVE)
+    prior = os.environ.get("PLAINKEEP_ENRICH_KEEP_ALIVE")
+    os.environ.setdefault("PLAINKEEP_ENRICH_KEEP_ALIVE", BATCH_KEEP_ALIVE)
     try:
         return [enrich_note(slug, reenrich=reenrich) for slug in _all_slugs()]
     finally:
         if prior is None:
-            os.environ.pop("OPS_ENRICH_KEEP_ALIVE", None)
+            os.environ.pop("PLAINKEEP_ENRICH_KEEP_ALIVE", None)
         else:
-            os.environ["OPS_ENRICH_KEEP_ALIVE"] = prior
+            os.environ["PLAINKEEP_ENRICH_KEEP_ALIVE"] = prior
 
 
 def main(argv):
@@ -150,7 +150,7 @@ def main(argv):
 
     slugs = [a for a in rest if not a.startswith("-")]
     if not slugs:
-        output.fail(output.EXIT_USAGE, "usage: ops enrich <slug> [--reenrich] | --all [--reenrich]",
+        output.fail(output.EXIT_USAGE, "usage: plainkeep enrich <slug> [--reenrich] | --all [--reenrich]",
                     verb="enrich")
     res = enrich_note(slugs[0], reenrich=reenrich)
     if res["status"] == "no-note":

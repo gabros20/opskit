@@ -56,12 +56,12 @@ def t_journal_append():
 
 
 def t_restore_order():
-    good = ["toolchain", "auth", "clone_ops", "doctor_init", "clone_work", "restic_restore"]
-    bad = ["toolchain", "clone_ops", "auth", "clone_work", "restic_restore", "doctor_init"]
+    good = ["toolchain", "auth", "clone_plainkeep", "doctor_init", "clone_work", "restic_restore"]
+    bad = ["toolchain", "clone_plainkeep", "auth", "clone_work", "restic_restore", "doctor_init"]
     check("correct restore order has no violations", validate_restore_order(good) == [],
           f"{validate_restore_order(good)}")
     v = validate_restore_order(bad)
-    check("clone-before-auth flagged", any("clone_ops" in x and "auth" in x for x in v), f"{v}")
+    check("clone-before-auth flagged", any("clone_plainkeep" in x and "auth" in x for x in v), f"{v}")
     check("restic-before-skeleton flagged", any("restic_restore" in x for x in v), f"{v}")
 
 

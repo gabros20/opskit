@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops week — weekly review (§16): shipped vs stalled, repo health, the compounding question, and
+plainkeep week — weekly review (§16): shipped vs stalled, repo health, the compounding question, and
 sweep done/ tasks into done/<year>/. Writes a review block into today's journal.
 """
 import sys
@@ -61,14 +61,14 @@ def main(argv):
         paths.append_journal("weekly review")
 
     data = {
-        "journal": str(note.relative_to(paths.OPS_HOME)),
+        "journal": str(note.relative_to(paths.PLAINKEEP_HOME)),
         "shipped": len(shipped), "shipped_ids": [f.stem for f in shipped],
         "stalled": len(stalled), "stalled_ids": [f.stem for f in stalled],
         "repo_dirty": dirty, "swept": swept, "dry_run": dry,
     }
 
     def render(_):
-        print(f"weekly review{' (dry run — nothing written)' if dry else ''} -> {note.relative_to(paths.OPS_HOME)}")
+        print(f"weekly review{' (dry run — nothing written)' if dry else ''} -> {note.relative_to(paths.PLAINKEEP_HOME)}")
         print(f"  shipped: {len(shipped)} | stalled: {len(stalled)} | repo: "
               f"{'clean' if dirty == 0 else str(dirty)+' dirty'} | swept: {swept}")
         print("  ask: what did you do by hand twice this week? → skill/verb candidate")

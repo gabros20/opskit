@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""run_health.py — exercises `ops doctor` (self-check) and `ops wiki` (navigation), temp OPS_HOME."""
+"""run_health.py — exercises `plainkeep doctor` (self-check) and `plainkeep wiki` (navigation), temp PLAINKEEP_HOME."""
 from __future__ import annotations
 import os
 import shutil
@@ -18,7 +18,7 @@ def check(name, cond, detail=""):
 
 
 def run(home, verb, *args, stdin=None):
-    env = {**os.environ, "OPS_HOME": str(home)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home)}
     return subprocess.run([sys.executable, str(REPO / "bin" / verb / "run.py"), *args],
                           input=stdin, capture_output=True, text=True, env=env)
 
@@ -31,23 +31,23 @@ def note(home, rel, typ, title, updated, body=""):
 
 
 def main() -> int:
-    # ---- doctor: a well-formed ops should pass (no FAIL) ----
+    # ---- doctor: a well-formed vault should pass (no FAIL) ----
     with tempfile.TemporaryDirectory() as td:
         h = Path(td)
         shutil.copy(REPO / "AGENTS.md", h / "AGENTS.md")
         shutil.copy(REPO / "CLAUDE.md", h / "CLAUDE.md")
-        (h / "skills" / "operate-ops").mkdir(parents=True)
-        shutil.copy(REPO / "skills" / "operate-ops" / "SKILL.md", h / "skills" / "operate-ops" / "SKILL.md")
+        (h / "skills" / "operate-plainkeep").mkdir(parents=True)
+        shutil.copy(REPO / "skills" / "operate-plainkeep" / "SKILL.md", h / "skills" / "operate-plainkeep" / "SKILL.md")
         # per-agent adapters (relative skill symlinks, like the real repo)
         (h / ".codex").mkdir(); (h / ".claude").mkdir()
         (h / ".codex" / "config.toml").write_text('sandbox_mode="workspace-write"\n')
-        (h / ".claude" / "settings.json").write_text('{"permissions":{"allow":["Bash(ops:*)"]}}')
+        (h / ".claude" / "settings.json").write_text('{"permissions":{"allow":["Bash(plainkeep:*)"]}}')
         os.symlink("../skills", h / ".codex" / "skills"); os.symlink("../skills", h / ".claude" / "skills")
         run(h, "doctor", "--init")   # create skeleton folders
-        run(h, "help")               # generate ops.json
+        run(h, "help")               # generate plainkeep.json
         r = run(h, "doctor")
-        check("doctor: well-formed ops has no FAIL", r.returncode == 0 and "FAIL" not in r.stdout, r.stdout)
-        check("doctor checks adapters + manifest", "AGENTS.md present" in r.stdout and "ops.json parses" in r.stdout, r.stdout)
+        check("doctor: well-formed vault has no FAIL", r.returncode == 0 and "FAIL" not in r.stdout, r.stdout)
+        check("doctor checks adapters + manifest", "AGENTS.md present" in r.stdout and "plainkeep.json parses" in r.stdout, r.stdout)
         check("doctor verifies per-agent adapters", ".claude/settings.json parses" in r.stdout
               and ".codex/skills → skills/ resolves" in r.stdout, r.stdout)
         # a broken adapter symlink must FAIL
@@ -55,10 +55,10 @@ def main() -> int:
         rb = run(h, "doctor")
         check("doctor FAILs on a broken adapter symlink", rb.returncode == 1 and "BROKEN" in rb.stdout, rb.stdout)
         os.unlink(h / ".claude" / "skills"); os.symlink("../skills", h / ".claude" / "skills")
-        # `ops index --manifest` regenerates ops.json from the cmd.json sidecars
-        (h / "ops.json").unlink(missing_ok=True)
+        # `plainkeep index --manifest` regenerates plainkeep.json from the cmd.json sidecars
+        (h / "plainkeep.json").unlink(missing_ok=True)
         rm = run(h, "index", "--manifest")
-        check("ops index --manifest regenerates ops.json", rm.returncode == 0 and (h / "ops.json").exists(), rm.stdout + rm.stderr)
+        check("plainkeep index --manifest regenerates plainkeep.json", rm.returncode == 0 and (h / "plainkeep.json").exists(), rm.stdout + rm.stderr)
         r2 = run(h, "doctor")  # idempotent
         check("doctor is idempotent", r2.returncode == 0)
 

@@ -1,16 +1,16 @@
 {
-  "name": "ops-ui",
-  "version": "0.1.2",
-  "description": "The human terminal UI for ops — a guided, menu-driven face over the ops.json/3 contract. Humans point-and-pick; agents keep ops <verb> --flags.",
+  "name": "plainkeep-ui",
+  "version": "0.2.0",
+  "description": "The human terminal UI for plainkeep — a guided, menu-driven face over the plainkeep.json/3 contract. Humans point-and-pick; agents keep plainkeep <verb> --flags.",
   "type": "module",
   "bin": {
-    "ops-ui": "./dist/index.js"
+    "plainkeep-ui": "./dist/index.js"
   },
   "files": ["dist"],
   "engines": { "node": ">=20" },
   "scripts": {
     "build": "tsc",
-    "build:binary": "bun build --compile src/index.ts --outfile ../.local/bin/ops-ui",
+    "build:binary": "bun build --compile src/index.ts --outfile ../.local/bin/plainkeep-ui",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"

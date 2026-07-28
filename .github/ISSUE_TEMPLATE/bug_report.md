@@ -10,15 +10,15 @@ A clear description of the bug.
 
 **The command(s)**
 ```sh
-ops ...
+plainkeep ...
 ```
 
 **Expected vs actual**
 What you expected, and what happened instead (paste output).
 
-**`ops doctor`**
+**`plainkeep doctor`**
 ```
-# paste the output of `ops doctor`
+# paste the output of `plainkeep doctor`
 ```
 
 **Environment**

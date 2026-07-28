@@ -6,7 +6,7 @@
 # Inspect before you run (never pipe a script you haven't read):
 #
 #   curl --proto '=https' --tlsv1.2 -fsSL \
-#     https://raw.githubusercontent.com/gabros20/opskit/main/script/get -o get.sh
+#     https://raw.githubusercontent.com/gabros20/plainkeep/main/script/get -o get.sh
 #   shasum -a 256 get.sh          # compare against the published get.sh.sha256 for the same ref
 #   less get.sh                    # read it
 #   sh get.sh                      # then, and only then, run it
@@ -22,8 +22,8 @@
 #     --full      keep the dev-only test/ + ref/ tree (for contributors). Default is a LEAN vault
 #                 (engine + content; test/+ref/ dropped, restorable from upstream).
 #     --dry-run   print every step, change nothing (no clone, no setup).
-#     --dir PATH  install location (default: $HOME/ops; env OPS_GET_DIR).
-#     --repo URL  clone source        (default: the upstream template; env OPS_GET_REPO).
+#     --dir PATH  install location (default: $HOME/plainkeep; env PLAINKEEP_GET_DIR).
+#     --repo URL  clone source        (default: the upstream template; env PLAINKEEP_GET_REPO).
 #     --yes       accepted for compatibility; the real install is ALWAYS non-interactive now
 #                 (so a piped `curl … | sh` never blocks), so this flag is a no-op.
 #
@@ -33,8 +33,8 @@
 # PowerShell path).
 set -euo pipefail
 
-REPO_URL="${OPS_GET_REPO:-https://github.com/gabros20/opskit.git}"
-TARGET="${OPS_GET_DIR:-$HOME/ops}"
+REPO_URL="${PLAINKEEP_GET_REPO:-https://github.com/gabros20/plainkeep.git}"
+TARGET="${PLAINKEEP_GET_DIR:-$HOME/plainkeep}"
 DEMO=0; DRY=0; YES=0; FULL=0
 
 while [ $# -gt 0 ]; do
@@ -54,40 +54,40 @@ say() { printf '\033[1m%s\033[0m\n' "$*"; }
 run() { printf '  + %s\n' "$*"; [ "$DRY" = 1 ] || eval "$*"; }
 need() { command -v "$1" >/dev/null 2>&1 || { echo "get: missing prerequisite '$1' — install it and re-run" >&2; exit 1; }; }
 
-say "ops get — bootstrap a vault (clone + hand off to script/setup)"
+say "plainkeep get — bootstrap a vault (clone + hand off to script/setup)"
 need git
 need python3
 # Python floor: the verbs use PEP 604 `str | None` syntax, so 3.10 is the true minimum. Fail early
 # with a clear message rather than letting a verb crash later on an old interpreter.
 PYVER="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || echo '?')"
 python3 -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 10) else 1)' 2>/dev/null \
-  || { echo "get: python3 is $PYVER — ops needs Python 3.10+ (uses \`str | None\` syntax). Install a newer python3 and re-run." >&2; exit 1; }
+  || { echo "get: python3 is $PYVER — plainkeep needs Python 3.10+ (uses \`str | None\` syntax). Install a newer python3 and re-run." >&2; exit 1; }
 echo "  git:     $(command -v git)"
 echo "  python3: $(command -v python3) ($PYVER)"
 echo
 
-# --demo: everything lands under one throwaway dir (the roots too, via OPS_ROOTS_HOME), so a single
-# `rm -rf` walks away. No PATH symlink, no completion install, no commit — pure sandbox.
+# --demo: everything lands under one throwaway dir (the roots too, via PLAINKEEP_ROOTS_HOME), so a
+# single `rm -rf` walks away. No PATH symlink, no completion install, no commit — pure sandbox.
 if [ "$DEMO" = 1 ]; then
-  if [ -n "${OPS_GET_DIR:-}" ]; then
+  if [ -n "${PLAINKEEP_GET_DIR:-}" ]; then
     DEMO_DIR="$TARGET"
     [ -e "$DEMO_DIR" ] && [ -n "$(ls -A "$DEMO_DIR" 2>/dev/null)" ] && { echo "get: --demo dir '$DEMO_DIR' is not empty" >&2; exit 1; }
   else
-    DEMO_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ops-demo.XXXXXX")"
+    DEMO_DIR="$(mktemp -d "${TMPDIR:-/tmp}/plainkeep-demo.XXXXXX")"
   fi
-  VAULT="$DEMO_DIR/ops"
+  VAULT="$DEMO_DIR/plainkeep"
   say "1. clone into a throwaway demo vault"
   run "git clone --depth 1 -q '$REPO_URL' '$VAULT'"
   # Capture the cloned template SHA BEFORE setup does any lean-strip/first-commit, so setup can seed
-  # .ops-engine-ref with the exact upstream base for script/update's 3-way merge.
+  # .plainkeep-engine-ref with the exact upstream base for script/update's 3-way merge.
   ENGINE_REF=""
   [ "$DRY" = 1 ] || ENGINE_REF="$(git -C "$VAULT" rev-parse HEAD 2>/dev/null || true)"
   REF_ARG=""; [ -n "$ENGINE_REF" ] && REF_ARG="--engine-ref $ENGINE_REF"
   say "2. setup (sandboxed: roots, PATH, completion all inside the demo dir)"
-  SETUP_ENV="OPS_ROOTS_HOME='$DEMO_DIR' OPS_BIN_DIR='$DEMO_DIR/.bin' OPS_COMP_DIR='$DEMO_DIR/.comp' OPS_HOME='$VAULT'"
+  SETUP_ENV="PLAINKEEP_ROOTS_HOME='$DEMO_DIR' PLAINKEEP_BIN_DIR='$DEMO_DIR/.bin' PLAINKEEP_COMP_DIR='$DEMO_DIR/.comp' PLAINKEEP_HOME='$VAULT'"
   run "env $SETUP_ENV '$VAULT/script/setup' --full --yes --no-commit $REF_ARG --upstream '$REPO_URL'"
   say "3. seed example notes so search/week have something to show"
-  run "env OPS_HOME='$VAULT' '$VAULT/ops' capture 'demo: try ops search, ops week, ops task add'"
+  run "env PLAINKEEP_HOME='$VAULT' '$VAULT/plainkeep' capture 'demo: try plainkeep search, plainkeep week, plainkeep task add'"
   if [ "$DRY" != 1 ]; then
     mkdir -p "$VAULT/wiki/notes"
     cat > "$VAULT/wiki/notes/demo-welcome.md" <<'NOTE'
@@ -102,19 +102,19 @@ aliases: [demo]
 
 This is a throwaway demo vault. Try:
 
-- `ops search demo` — ranked hits across your notes
-- `ops week` — the weekly review
-- `ops task add "kick the tyres"` — add a task
+- `plainkeep search demo` — ranked hits across your notes
+- `plainkeep week` — the weekly review
+- `plainkeep task add "kick the tyres"` — add a task
 
 Delete the one directory printed below to walk away — nothing else on your machine was touched.
 NOTE
   fi
-  run "env OPS_HOME='$VAULT' '$VAULT/ops' index"
+  run "env PLAINKEEP_HOME='$VAULT' '$VAULT/plainkeep' index"
   echo
   say "demo ready. everything is under ONE directory:"
   echo "  vault:  $VAULT"
-  echo "  try:    OPS_HOME='$VAULT' '$VAULT/ops' search demo"
-  echo "          OPS_HOME='$VAULT' '$VAULT/ops' week"
+  echo "  try:    PLAINKEEP_HOME='$VAULT' '$VAULT/plainkeep' search demo"
+  echo "          PLAINKEEP_HOME='$VAULT' '$VAULT/plainkeep' week"
   say "walk away (deletes the whole demo, touches nothing else):"
   echo "  rm -rf '$DEMO_DIR'"
   exit 0
@@ -134,7 +134,7 @@ echo "  into:  $TARGET"
 run "git clone -q '$REPO_URL' '$TARGET'"
 
 # Capture the cloned template SHA BEFORE setup's lean-strip/first-commit, so setup can seed
-# .ops-engine-ref with the exact upstream base for script/update's 3-way merge.
+# .plainkeep-engine-ref with the exact upstream base for script/update's 3-way merge.
 ENGINE_REF=""
 [ "$DRY" = 1 ] || ENGINE_REF="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
 

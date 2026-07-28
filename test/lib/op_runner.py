@@ -91,7 +91,7 @@ def _dry_run_plan(prompt: str) -> dict:
                 "notes": "stub"}
     if "decide" in request or "what did we" in request:
         return {"searched_first": True, "refused": False, "asked_user": False,
-                "actions": [{"type": "search", "verb": "ops search \"webhook retry\"",
+                "actions": [{"type": "search", "verb": "plainkeep search \"webhook retry\"",
                              "target_path": None, "transmits_externally": False,
                              "rationale": "brain-first"}], "notes": "stub"}
     return {"searched_first": True, "refused": False, "asked_user": True,

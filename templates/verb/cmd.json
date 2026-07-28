@@ -1,7 +1,7 @@
 {
   "verb": "{{name}}",
   "summary": "{{summary}}",
-  "usage": "ops {{name}} [args]",
+  "usage": "plainkeep {{name}} [args]",
   "risk": "{{risk}}",
   "args": [],
   "reads": [],

@@ -22,7 +22,7 @@ SCHEDULABLE_RISK = {"read", "safe_write"}
 # Repo subactions documented in §4.1 (health|clone|adopt|nuke-modules as of v3.7).
 DOCUMENTED_REPO_SUBACTIONS = {"health", "clone", "adopt", "nuke-modules"}
 # Filesystem zones a job may write beyond the three roots — the §5 sweep-zone carve-out (v3.7):
-# Desktop/Downloads are the move-only macOS-inbox domain of `ops sweep`.
+# Desktop/Downloads are the move-only macOS-inbox domain of `plainkeep sweep`.
 SANCTIONED_EXTRA_WRITE_ZONES: set[str] = {"~/Desktop", "~/Downloads"}
 
 
@@ -38,7 +38,7 @@ def _verb_of(command: str) -> str:
     toks = command.split()
     if not toks:
         return ""
-    if toks[0] != "ops":
+    if toks[0] != "plainkeep":
         return ""  # external command
     return toks[1] if len(toks) > 1 else ""
 
@@ -55,7 +55,7 @@ def check_jobs(registry: dict) -> list[Finding]:
         cmd = job["command"]
         risk = job.get("risk", "")
         toks = cmd.split()
-        is_external = bool(toks) and toks[0] != "ops"
+        is_external = bool(toks) and toks[0] != "plainkeep"
 
         # rule 1 — only read/safe_write may be scheduled
         findings.append(Finding(name, "schedulable-risk", risk in SCHEDULABLE_RISK,
@@ -70,7 +70,7 @@ def check_jobs(registry: dict) -> list[Finding]:
             verb = _verb_of(cmd)
             ok = verb in KNOWN_VERBS
             findings.append(Finding(name, "known-verb", ok,
-                                    f"verb={verb!r} {'known' if ok else 'NOT in ops.json surface'}"))
+                                    f"verb={verb!r} {'known' if ok else 'NOT in plainkeep.json surface'}"))
             # repo subaction documentation
             if verb == "repo" and len(toks) > 2:
                 sub = toks[2]
@@ -91,7 +91,7 @@ def check_jobs(registry: dict) -> list[Finding]:
                                     "declared 'read' but transmits externally with no sanctioned-transmit carve-out (§5)"))
         # rule 4 — write targets must stay inside the three roots (or a sanctioned extra zone)
         for w in job.get("writes", []):
-            if w.startswith("(") or w.startswith("~/ops") or w.startswith("~/files") or w.startswith("~/work"):
+            if w.startswith("(") or w.startswith("~/plainkeep") or w.startswith("~/files") or w.startswith("~/work"):
                 continue
             sanctioned = any(w.startswith(z) for z in SANCTIONED_EXTRA_WRITE_ZONES)
             findings.append(Finding(name, "writes-inside-roots", sanctioned,

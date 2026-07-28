@@ -1,15 +1,15 @@
 {
   "verb": "help",
-  "summary": "list verbs / usage for one (rendered from ops.json)",
-  "usage": "ops help [verb]",
+  "summary": "list verbs / usage for one (rendered from plainkeep.json)",
+  "usage": "plainkeep help [verb]",
   "risk": "read",
   "reads": [
     "bin/*/cmd.json"
   ],
   "writes": [
-    "ops.json"
+    "plainkeep.json"
   ],
-  "hints": "The surface itself: verbs, capabilities, per-verb I/O contract. Read this first; never invent a verb. Common mistake: hardcoding a verb list instead of reading ops.json.",
+  "hints": "The surface itself: verbs, capabilities, per-verb I/O contract. Read this first; never invent a verb. Common mistake: hardcoding a verb list instead of reading plainkeep.json.",
   "output": {
     "mode": "scalar",
     "fields": {

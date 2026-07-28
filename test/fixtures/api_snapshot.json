@@ -1,7 +1,7 @@
 {
   "INBOX": "value:PosixPath",
-  "OPS_API_VERSION": "value:str",
-  "OPS_HOME": "value:PosixPath",
+  "PLAINKEEP_API_VERSION": "value:str",
+  "PLAINKEEP_HOME": "value:PosixPath",
   "WIKI": "value:PosixPath",
   "append_journal": "callable (line: 'str') -> 'Path'",
   "classify": "callable (action: 'dict') -> 'Decision'",

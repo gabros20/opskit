@@ -1,7 +1,7 @@
 {
   "verb": "sweep",
   "summary": "decay Desktop/Downloads: untouched 7d \u2192 _swept/YYYY-MM/, 60d in _swept \u2192 Trash",
-  "usage": "ops sweep [--dry-run]",
+  "usage": "plainkeep sweep [--dry-run]",
   "risk": "safe_write",
   "reads": [
     "~/Desktop",
@@ -13,7 +13,7 @@
     "~/.Trash",
     "journal/"
   ],
-  "hints": "Decay Desktop/Downloads: untouched 7d \u2192 _swept/, 60d in _swept \u2192 Trash (never deletes outright). Common mistake: expecting rescue by reopening \u2014 rescue is `ops files ingest`.",
+  "hints": "Decay Desktop/Downloads: untouched 7d \u2192 _swept/, 60d in _swept \u2192 Trash (never deletes outright). Common mistake: expecting rescue by reopening \u2014 rescue is `plainkeep files ingest`.",
   "output": {
     "mode": "rows",
     "fields": {

@@ -1,4 +1,4 @@
-// ops share worker — a capability-URL pastebin for plaintext "OPSX" bundles. ~120 lines, no deps.
+// plainkeep share worker — a capability-URL pastebin for plaintext "OPSX" bundles. ~120 lines, no deps.
 //
 // Model: the client PUTs a plaintext OPSX bundle (markdown + rendered HTML). The worker stores it in
 // KV under a long unguessable id and serves either half on GET. There is NO encryption: the id IS the
@@ -60,7 +60,7 @@ function json(obj, status = 200) {
 
 // A stored blob that is not an OPSX bundle is a legacy encrypted/HTML-only share — permanently dead.
 const GONE = () =>
-  json({ error: "legacy encrypted share — re-publish with current ops share" }, 410);
+  json({ error: "legacy encrypted share — re-publish with current plainkeep share" }, 410);
 
 function halfResponse(body, contentType, extraHeaders) {
   return new Response(body, {
@@ -81,7 +81,7 @@ export default {
     // PUT / — publish an OPSX blob.
     if (request.method === "PUT" && path === "") {
       if (env.PUBLISH_TOKEN && request.headers.get("X-Publish-Token") !== env.PUBLISH_TOKEN) {
-        return json({ error: "publish token required", hint: "run: ops share init" }, 401);
+        return json({ error: "publish token required", hint: "run: plainkeep share init" }, 401);
       }
       const ttl = Math.max(60, parseInt(request.headers.get("X-Expire-Seconds") || "604800", 10));
       const body = await request.arrayBuffer();
@@ -89,8 +89,8 @@ export default {
       if (body.byteLength > 24 * 1024 * 1024) return json({ error: "too large" }, 413);
       const id = randId(24); // the URL is now the entire secret (~124 bits)
       const admin = randId(24);
-      await env.OPS_SHARE.put("blob:" + id, body, { expirationTtl: ttl });
-      await env.OPS_SHARE.put("admin:" + id, admin, { expirationTtl: ttl });
+      await env.PLAINKEEP_SHARE.put("blob:" + id, body, { expirationTtl: ttl });
+      await env.PLAINKEEP_SHARE.put("admin:" + id, admin, { expirationTtl: ttl });
       return json({ id, admin_token: admin });
     }
 
@@ -100,12 +100,12 @@ export default {
     const dotMd = idMatch ? Boolean(idMatch[2]) : false;
 
     if (request.method === "GET" && id) {
-      const blob = await env.OPS_SHARE.get("blob:" + id, "arrayBuffer");
+      const blob = await env.PLAINKEEP_SHARE.get("blob:" + id, "arrayBuffer");
       if (!blob) return json({ error: "not found" }, 404);
       const bytes = new Uint8Array(blob);
       if (!isOpsx(bytes)) return GONE(); // legacy blobs are dead on every GET
 
-      // ?raw=1 — the whole OPSX blob (ops share pull, debugging).
+      // ?raw=1 — the whole OPSX blob (plainkeep share pull, debugging).
       if (url.searchParams.has("raw")) {
         return halfResponse(bytes, "application/octet-stream");
       }
@@ -125,11 +125,11 @@ export default {
     }
 
     if (request.method === "DELETE" && id) {
-      const admin = await env.OPS_SHARE.get("admin:" + id);
+      const admin = await env.PLAINKEEP_SHARE.get("admin:" + id);
       if (!admin) return json({ error: "not found" }, 404);
       if (request.headers.get("X-Admin-Token") !== admin) return json({ error: "forbidden" }, 403);
-      await env.OPS_SHARE.delete("blob:" + id);
-      await env.OPS_SHARE.delete("admin:" + id);
+      await env.PLAINKEEP_SHARE.delete("blob:" + id);
+      await env.PLAINKEEP_SHARE.delete("admin:" + id);
       return new Response(null, { status: 204 });
     }
 

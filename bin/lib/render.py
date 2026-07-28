@@ -4,10 +4,10 @@ render.py — how a note looks when you read it in the terminal (Tier-1 ergonomi
 Zero-dependency baseline, auto-upgrading: if `glow` or `bat` is installed we hand the file to it;
 otherwise a tiny built-in ANSI renderer makes Markdown legible (bold headings, dim frontmatter,
 accented [[wikilinks]]). When stdout is NOT a TTY (piped, captured by a test, redirected to a file)
-or OPS_RENDER=raw, we print the raw Markdown untouched — piping should always yield plain text.
+or PLAINKEEP_RENDER=raw, we print the raw Markdown untouched — piping should always yield plain text.
 
-  OPS_RENDER=raw   force raw Markdown (also the default when stdout is not a terminal)
-  OPS_RENDER=plain force the built-in ANSI renderer (even when piped — used for the fzf preview)
+  PLAINKEEP_RENDER=raw   force raw Markdown (also the default when stdout is not a terminal)
+  PLAINKEEP_RENDER=plain force the built-in ANSI renderer (even when piped — used for the fzf preview)
 
 fzf_pick() is the Tier-2 fuzzy picker: when a verb is called with no target and we're interactive
 and `fzf` is installed, let the user fuzzy-select from a list (with a live preview). Absent fzf or a
@@ -35,7 +35,7 @@ _ICODE = re.compile(r"`([^`]+)`")
 
 
 def _tty() -> bool:
-    return sys.stdout.isatty() and os.environ.get("OPS_RENDER") != "raw"
+    return sys.stdout.isatty() and os.environ.get("PLAINKEEP_RENDER") != "raw"
 
 
 def render_markdown(text: str) -> str:
@@ -77,7 +77,7 @@ def render_markdown(text: str) -> str:
 def open_note(path: Path) -> None:
     """Show a note the best way available; raw Markdown when piped/redirected."""
     text = path.read_text(encoding="utf-8")
-    mode = os.environ.get("OPS_RENDER")
+    mode = os.environ.get("PLAINKEEP_RENDER")
     if mode == "raw":
         sys.stdout.write(text if text.endswith("\n") else text + "\n")
         return

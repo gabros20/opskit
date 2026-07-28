@@ -1,29 +1,29 @@
 # Mobile & capture — the documented (not-an-app) surface
 
-This guide shows how to capture and read your vault away from your desk: a global hotkey on macOS, a Shortcut on iOS, and reading/editing on a phone. It is for anyone running opskit who wants mobile access without a native app.
+This guide shows how to capture and read your vault away from your desk: a global hotkey on macOS, a Shortcut on iOS, and reading/editing on a phone. It is for anyone running plainkeep who wants mobile access without a native app.
 
 ## The one rule
 
-opskit has no server, no daemon, no account. The vault is plaintext plus git. Mobile-lite is documentation, not code (proposal Part 3.4).
+plainkeep has no server, no daemon, no account. The vault is plaintext plus git. Mobile-lite is documentation, not code (proposal Part 3.4).
 
 The only sync transport is `git push` / `git pull` over your own private remote. Everything here rides on that one fact.
 
 **URIs and share-sheets OPEN and CAPTURE. All writes still go through a verb.**
 
 - Capture drops a file into `inbox/`.
-- You run `ops triage` later on a real machine.
+- You run `plainkeep triage` later on a real machine.
 - Nothing on mobile edits the wiki or tasks directly.
-- Nothing here bypasses the `ops` dispatcher or the guardrail.
+- Nothing here bypasses the `plainkeep` dispatcher or the guardrail.
 
 ---
 
 ## 1. Desktop capture — a global hotkey on macOS
 
-The fastest capture path on macOS is an [Apple Shortcut](https://support.apple.com/guide/shortcuts-mac/welcome/mac) bound to a global hotkey or the share sheet. It shells straight to `ops capture`.
+The fastest capture path on macOS is an [Apple Shortcut](https://support.apple.com/guide/shortcuts-mac/welcome/mac) bound to a global hotkey or the share sheet. It shells straight to `plainkeep capture`.
 
 **Build it:**
 
-1. Shortcuts.app → **＋** → name it *Ops Capture*.
+1. Shortcuts.app → **＋** → name it *Plainkeep Capture*.
 2. Add **Receive Text** as input. Tick *Show in Share Sheet* so it accepts selected text and URLs from any app.
 3. Add **Run Shell Script** with these settings:
    - Shell: `/bin/zsh` (or bash)
@@ -31,14 +31,14 @@ The fastest capture path on macOS is an [Apple Shortcut](https://support.apple.c
    - Script:
      ```bash
      export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
-     OPS="$(command -v ops || echo "$HOME/ops/ops")"
-     "$OPS" capture "$*"
+     PLAINKEEP="$(command -v plainkeep || echo "$HOME/plainkeep/plainkeep")"
+     "$PLAINKEEP" capture "$*"
      ```
 4. Assign a keyboard shortcut in *Shortcuts → Settings → Keyboard*, or trigger it from Raycast or the share sheet.
 
-Because it shells to `ops capture`, the guardrail and `.logs/` apply. The Shortcut is just another unprivileged caller.
+Because it shells to `plainkeep capture`, the guardrail and `.logs/` apply. The Shortcut is just another unprivileged caller.
 
-Pair it with the Raycast **Ops Capture** command ([`frontends/raycast`](../frontends/raycast/README.md)) for a Spotlight-style capture box.
+Pair it with the Raycast **Plainkeep Capture** command ([`frontends/raycast`](../frontends/raycast/README.md)) for a Spotlight-style capture box.
 
 ---
 
@@ -50,17 +50,17 @@ Two workable shapes follow. Working Copy is the lower-friction path for most peo
 
 ### 2a. Working Copy (recommended — real git on iOS)
 
-[Working Copy](https://workingcopy.app) clones your private `~/ops` remote on-device and exposes *Write File* and *Append* Shortcut actions.
+[Working Copy](https://workingcopy.app) clones your private `~/plainkeep` remote on-device and exposes *Write File* and *Append* Shortcut actions.
 
-1. Clone the ops remote into Working Copy once.
-2. Build a Shortcut *Ops Capture*:
+1. Clone the plainkeep remote into Working Copy once.
+2. Build a Shortcut *Plainkeep Capture*:
    - **Receive Text/URL from Share Sheet**
    - **Text** (timestamp + body)
    - Working Copy **Write File** into `inbox/cap-<timestamp>.md` (append or new file)
 3. End the Shortcut with Working Copy **Commit** + **Push**.
-4. Next time you're at a machine: `git pull`, then `ops triage`.
+4. Next time you're at a machine: `git pull`, then `plainkeep triage`.
 
-Keep the file shape trivial. A plain markdown file with your text is enough — `ops triage` classifies and routes it.
+Keep the file shape trivial. A plain markdown file with your text is enough — `plainkeep triage` classifies and routes it.
 
 ### 2b. a-Shell / iSH (a POSIX shell on iOS)
 
@@ -68,7 +68,7 @@ If you run [a-Shell](https://holzschu.github.io/a-Shell_iOS/), you can `git clon
 
 This is heavier to set up than Working Copy.
 
-> **Never** point iCloud, Dropbox, or Syncthing at the `.git` directory to "sync" the vault. See anti-roadmap #9. `ops doctor` fails if `~/ops` resolves under a sync-wall. git push/pull is the transport; a file-sync tool corrupts the repo.
+> **Never** point iCloud, Dropbox, or Syncthing at the `.git` directory to "sync" the vault. See anti-roadmap #9. `plainkeep doctor` fails if `~/plainkeep` resolves under a sync-wall. git push/pull is the transport; a file-sync tool corrupts the repo.
 
 ---
 
@@ -85,7 +85,7 @@ Either way, sync is git over your private remote (via Working Copy or the app's 
 
 Edits you make on mobile land as commits. You pull them on desktop.
 
-Re-index after pulling: `ops index --changed` picks up externally-edited notes. It never rewrites your files.
+Re-index after pulling: `plainkeep index --changed` picks up externally-edited notes. It never rewrites your files.
 
 ---
 
@@ -98,7 +98,7 @@ Re-index after pulling: `ops index --changed` picks up externally-edited notes. 
  private remote (your own git host — GitHub private repo, a self-hosted bare repo, …)
         ▲
         │  git push / pull
- desktop (~/ops, the ops verbs, the index)
+ desktop (~/plainkeep, the plainkeep verbs, the index)
 ```
 
 No provider ever sees plaintext beyond your chosen git host. No piece here transmits on its own — you push, you pull.

@@ -1,33 +1,33 @@
-# opskit
+# plainkeep
 
-> A personal operating system in a folder of plaintext. Markdown files in the user's own git repo hold knowledge (wiki), tasks, and a journal; one `ops <verb>` command is the only writer. Two faces, one door: humans use `ops ui` (a guided terminal UI generated from the machine contract), agents and scripts use `ops <verb> --json` (a frozen envelope + exit-code protocol). A guardrail classifies every invocation (read / safe_write / draft_only / confirm / deny); nothing transmits without a human. No server, no daemon, no cloud. Python 3.10+ stdlib engine; optional layers (semantic search, local models, backups, scheduled jobs, the compiled terminal UI) are opt-in via a layered installer.
+> A personal operating system in a folder of plaintext. Markdown files in the user's own git repo hold knowledge (wiki), tasks, and a journal; one `plainkeep <verb>` command is the only writer. Two faces, one door: humans use `plainkeep ui` (a guided terminal UI generated from the machine contract), agents and scripts use `plainkeep <verb> --json` (a frozen envelope + exit-code protocol). A guardrail classifies every invocation (read / safe_write / draft_only / confirm / deny); nothing transmits without a human. No server, no daemon, no cloud. Python 3.10+ stdlib engine; optional layers (semantic search, local models, backups, scheduled jobs, the compiled terminal UI) are opt-in via a layered installer.
 
-Key facts: the repo is a TEMPLATE — `script/get` clones a private copy to `~/ops`, `script/setup` wires the machine, `script/update` 3-way-merges only engine files so user content is never touched. The generated `ops.json` (schema `ops.json/3`) describes the entire verb surface: args, output schemas, risk classes, per-action grammar (`actions[]` with typed args + completion providers), and capabilities. Exit codes are a protocol: 0 ok · 2 usage · 3 needs --yes · 4 not found · 5 denied — refusal messages carry the exact corrected command ("refusals teach"). `ops mcp` is a stateless MCP stdio server whose tool list is generated from ops.json; every tool call shells back through `ops <verb> --json`, so the guardrail and logs remain the single enforcement path. Four roots: `~/ops` (this repo), `~/work` (code, separate repos), `~/files` (binary assets, restic-backed), `~/dotfiles`.
+Key facts: the repo is a TEMPLATE — `script/get` clones a private copy to `~/plainkeep`, `script/setup` wires the machine, `script/update` 3-way-merges only engine files so user content is never touched. The generated `plainkeep.json` (schema `plainkeep.json/3`) describes the entire verb surface: args, output schemas, risk classes, per-action grammar (`actions[]` with typed args + completion providers), and capabilities. Exit codes are a protocol: 0 ok · 2 usage · 3 needs --yes · 4 not found · 5 denied — refusal messages carry the exact corrected command ("refusals teach"). `plainkeep mcp` is a stateless MCP stdio server whose tool list is generated from plainkeep.json; every tool call shells back through `plainkeep <verb> --json`, so the guardrail and logs remain the single enforcement path. Four roots: `~/plainkeep` (this repo), `~/work` (code, separate repos), `~/files` (binary assets, restic-backed), `~/dotfiles`.
 
 All links below are raw markdown — fetch them directly.
 
 ## Start here
 
-- [README](https://raw.githubusercontent.com/gabros20/opskit/main/README.md): what opskit is, quick start, the verb surface, guardrail classes, agent wiring, project layout
-- [Layered setup](https://raw.githubusercontent.com/gabros20/opskit/main/docs/setup.md): the `ops setup` installer — wizard, dashboard, all six layers (skeleton, search, backups, models, automation, ui), status enum, agent rules
-- [Docs map](https://raw.githubusercontent.com/gabros20/opskit/main/docs/README.md): every doc, organized by reader intent
+- [README](https://raw.githubusercontent.com/gabros20/plainkeep/main/README.md): what plainkeep is, quick start, the verb surface, guardrail classes, agent wiring, project layout
+- [Layered setup](https://raw.githubusercontent.com/gabros20/plainkeep/main/docs/setup.md): the `plainkeep setup` installer — wizard, dashboard, all six layers (skeleton, search, backups, models, automation, ui), status enum, agent rules
+- [Docs map](https://raw.githubusercontent.com/gabros20/plainkeep/main/docs/README.md): every doc, organized by reader intent
 
 ## The contracts (for agents)
 
-- [Machine contract](https://raw.githubusercontent.com/gabros20/opskit/main/docs/machine-contract.md): the normative reference — `--json` envelope, exit-code protocol, `--dry-run` semantics, `ops.json/3` schema, `cmd.json` sidecar, `actions[]` grammar, completion contract
-- [Agent contract](https://raw.githubusercontent.com/gabros20/opskit/main/AGENTS.md): the operating contract any agent reads before driving the vault
-- [Operating manual](https://raw.githubusercontent.com/gabros20/opskit/main/skills/operate-ops/SKILL.md): the detailed skill — orientation ritual, verb reference, provenance rules, what agents must never do
+- [Machine contract](https://raw.githubusercontent.com/gabros20/plainkeep/main/docs/machine-contract.md): the normative reference — `--json` envelope, exit-code protocol, `--dry-run` semantics, `plainkeep.json/3` schema, `cmd.json` sidecar, `actions[]` grammar, completion contract
+- [Agent contract](https://raw.githubusercontent.com/gabros20/plainkeep/main/AGENTS.md): the operating contract any agent reads before driving the vault
+- [Operating manual](https://raw.githubusercontent.com/gabros20/plainkeep/main/skills/operate-plainkeep/SKILL.md): the detailed skill — orientation ritual, verb reference, provenance rules, what agents must never do
 
 ## Understanding the system
 
-- [Architecture](https://raw.githubusercontent.com/gabros20/opskit/main/docs/architecture.md): why the system is shaped this way — principles, the one-door enforcement path, trade-offs, frontends
-- [Decision log](https://raw.githubusercontent.com/gabros20/opskit/main/docs/DECISIONS.md): the ADR record of every load-bearing decision, including rejected alternatives
-- [Changelog](https://raw.githubusercontent.com/gabros20/opskit/main/CHANGELOG.md): what changed and when
+- [Architecture](https://raw.githubusercontent.com/gabros20/plainkeep/main/docs/architecture.md): why the system is shaped this way — principles, the one-door enforcement path, trade-offs, frontends
+- [Decision log](https://raw.githubusercontent.com/gabros20/plainkeep/main/docs/DECISIONS.md): the ADR record of every load-bearing decision, including rejected alternatives
+- [Changelog](https://raw.githubusercontent.com/gabros20/plainkeep/main/CHANGELOG.md): what changed and when
 
 ## Capabilities
 
-- [The terminal UI](https://raw.githubusercontent.com/gabros20/opskit/main/docs/terminal-ui.md): install, use, and update `ops ui` — the contract-generated human face, shipped as a compiled binary
-- [Plugins](https://raw.githubusercontent.com/gabros20/opskit/main/docs/plugins.md): write your own verbs against the frozen SDK; the install + trust model for packs
-- [Backup & share](https://raw.githubusercontent.com/gabros20/opskit/main/docs/backup-and-share.md): the restic backup family (append-only cloud key) and capability-URL sharing
-- [Agent-readable shares](https://raw.githubusercontent.com/gabros20/opskit/main/docs/share-agent-markdown.md): how a shared link serves raw markdown to any agent's fetch tool
-- [Obsidian compatibility](https://raw.githubusercontent.com/gabros20/opskit/main/docs/obsidian-compat.md): the normative emit/tolerate definition for the zero-cost frontend
+- [The terminal UI](https://raw.githubusercontent.com/gabros20/plainkeep/main/docs/terminal-ui.md): install, use, and update `plainkeep ui` — the contract-generated human face, shipped as a compiled binary
+- [Plugins](https://raw.githubusercontent.com/gabros20/plainkeep/main/docs/plugins.md): write your own verbs against the frozen SDK; the install + trust model for packs
+- [Backup & share](https://raw.githubusercontent.com/gabros20/plainkeep/main/docs/backup-and-share.md): the restic backup family (append-only cloud key) and capability-URL sharing
+- [Agent-readable shares](https://raw.githubusercontent.com/gabros20/plainkeep/main/docs/share-agent-markdown.md): how a shared link serves raw markdown to any agent's fetch tool
+- [Obsidian compatibility](https://raw.githubusercontent.com/gabros20/plainkeep/main/docs/obsidian-compat.md): the normative emit/tolerate definition for the zero-cost frontend

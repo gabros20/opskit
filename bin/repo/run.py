@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops repo health | clone <slug> [--kind k] | clone --all | adopt <path> --kind <k> | nuke-modules --stale <days>
+plainkeep repo health | clone <slug> [--kind k] | clone --all | adopt <path> --kind <k> | nuke-modules --stale <days>
 — the ~/work fleet manager (§4.1, §12.3). health scans every repo (dirty/unpushed/stale); clone
 restores repos from their wiki hub's `remote:`; adopt moves an already-cloned repo into the routing
 tree + writes its hub; nuke-modules reclaims node_modules untouched N+ days (the §15 job — regenerable).
@@ -41,7 +41,7 @@ def _hub(slug, name, remote=""):
     if not f.exists():
         f.write_text(f"---\ntype: project\ntitle: {name}\nstatus: active\ncreated: {paths.today()}\n"
                      f"updated: {paths.today()}\ntags: []\naliases: []\nremote: {remote}\n---\n# {name}\n\n"
-                     f"## Timeline\n- {paths.today()} adopted via `ops repo adopt`\n", encoding="utf-8")
+                     f"## Timeline\n- {paths.today()} adopted via `plainkeep repo adopt`\n", encoding="utf-8")
     return f
 
 
@@ -93,7 +93,7 @@ def cmd_clone(argv):
         print(f"\ncloned {n} repo(s) with a remote set")
         return 0
     if not argv:
-        print("usage: ops repo clone <slug> [--kind k] | clone --all", file=sys.stderr); return 2
+        print("usage: plainkeep repo clone <slug> [--kind k] | clone --all", file=sys.stderr); return 2
     slug = argv[0]
     kind = argv[argv.index("--kind") + 1] if "--kind" in argv else "labs"
     hub = paths.WIKI / "projects" / f"{slug}.md"
@@ -119,7 +119,7 @@ def _clone_one(slug, remote, kind):
 
 def cmd_adopt(argv):
     if not argv or "--kind" not in argv:
-        print("usage: ops repo adopt <path> --kind <products|labs|tools>", file=sys.stderr); return 2
+        print("usage: plainkeep repo adopt <path> --kind <products|labs|tools>", file=sys.stderr); return 2
     src = Path(argv[0]).expanduser().resolve()
     kind = argv[argv.index("--kind") + 1]
     if kind not in paths.WORK_KINDS:
@@ -136,11 +136,11 @@ def cmd_adopt(argv):
     hub = _hub(slug, src.name, remote)
     paths.append_journal(f"repo adopt {slug} -> {kind}")
     data = {"slug": slug, "kind": kind, "dest": str(dest.relative_to(paths.WORK_ROOT)),
-            "hub": str(hub.relative_to(paths.OPS_HOME)), "remote": remote or None}
+            "hub": str(hub.relative_to(paths.PLAINKEEP_HOME)), "remote": remote or None}
 
     def render(_):
         print(f"adopted {src.name} -> {dest.relative_to(paths.WORK_ROOT)}")
-        print(f"  wiki hub: {hub.relative_to(paths.OPS_HOME)}" + (f"  (remote: {remote})" if remote else ""))
+        print(f"  wiki hub: {hub.relative_to(paths.PLAINKEEP_HOME)}" + (f"  (remote: {remote})" if remote else ""))
 
     return output.emit(data, "repo", human=render)
 
@@ -179,7 +179,7 @@ def main(argv):
         return cmd_adopt(rest)
     if action == "nuke-modules":
         return cmd_nuke(rest)
-    print("usage: ops repo health | clone <slug>|--all | adopt <path> --kind <k> | nuke-modules --stale <days>",
+    print("usage: plainkeep repo health | clone <slug>|--all | adopt <path> --kind <k> | nuke-modules --stale <days>",
           file=sys.stderr)
     return 2
 

@@ -3,7 +3,7 @@ embed.py — local embedding via Ollama, with the per-model PROMPT PROFILES that
 are mandatory (ADR-005). Without the doc/query prompts, EmbeddingGemma collapses; with them it
 behaves. So prompts are a first-class part of the embedder, not an afterthought.
 
-- Default model: embeddinggemma (ADR-005). Override with OPS_EMBED_MODEL.
+- Default model: embeddinggemma (ADR-005). Override with PLAINKEEP_EMBED_MODEL.
 - Asymmetric prompts: documents and queries get different prefixes.
 - Batch path (/api/embed) with single-call fallback (/api/embeddings), so bulk indexing of a
   large vault is one request per batch, not per chunk.
@@ -25,7 +25,7 @@ PROFILES = {
     "qwen3-embedding":       ("", "Instruct: Given a search query, retrieve relevant passages\nQuery: ", 1024),
     "mxbai-embed-large":     ("", "Represent this sentence for searching relevant passages: ", 1024),
 }
-DEFAULT_MODEL = os.environ.get("OPS_EMBED_MODEL", "embeddinggemma")
+DEFAULT_MODEL = os.environ.get("PLAINKEEP_EMBED_MODEL", "embeddinggemma")
 
 
 def _profile(model: str) -> tuple[str, str, int]:
@@ -39,7 +39,7 @@ def model_name() -> str:
 
 def dim(model: str | None = None) -> int:
     d = _profile(model or DEFAULT_MODEL)[2]
-    env = os.environ.get("OPS_EMBED_DIM")
+    env = os.environ.get("PLAINKEEP_EMBED_DIM")
     return int(env) if env else d
 
 

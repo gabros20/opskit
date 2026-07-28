@@ -1,11 +1,11 @@
 {
   "verb": "doctor",
   "summary": "self-check: tools, folders, manifest, adapters, secrets, index (--init creates folders)",
-  "usage": "ops doctor [--init]",
+  "usage": "plainkeep doctor [--init]",
   "risk": "safe_write",
   "reads": [
     "bin/",
-    "ops.json",
+    "plainkeep.json",
     "AGENTS.md",
     "CLAUDE.md",
     "skills/",

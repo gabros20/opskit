@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""ops index [--changed] [--manifest] [--dry-run] [--json] — (re)build the search index from the
+"""plainkeep index [--changed] [--manifest] [--dry-run] [--json] — (re)build the search index from the
 content tree (§10.2, stage 1). --changed is the external-edit fast path (mtime vs the last build,
-ignoring .obsidian/.trash — Part 3.1). --manifest instead only regenerates ops.json."""
+ignoring .obsidian/.trash — Part 3.1). --manifest instead only regenerates plainkeep.json."""
 import sys
 from pathlib import Path
 
@@ -16,8 +16,8 @@ def main(argv):
     if "--manifest" in argv:
         from lib.manifest import write_manifest
         if dry:
-            return output.emit({"dry_run": True, "target": "ops.json"}, "index",
-                               human=lambda _: "would regenerate ops.json  (dry run — nothing written)")
+            return output.emit({"dry_run": True, "target": "plainkeep.json"}, "index",
+                               human=lambda _: "would regenerate plainkeep.json  (dry run — nothing written)")
         p = write_manifest()
         return output.emit({"manifest": p.name}, "index",
                            human=lambda _: f"manifest regenerated -> {p.name}")

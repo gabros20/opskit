@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""run_sweepverb.py — exercises the real `ops sweep` verb against a temp HOME (OPS_SWEEP_HOME):
+"""run_sweepverb.py — exercises the real `plainkeep sweep` verb against a temp HOME (PLAINKEEP_SWEEP_HOME):
 7-day promote → _swept/YYYY-MM/, 60-day trash, move-never-delete, idempotency."""
 from __future__ import annotations
 import os
@@ -26,7 +26,7 @@ def aged(p: Path, days: float):
 
 
 def run(home):
-    env = {**os.environ, "OPS_SWEEP_HOME": str(home), "OPS_HOME": str(home)}
+    env = {**os.environ, "PLAINKEEP_SWEEP_HOME": str(home), "PLAINKEEP_HOME": str(home)}
     return subprocess.run([sys.executable, str(REPO / "bin" / "sweep" / "run.py")],
                           capture_output=True, text=True, env=env)
 

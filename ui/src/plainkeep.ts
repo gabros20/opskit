@@ -1,21 +1,23 @@
-// The bridge to the ops engine. ops-ui NEVER imports ops internals — it shells to the same public
-// `ops <verb> --json` surface an agent uses, so the guardrail + .logs see every action (one door).
+// The bridge to the plainkeep engine. plainkeep-ui NEVER imports plainkeep internals — it shells to
+// the same public `plainkeep <verb> --json` surface an agent uses, so the guardrail + .logs see every
+// action (one door).
 import { execa } from "execa";
 import { existsSync } from "node:fs";
 
-// Locate the `ops` dispatcher: explicit $OPS_BIN wins (an absolute path to the ops script), else the
-// `ops` on PATH. We resolve it once. The TUI is useless without it — fail loudly with the fix.
-export function resolveOpsBin(): string {
-  const explicit = process.env.OPS_BIN;
+// Locate the `plainkeep` dispatcher: explicit $PLAINKEEP_BIN wins (an absolute path to the plainkeep
+// script), else the `plainkeep` on PATH. We resolve it once. The TUI is useless without it — fail
+// loudly with the fix.
+export function resolvePlainkeepBin(): string {
+  const explicit = process.env.PLAINKEEP_BIN;
   if (explicit) {
     if (existsSync(explicit)) return explicit;
-    throw new OpsMissing(`OPS_BIN=${explicit} does not exist`);
+    throw new PlainkeepMissing(`PLAINKEEP_BIN=${explicit} does not exist`);
   }
   // Rely on PATH resolution via the shell — execa with a bare name searches PATH.
-  return "ops";
+  return "plainkeep";
 }
 
-export class OpsMissing extends Error {}
+export class PlainkeepMissing extends Error {}
 
 // The exit-code protocol (machine-contract §2): 0 ok · 2 usage · 3 confirm · 4 not-found · 5 deny.
 export const EXIT = { OK: 0, USAGE: 2, CONFIRM: 3, NOT_FOUND: 4, DENY: 5 } as const;
@@ -37,10 +39,11 @@ export interface RunResult {
   stderr: string;
 }
 
-// Run `ops <argv...> --json` and parse the envelope. Never throws on a non-zero ops exit — a refusal
-// (exit 3/4/5) is normal control flow the UI renders; only a spawn failure (ops missing) throws.
-export async function runOps(argv: string[], opts: { json?: boolean } = {}): Promise<RunResult> {
-  const bin = resolveOpsBin();
+// Run `plainkeep <argv...> --json` and parse the envelope. Never throws on a non-zero plainkeep exit —
+// a refusal (exit 3/4/5) is normal control flow the UI renders; only a spawn failure (plainkeep
+// missing) throws.
+export async function runPlainkeep(argv: string[], opts: { json?: boolean } = {}): Promise<RunResult> {
+  const bin = resolvePlainkeepBin();
   const args = opts.json === false ? argv : [...argv, "--json"];
   let stdout = "";
   let stderr = "";
@@ -52,9 +55,9 @@ export async function runOps(argv: string[], opts: { json?: boolean } = {}): Pro
     exitCode = res.exitCode ?? 1;
   } catch (e: any) {
     if (e?.code === "ENOENT") {
-      throw new OpsMissing(
-        "the `ops` command was not found on PATH. Install/link the ops vault (script/setup puts it " +
-          "on PATH), or set OPS_BIN=/absolute/path/to/ops.",
+      throw new PlainkeepMissing(
+        "the `plainkeep` command was not found on PATH. Install/link the plainkeep vault (script/setup " +
+          "puts it on PATH), or set PLAINKEEP_BIN=/absolute/path/to/plainkeep.",
       );
     }
     throw e;
@@ -64,20 +67,20 @@ export async function runOps(argv: string[], opts: { json?: boolean } = {}): Pro
 }
 
 // For tty-class verbs (backup init's password prompt, wiki edit → $EDITOR): hand the real terminal
-// to ops — inherit stdio, no --json capture — and return the exit code. This is the "suspend and
-// pass through" path the tty flag exists for.
-export async function runOpsInteractive(argv: string[]): Promise<number> {
-  const bin = resolveOpsBin();
+// to plainkeep — inherit stdio, no --json capture — and return the exit code. This is the "suspend
+// and pass through" path the tty flag exists for.
+export async function runPlainkeepInteractive(argv: string[]): Promise<number> {
+  const bin = resolvePlainkeepBin();
   try {
     const res = await execa(bin, argv, { stdio: "inherit", reject: false });
     return res.exitCode ?? 1;
   } catch (e: any) {
-    if (e?.code === "ENOENT") throw new OpsMissing("`ops` not found on PATH (set OPS_BIN).");
+    if (e?.code === "ENOENT") throw new PlainkeepMissing("`plainkeep` not found on PATH (set PLAINKEEP_BIN).");
     throw e;
   }
 }
 
-// Parse the ops JSON output: either a single scalar envelope object, or NDJSON (one header envelope
+// Parse the plainkeep JSON output: either a single scalar envelope object, or NDJSON (one header envelope
 // then one data row per line). Tolerant of blank lines and trailing noise.
 function parseJsonl(text: string): { envelope: Envelope | null; rows: Record<string, unknown>[] } {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);

@@ -1,25 +1,26 @@
 # Backup & share — the durability floor and the sharing surface
 
-How to use ops's two durability verbs: `ops backup` (Part 5.1) makes the system trustworthy, and
-`ops share` (Part 5.2) makes it reachable. For anyone running or maintaining an ops vault.
+How to use plainkeep's two durability verbs: `plainkeep backup` (Part 5.1) makes the system
+trustworthy, and `plainkeep share` (Part 5.2) makes it reachable. For anyone running or maintaining
+a plainkeep vault.
 
 Backup comes first. `~/files` is the one root where loss is physically irreversible.
 
-## `ops backup` — the restic family
+## `plainkeep backup` — the restic family
 
-Bare `ops backup` is a read-only nag. It verifies `~/ops` is committed and pushed, and exits 1 if
-anything is at risk. It never transmits.
+Bare `plainkeep backup` is a read-only nag. It verifies `~/plainkeep` is committed and pushed, and
+exits 1 if anything is at risk. It never transmits.
 
 The subcommands add the real durability floor. restic is auto-detected (`shutil.which`); every
 restic path degrades with an install hint when restic is absent.
 
 | Subcommand | Class | What it does |
 |---|---|---|
-| `backup init` | confirm (`--yes`) | Human-run once. Writes `.backup/config.json` with the local external-SSD repo and B2 bucket as **`op://` references** (never resolved), renders `com.ops.backup.cloud.plist`, and prints the `cp` / `launchctl load` lines. It never installs a launch agent for you. |
+| `backup init` | confirm (`--yes`) | Human-run once. Writes `.backup/config.json` with the local external-SSD repo and B2 bucket as **`op://` references** (never resolved), renders `com.plainkeep.backup.cloud.plist`, and prints the `cp` / `launchctl load` lines. It never installs a launch agent for you. |
 | `backup status` | read | Snapshot age per target. Exits 1 if any target is stale over 48h, unconfigured, or unverifiable. Works without restic. |
-| `backup run [--target local\|cloud]` | safe_write; **cloud is confirm** | `restic backup` of `~/files`, `~/dotfiles`, and the working trees of `~/ops` and `~/work`, then `restic check`. |
+| `backup run [--target local\|cloud]` | safe_write; **cloud is confirm** | `restic backup` of `~/files`, `~/dotfiles`, and the working trees of `~/plainkeep` and `~/work`, then `restic check`. |
 | `backup drill` | confirm (`--yes`) | Restore the latest snapshot to a temp dir and diff. A backup that has never been restored is a hypothesis. |
-| `backup bundle` | safe_write | Rotated `git bundle --all` of `~/ops` and every `~/work` repo into `~/files/backups/bundles/` (keep last N, `OPS_BUNDLE_KEEP`). Closes the "remote-less repo has one copy in the world" hole; captured by restic. |
+| `backup bundle` | safe_write | Rotated `git bundle --all` of `~/plainkeep` and every `~/work` repo into `~/files/backups/bundles/` (keep last N, `PLAINKEEP_BUNDLE_KEEP`). Closes the "remote-less repo has one copy in the world" hole; captured by restic. |
 
 ### The append-only cloud push runs outside the verb surface
 
@@ -32,15 +33,15 @@ Thereafter it is machine infrastructure, like Time Machine.
 Even a fully compromised laptop or agent can only ADD to history, never erase it. Pruning is manual
 only, with a separate privileged key.
 
-The rendered plist carries exactly this command. `ops` itself never performs the cloud push.
+The rendered plist carries exactly this command. `plainkeep` itself never performs the cloud push.
 
 `.backup/config.json` and the rendered plist are user-owned (per-vault). They are not in
 `script/engine.txt`.
 
-## `ops share` — capability URL, confirm-gated
+## `plainkeep share` — capability URL, confirm-gated
 
-`ops share <slug>` and `share collection <tag>` render the note(s) to a self-contained **OPSX**
-bundle (raw wiki markdown plus rendered HTML) locally:
+`plainkeep share <slug>` and `share collection <tag>` render the note(s) to a self-contained
+**OPSX** bundle (raw wiki markdown plus rendered HTML) locally:
 
 - inline CSS
 - wikilinks resolve only within the shared set; others degrade to plain text
@@ -69,14 +70,14 @@ There is no second "agent URL" to construct and no header to set. Append `.md`, 
   (`EXIT_CONFIRM=3`). `--dry-run` renders locally and stops before the PUT. The verb's output is a
   **draft link** — the human sends it.
 - `PUT /` requires a matching `X-Publish-Token` header when the `PUBLISH_TOKEN` wrangler secret is
-  set (`ops share init` provisions it). A discovered endpoint can't be abused as a free file host.
+  set (`plainkeep share init` provisions it). A discovered endpoint can't be abused as a free file host.
 - Expiry is native KV `expirationTtl`, 1:1 from `--expires` (e.g. `7d`).
 - `share revoke <id>` issues a `DELETE` with the admin token recorded in `.share/ledger.json`.
 - `share list` shows every share.
 - Links published under the previous encrypted model return **410** on every route. Re-publish.
 - `--gist` is a throwaway fallback (`gh gist create`, confirm-gated). Same trust model as this
   capability-URL scheme, just hosted by GitHub instead of the vendored worker.
-- `ops sweep` warns on expired shares and on notes edited since they were shared.
+- `plainkeep sweep` warns on expired shares and on notes edited since they were shared.
 
 ### Threat model — what changed, and why
 
@@ -98,7 +99,7 @@ something first" step. Both were rejected on ergonomics:
 - `?k=` query key
 - an `X-Ops-Share-Key` header
 - a second `agent_url`
-- client-side `ops share pull` math
+- client-side `plainkeep share pull` math
 
 Once the key has to be visible to the server for any agent-fetchable route to work, zero-knowledge
 buys nothing over a plain unguessable token. So we drop it and get the one-link contract for free.

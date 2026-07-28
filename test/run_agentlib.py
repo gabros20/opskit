@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """run_agentlib.py — the §6 agent indirection: run_agent dispatch + the deterministic fallback, and
-that a configured agent (faked via OPS_AGENT_CMD) actually overrides triage's shell classifier."""
+that a configured agent (faked via PLAINKEEP_AGENT_CMD) actually overrides triage's shell classifier."""
 from __future__ import annotations
 import importlib.util
 import os
@@ -19,32 +19,32 @@ def check(name, cond, detail=""):
 
 
 def load_agent():
-    spec = importlib.util.spec_from_file_location("ops_agent", REPO / "bin" / "lib" / "agent.py")
+    spec = importlib.util.spec_from_file_location("plainkeep_agent", REPO / "bin" / "lib" / "agent.py")
     m = importlib.util.module_from_spec(spec)
-    sys.modules["ops_agent"] = m
+    sys.modules["plainkeep_agent"] = m
     spec.loader.exec_module(m)
     return m
 
 
 def main() -> int:
     ag = load_agent()
-    for k in ("OPS_AGENT", "OPS_AGENT_CMD", "OPS_AGENT_MODEL"):
+    for k in ("PLAINKEEP_AGENT", "PLAINKEEP_AGENT_CMD", "PLAINKEEP_AGENT_MODEL"):
         os.environ.pop(k, None)
 
     check("no agent → unavailable", not ag.available())
     check("no agent → run_agent returns None (caller falls back)", ag.run_agent("x") is None)
-    os.environ["OPS_AGENT"] = "none"
-    check("OPS_AGENT=none → unavailable", not ag.available())
-    os.environ["OPS_AGENT"] = "bogus"
+    os.environ["PLAINKEEP_AGENT"] = "none"
+    check("PLAINKEEP_AGENT=none → unavailable", not ag.available())
+    os.environ["PLAINKEEP_AGENT"] = "bogus"
     check("unknown agent → available but run_agent None", ag.available() and ag.run_agent("x") is None)
-    os.environ.pop("OPS_AGENT")
+    os.environ.pop("PLAINKEEP_AGENT")
 
     with tempfile.TemporaryDirectory() as td:
         scr = Path(td) / "fake.sh"; scr.write_text('#!/usr/bin/env bash\necho task\n'); scr.chmod(0o755)
-        os.environ["OPS_AGENT_CMD"] = str(scr)
-        check("OPS_AGENT_CMD → available", ag.available())
-        check("OPS_AGENT_CMD → run_agent returns the agent's output", ag.run_agent("anything") == "task")
-        os.environ.pop("OPS_AGENT_CMD")
+        os.environ["PLAINKEEP_AGENT_CMD"] = str(scr)
+        check("PLAINKEEP_AGENT_CMD → available", ag.available())
+        check("PLAINKEEP_AGENT_CMD → run_agent returns the agent's output", ag.run_agent("anything") == "task")
+        os.environ.pop("PLAINKEEP_AGENT_CMD")
 
     # end-to-end: a deterministically-'note' item, with a fake agent forcing 'task', is filed as a task
     with tempfile.TemporaryDirectory() as td:
@@ -52,7 +52,7 @@ def main() -> int:
         (h / "wiki" / "conventions.md").write_text("# c\n## Filing rules\n")
         (h / "inbox" / "cap.md").write_text("---\ntype: capture\n---\nRRF merges BM25 and vectors")  # → note by the shell rule
         scr = h / "fake.sh"; scr.write_text('#!/usr/bin/env bash\necho task\n'); scr.chmod(0o755)
-        env = {**os.environ, "OPS_HOME": str(h), "OPS_AGENT_CMD": str(scr)}
+        env = {**os.environ, "PLAINKEEP_HOME": str(h), "PLAINKEEP_AGENT_CMD": str(scr)}
         r = subprocess.run([sys.executable, str(REPO / "bin" / "triage" / "run.py"), "--yes"],
                            capture_output=True, text=True, env=env)
         tasks = list((h / "tasks" / "active").glob("T-*.md")) if (h / "tasks" / "active").exists() else []

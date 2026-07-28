@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""ops search "<query>" [--author human|agent] [--open] [--json] — ranked file#heading hits with an
+"""plainkeep search "<query>" [--author human|agent] [--open] [--json] — ranked file#heading hits with an
 FTS5 snippet excerpt (§10.2 stage 1, proposal Part 3.4). `--author human` excludes agent + derived
 material, `--author agent` keeps only agent notes (provenance planes, Part 4.3). `--open` jumps to the
-top hit via `ops open`; bare `ops search` in a tty with fzf opens a live-reload search session."""
+top hit via `plainkeep open`; bare `plainkeep search` in a tty with fzf opens a live-reload search session."""
 import shutil
 import subprocess
 import sys
@@ -16,15 +16,15 @@ DIM, RESET = "\033[2m", "\033[0m"
 
 
 def _open(slug: str) -> int:
-    return subprocess.run([str(paths.OPS_HOME / "ops"), "open", slug]).returncode
+    return subprocess.run([str(paths.PLAINKEEP_HOME / "plainkeep"), "open", slug]).returncode
 
 
 def _live_session() -> int:
-    """fzf live-reload search: each keystroke re-runs `ops search`; enter opens the hit via `ops open`.
+    """fzf live-reload search: each keystroke re-runs `plainkeep search`; enter opens the hit via `plainkeep open`.
     Re-enters through the dispatcher (guardrail applies); no verb/lib import shortcut (anti-roadmap #2)."""
-    ops = str(paths.OPS_HOME / "ops")
-    reload_cmd = f'OPS_RENDER=raw "{ops}" search {{q}} 2>/dev/null'
-    preview = f'OPS_RENDER=plain "{ops}" open {{2}} 2>/dev/null'
+    pk = str(paths.PLAINKEEP_HOME / "plainkeep")
+    reload_cmd = f'PLAINKEEP_RENDER=raw "{pk}" search {{q}} 2>/dev/null'
+    preview = f'PLAINKEEP_RENDER=plain "{pk}" open {{2}} 2>/dev/null'
     argv = ["fzf", "--ansi", "--reverse", "--disabled", "--height", "80%", "--nth", "2..",
             "--prompt", "search> ", "--preview", preview, "--preview-window", "right:60%:wrap",
             "--bind", f"change:reload({reload_cmd})", "--bind", f"start:reload({reload_cmd})"]
@@ -46,14 +46,14 @@ def main(argv):
         author = argv[i + 1] if i + 1 < len(argv) else None
         del argv[i:i + 2]
         if author not in ("human", "agent"):
-            output.fail(output.EXIT_USAGE, "usage: ops search \"<query>\" --author human|agent",
+            output.fail(output.EXIT_USAGE, "usage: plainkeep search \"<query>\" --author human|agent",
                         verb="search")
     query = " ".join(argv).strip()
 
     if not query:
         if sys.stdin.isatty() and sys.stdout.isatty() and shutil.which("fzf"):
             return _live_session()
-        output.fail(output.EXIT_USAGE, 'usage: ops search "<query>"', verb="search")
+        output.fail(output.EXIT_USAGE, 'usage: plainkeep search "<query>"', verb="search")
 
     # every real search is logged to .logs/queries.jsonl (ADR-002); --author filters the plane (4.3)
     hits = search(query, log=True, author=author)
@@ -68,7 +68,7 @@ def main(argv):
 
     def render_hits(rs):
         if not rs:
-            return "(no hits — try `ops index` first, or broaden the query)"
+            return "(no hits — try `plainkeep index` first, or broaden the query)"
         out = []
         for r in rs:
             out.append(f"{r['score']:6.4f}  {r['path']}#{r['heading']}")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops new project "<name>" [--kind labs|products|tools] | new client "<name>"
+plainkeep new project "<name>" [--kind labs|products|tools] | new client "<name>"
     | new verb <name> [--risk <class>] [--summary "<text>"]
 — scaffold a unit of work (§4.1, §12.3) or a new command. A PROJECT gets a wiki hub AND a ~/work repo
 scaffolded from templates/project-repo/ (git-initialized). A CLIENT gets a wiki hub AND a
@@ -19,8 +19,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import output, paths, resolver  # noqa: E402
 
-TEMPLATE = paths.OPS_HOME / "templates" / "project-repo"
-VERB_TEMPLATE = paths.OPS_HOME / "templates" / "verb"
+TEMPLATE = paths.PLAINKEEP_HOME / "templates" / "project-repo"
+VERB_TEMPLATE = paths.PLAINKEEP_HOME / "templates" / "verb"
 RISK_CLASSES = ("read", "safe_write", "draft_only", "confirm", "deny")
 
 
@@ -43,7 +43,7 @@ def _new_verb(rest, dry=False):
     # NEVER into bin/ (the engine checkout boundary). Engine names stay reserved (Part 2.1).
     if resolver.is_engine_verb(name):
         output.fail(output.EXIT_UNEXPECTED, f"'{name}' is a reserved engine verb — choose another name", verb="new")
-    dest = paths.OPS_HOME / "plugins" / "local" / name
+    dest = paths.PLAINKEEP_HOME / "plugins" / "local" / name
     rel = f"plugins/local/{name}"
     if dest.exists():
         output.fail(output.EXIT_UNEXPECTED, f"plugin verb '{name}' already exists ({rel})", verb="new")
@@ -56,7 +56,7 @@ def _new_verb(rest, dry=False):
     shutil.copytree(VERB_TEMPLATE, dest)
     _fill(dest, {"{{name}}": name, "{{risk}}": risk,
                  "{{summary}}": summary or f"TODO: describe {name}"})
-    from lib.manifest import write_manifest  # regenerate ops.json so `ops help` shows the new verb
+    from lib.manifest import write_manifest  # regenerate plainkeep.json so `plainkeep help` shows the new verb
     write_manifest()
     paths.append_journal(f"new verb: {name} (risk {risk})")
     data = {"type": "verb", "name": name, "risk": risk, "code": f"{rel}/run.py"}
@@ -65,7 +65,7 @@ def _new_verb(rest, dry=False):
         print(f"scaffolded verb '{name}':")
         print(f"  code:   {rel}/run.py  (+ cmd.json, risk: {risk})")
         print(f"  source: plugin:local — user-owned, survives `script/update` (never in engine.txt)")
-        print(f"  next:   implement main() in {rel}/run.py, then `ops {name}`"
+        print(f"  next:   implement main() in {rel}/run.py, then `plainkeep {name}`"
               + ("" if risk != "confirm" else "  (confirm-class → runs with --yes until you lower risk)"))
 
     return output.emit(data, "new", human=render)
@@ -81,7 +81,7 @@ def _hub(folder: str, typ: str, slug: str, name: str) -> Path:
     f = d / f"{slug}.md"
     f.write_text(f"---\ntype: {typ}\ntitle: {name}\nstatus: active\ncreated: {paths.today()}\n"
                  f"updated: {paths.today()}\ntags: []\naliases: []\nremote:\n---\n# {name}\n\n"
-                 f"## Timeline\n- {paths.today()} created via `ops new {typ}`\n", encoding="utf-8")
+                 f"## Timeline\n- {paths.today()} created via `plainkeep new {typ}`\n", encoding="utf-8")
     return f
 
 
@@ -100,7 +100,7 @@ def main(argv):
     argv = [a for a in argv if a != "--dry-run"]
     if len(argv) < 2 or argv[0] not in ("project", "client", "verb"):
         output.fail(output.EXIT_USAGE,
-                    'usage: ops new project "<name>" [--kind labs|products|tools] | new client "<name>"\n'
+                    'usage: plainkeep new project "<name>" [--kind labs|products|tools] | new client "<name>"\n'
                     '       | new verb <name> [--risk <class>] [--summary "<text>"]', verb="new")
     if argv[0] == "verb":
         return _new_verb(argv[1:], dry)
@@ -130,11 +130,11 @@ def main(argv):
         for sub in ("in", "out", "work"):
             (tree / sub).mkdir(parents=True, exist_ok=True)
         paths.append_journal(f"new client: {slug}")
-        data = {"type": "client", "slug": slug, "hub": str(hub.relative_to(paths.OPS_HOME)), "tree": str(tree)}
+        data = {"type": "client", "slug": slug, "hub": str(hub.relative_to(paths.PLAINKEEP_HOME)), "tree": str(tree)}
 
         def render_c(_):
             print(f"created client '{name}':")
-            print(f"  wiki hub:  {hub.relative_to(paths.OPS_HOME)}")
+            print(f"  wiki hub:  {hub.relative_to(paths.PLAINKEEP_HOME)}")
             print(f"  material:  {tree}/  (in/ = read-only originals, out/ = deliverables, work/ = drafts)")
         return output.emit(data, "new", human=render_c)
 
@@ -158,15 +158,15 @@ def main(argv):
     subprocess.run(["git", "init", "-q", str(repo)], check=False)
     subprocess.run(["git", "-C", str(repo), "add", "-A"], check=False)
     subprocess.run(["git", "-C", str(repo), "-c", "commit.gpgsign=false",
-                    "commit", "-qm", f"scaffold {name} via ops new"], check=False,
+                    "commit", "-qm", f"scaffold {name} via plainkeep new"], check=False,
                    capture_output=True)
     paths.append_journal(f"new project: {slug} ({kind})")
     data = {"type": "project", "slug": slug, "kind": kind,
-            "hub": str(hub.relative_to(paths.OPS_HOME)), "repo": str(repo)}
+            "hub": str(hub.relative_to(paths.PLAINKEEP_HOME)), "repo": str(repo)}
 
     def render_p(_):
         print(f"created project '{name}':")
-        print(f"  wiki hub:  {hub.relative_to(paths.OPS_HOME)}")
+        print(f"  wiki hub:  {hub.relative_to(paths.PLAINKEEP_HOME)}")
         print(f"  repo:      {repo}/  (git-initialized from templates/project-repo)")
         print(f"  next:      cd {repo} && script/setup   ·   set the hub's remote: field when you push")
 

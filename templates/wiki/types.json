@@ -1,5 +1,5 @@
 {
-  "_comment": "The note-type registry (data-driven). Each type maps to the wiki subfolder it files into; `hub: true` marks the two-zone entity notes (compiled truth over an append-only Timeline). Add a type here + optionally a <type>.md body template in this folder, and it's usable by `ops wiki new <type>` and completion — no code change. Mirrors the built-in fallback in bin/lib/notetype.py.",
+  "_comment": "The note-type registry (data-driven). Each type maps to the wiki subfolder it files into; `hub: true` marks the two-zone entity notes (compiled truth over an append-only Timeline). Add a type here + optionally a <type>.md body template in this folder, and it's usable by `plainkeep wiki new <type>` and completion — no code change. Mirrors the built-in fallback in bin/lib/notetype.py.",
   "note":       { "dir": "notes" },
   "decision":   { "dir": "notes" },
   "meeting":    { "dir": "notes" },

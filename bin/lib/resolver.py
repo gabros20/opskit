@@ -4,17 +4,17 @@ name into the directory that holds its `run.py` + `cmd.json`, in STRICT preceden
 
     1. bin/<verb>/            — the engine, RESERVED (always wins; a plugin can never shadow a
                                 core or future-core verb)
-    2. plugins/<pack>/<verb>/ — user packs inside the vault (OPS_HOME), survive `script/update`
-    3. $OPS_PATH roots        — colon-separated extra pack roots, each a dir of <verb>/ folders
+    2. plugins/<pack>/<verb>/ — user packs inside the vault (PLAINKEEP_HOME), survive `script/update`
+    3. $PLAINKEEP_PATH roots        — colon-separated extra pack roots, each a dir of <verb>/ folders
 
 A plugin verb is the EXACT same shape as an engine verb (run.py + cmd.json) — zero new runtime. The
 dispatcher asks this module for a run.py path; the guardrail asks it for the verb set + cmd.json
 lookup; the manifest globs every cmd.json through it and tags each with its `source`. So every agent
-discovers plugins through ops.json with no other change.
+discovers plugins through plainkeep.json with no other change.
 
 Engine names are reserved: a plugin verb whose name collides with an engine verb is IGNORED (see
-`shadowed()`), surfaced as a warning in `ops help`. OPS_HOME/OPS_PATH are read per call so the running
-process and the test harness (OPS_HOME/OPS_PATH env) see the same resolution.
+`shadowed()`), surfaced as a warning in `plainkeep help`. PLAINKEEP_HOME/PLAINKEEP_PATH are read per call so the running
+process and the test harness (PLAINKEEP_HOME/PLAINKEEP_PATH env) see the same resolution.
 """
 from __future__ import annotations
 import os
@@ -25,7 +25,7 @@ ENGINE_BIN = Path(__file__).resolve().parents[1]          # bin/ — ships with 
 
 
 def _ops_home() -> Path:
-    return Path(os.environ.get("OPS_HOME", ENGINE_BIN.parent))
+    return Path(os.environ.get("PLAINKEEP_HOME", ENGINE_BIN.parent))
 
 
 def _is_verb_dir(d: Path) -> bool:
@@ -33,7 +33,7 @@ def _is_verb_dir(d: Path) -> bool:
 
 
 def _plugin_packs() -> list[tuple[str, Path]]:
-    """(pack_name, pack_dir) for each plugins/<pack>/ under OPS_HOME, then each $OPS_PATH root (the
+    """(pack_name, pack_dir) for each plugins/<pack>/ under PLAINKEEP_HOME, then each $PLAINKEEP_PATH root (the
     root itself is the pack). Order is the resolution order after the engine."""
     packs: list[tuple[str, Path]] = []
     pdir = _ops_home() / "plugins"
@@ -41,7 +41,7 @@ def _plugin_packs() -> list[tuple[str, Path]]:
         for sub in sorted(pdir.iterdir()):
             if sub.is_dir():
                 packs.append((sub.name, sub))
-    for root in os.environ.get("OPS_PATH", "").split(":"):
+    for root in os.environ.get("PLAINKEEP_PATH", "").split(":"):
         root = root.strip()
         if not root:
             continue
@@ -93,7 +93,7 @@ def is_engine_verb(verb: str) -> bool:
 
 
 def known_verbs() -> set[str]:
-    """Every resolvable verb name across engine + plugins + $OPS_PATH (engine names are reserved,
+    """Every resolvable verb name across engine + plugins + $PLAINKEEP_PATH (engine names are reserved,
     but a shadowing plugin doesn't change the NAME set — it only loses the resolution)."""
     names = _engine_names()
     for _, pack in _plugin_packs():
@@ -104,7 +104,7 @@ def known_verbs() -> set[str]:
 
 def plugin_names() -> list[str]:
     """Sorted, de-duplicated pack names that contribute at least one (non-shadowed) verb — for
-    ops.json `capabilities.plugins`."""
+    plainkeep.json `capabilities.plugins`."""
     engine = _engine_names()
     seen: set[str] = set()
     out: list[str] = []
@@ -119,7 +119,7 @@ def plugin_names() -> list[str]:
 
 def iter_cmds() -> list[tuple[Path, str]]:
     """All (cmd.json path, source) in resolution order — engine first (reserved). A plugin verb whose
-    name is already claimed (by the engine or an earlier pack) is SKIPPED, so ops.json never lists a
+    name is already claimed (by the engine or an earlier pack) is SKIPPED, so plainkeep.json never lists a
     shadowed verb; `shadowed()` reports the engine collisions as warnings."""
     seen: set[str] = set()
     out: list[tuple[Path, str]] = []

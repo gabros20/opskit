@@ -1,7 +1,7 @@
-# The machine contract — `--json`, exit codes, `ops.json/3`, `cmd.json`
+# The machine contract — `--json`, exit codes, `plainkeep.json/3`, `cmd.json`
 
-**Reference.** The exact shapes a program or agent can rely on when driving `ops`. Read this to
-build a frontend, an MCP layer, or any tool that shells out to `ops`.
+**Reference.** The exact shapes a program or agent can rely on when driving `plainkeep`. Read this to
+build a frontend, an MCP layer, or any tool that shells out to `plainkeep`.
 
 Everything here is frozen per version and covered by a contract test (`test/run_json.py`). The
 envelope only ever changes with an explicit `ops_json` version bump.
@@ -10,7 +10,7 @@ envelope only ever changes with an explicit `ops_json` version bump.
 
 ## 1. The `--json` envelope
 
-Every verb accepts a global `--json` flag (or `OPS_JSON=1` in the environment). Human rendering is
+Every verb accepts a global `--json` flag (or `PLAINKEEP_JSON=1` in the environment). Human rendering is
 unchanged when it is absent. One implementation lives in `bin/lib/output.py`; verbs never hand-roll
 JSON.
 
@@ -26,7 +26,7 @@ header object, then one plain JSON object per row:
 ```json
 {"ops_json": 1, "ok": true, "verb": "search", "count": 5}
 {"path": "notes/risk-classes.md", "heading": "(top)", "score": 0.0324, "snippet": "…"}
-{"path": "notes/the-ops-loop.md",  "heading": "The ops loop", "score": 0.0321, "snippet": "…"}
+{"path": "notes/the-plainkeep-loop.md",  "heading": "The plainkeep loop", "score": 0.0321, "snippet": "…"}
 ```
 
 The header may carry extra verb-specific fields (e.g. `queue`, `applied`, `dry_run` on
@@ -62,26 +62,27 @@ preview: print what *would* happen, write nothing.
 
 The guardrail honours the declaration. A confirm-class verb invoked with `--dry-run` is **downgraded
 to a read** and allowed without `--yes` — a true dry-run *is* a read. This makes the entire surface
-explorable: `ops archive foo --dry-run`, `ops organize apply --dry-run`, and
-`ops share <slug> --dry-run` all run freely and mutate nothing.
+explorable: `plainkeep archive foo --dry-run`, `plainkeep organize apply --dry-run`, and
+`plainkeep share <slug> --dry-run` all run freely and mutate nothing.
 
 One exception: untrusted plugin verbs keep the confirm ceiling even for `--dry-run`.
 
-## 4. `ops.json/3` — the generated surface description
+## 4. `plainkeep.json/3` — the generated surface description
 
-`ops.json` is **generated** by `bin/lib/manifest.py` (`ops index` and `ops help` refresh it). Nothing
-in it is hand-maintained, and nothing is persisted that isn't re-detected at write time.
+`plainkeep.json` is **generated** by `bin/lib/manifest.py` (`plainkeep index` and `plainkeep help`
+refresh it). Nothing in it is hand-maintained, and nothing is persisted that isn't re-detected at
+write time.
 
 ```json
 {
-  "schema": "ops.json/3",
-  "ops_version": "4.0.0-dev",          // the VERSION file
+  "schema": "plainkeep.json/3",
+  "plainkeep_version": "4.0.0-dev",    // the VERSION file
   "api_version": "1.0",                // the plugin SDK version (bin/lib/api.py)
   "json_envelope": 1,                  // the envelope version above
   "capabilities": {
     "vectors": true,                   // importlib-detected: lancedb present?
     "rerank": true,                    // fastembed present?
-    "agent": "none",                   // $OPS_AGENT
+    "agent": "none",                   // $PLAINKEEP_AGENT
     "plugins": []                      // installed packs
   },
   "verbs": [ { "...": "per-verb entries, see below" } ]
@@ -96,29 +97,29 @@ The three top-level version fields are **independent** and version different thi
 | `api_version` | the plugin SDK |
 | `schema` | the *shape of this file* |
 
-Only `schema` moved in this revision (`ops.json/2` → `ops.json/3`); the envelope and SDK are unchanged.
+Only `schema` moved in this revision (`plainkeep.json/2` → `plainkeep.json/3`); the envelope and SDK are unchanged.
 
 Per verb (copied from its `cmd.json` sidecar, plus injected fields):
 
 | Field | Meaning |
 |---|---|
-| `verb`, `summary`, `usage`, `args` | what `ops help` renders |
+| `verb`, `summary`, `usage`, `args` | what `plainkeep help` renders |
 | `risk` | guardrail class: `read` / `safe_write` / `draft_only` / `confirm` / `deny` |
 | `reads`, `writes` | declared filesystem footprint |
 | `source` | `engine` or `plugin:<name>` (injected by the manifest) |
-| `group` | **(ops.json/3)** the display group the verb renders under (`SYSTEM`/`FLOW`/`KNOWLEDGE`/`TASKS`/`WORK`/`BUSINESS`/`JOBS`, else `OTHER`) — injected by the manifest from its `GROUPS` table so a UI groups verbs without re-encoding that table |
+| `group` | **(plainkeep.json/3)** the display group the verb renders under (`SYSTEM`/`FLOW`/`KNOWLEDGE`/`TASKS`/`WORK`/`BUSINESS`/`JOBS`, else `OTHER`) — injected by the manifest from its `GROUPS` table so a UI groups verbs without re-encoding that table |
 | `output` | `{mode: "scalar"\|"rows", fields: {name: type}}` — the `--json` shape of the verb's default action |
-| `hints` | when-to-use + the common mistake (also shown by `ops help <verb>`; becomes the MCP tool description) |
+| `hints` | when-to-use + the common mistake (also shown by `plainkeep help <verb>`; becomes the MCP tool description) |
 | `dry_run` | `true` if the verb supports the dry-run contract |
-| `tty` | **(ops.json/3, optional)** `true` if the verb (or, per-action in `actions[]`, a subaction) prompts or takes over the terminal — a frontend must hand off stdio rather than capture `--json` (see §5.1) |
-| `actions` | **(ops.json/3, optional)** the real subcommand grammar of a compound verb — see §5.1. Absent on scalar verbs |
+| `tty` | **(plainkeep.json/3, optional)** `true` if the verb (or, per-action in `actions[]`, a subaction) prompts or takes over the terminal — a frontend must hand off stdio rather than capture `--json` (see §5.1) |
+| `actions` | **(plainkeep.json/3, optional)** the real subcommand grammar of a compound verb — see §5.1. Absent on scalar verbs |
 
-Both new fields are additive: every `ops.json/2` field is retained, so a `schema`-unaware consumer that
+Both new fields are additive: every `plainkeep.json/2` field is retained, so a `schema`-unaware consumer that
 keyed on the v2 shape keeps working. `group` is present on **every** verb; `actions` only on compound
 verbs that declare it.
 
-A third party can drive the whole system from `ops.json` alone. That is what `ops mcp` does: its MCP
-tool list is generated from this file, and every tool call shells back through `ops <verb> --json`.
+A third party can drive the whole system from `plainkeep.json` alone. That is what `plainkeep mcp` does: its
+MCP tool list is generated from this file, and every tool call shells back through `plainkeep <verb> --json`.
 
 ## 5. `cmd.json` — the per-verb sidecar (what a verb author writes)
 
@@ -128,7 +129,7 @@ Example (`bin/search/cmd.json`, abbreviated):
 {
   "verb": "search",
   "summary": "ranked file#heading hits (keyword + graph [+ vectors/rerank])",
-  "usage": "ops search \"<query>\"",
+  "usage": "plainkeep search \"<query>\"",
   "risk": "read",
   "args": [{ "name": "query", "required": true }],
   "reads": [".index/", "wiki/"],
@@ -140,20 +141,20 @@ Example (`bin/search/cmd.json`, abbreviated):
 
 Notes for authors:
 
-- `"hidden": true` keeps a plumbing verb (`__complete`, `mcp`) out of `ops help`/`ops.json` while the
+- `"hidden": true` keeps a plumbing verb (`__complete`, `mcp`) out of `plainkeep help`/`plainkeep.json` while the
   guardrail still gates it.
 - For subcommand verbs, `output` describes the **default** action's rows (`task`→list, `wiki`→list,
   `files`→list…); other subactions still emit valid envelopes, with their own row shapes.
 - Undeclared `risk` defaults to `confirm` — the safe class.
 
-### 5.1 `actions[]` — the subcommand grammar (compound verbs, `ops.json/3`)
+### 5.1 `actions[]` — the subcommand grammar (compound verbs, `plainkeep.json/3`)
 
 A **compound verb** (one whose first positional arg selects a subcommand — `task`, `wiki`, `files`, …)
 may declare an **optional** `actions` array in its `cmd.json`. It is the machine-readable form of the
 grammar that the verb's `usage` string states in prose and that `bin/__complete` hardcodes — one source
 a generated form/TUI, `__complete`, the MCP layer, and an agent can all read instead of re-parsing usage.
 
-It rides through into the verb's `ops.json` entry verbatim, and is purely additive: a verb keeps its
+It rides through into the verb's `plainkeep.json` entry verbatim, and is purely additive: a verb keeps its
 top-level `args`/`risk`/`output`/`dry_run`, which continue to describe the **default** action.
 
 ```json
@@ -167,7 +168,7 @@ top-level `args`/`risk`/`output`/`dry_run`, which continue to describe the **def
                                        //   Omitted ⇒ it does NOT — no inheritance from top-level.
     "default": false,                  // optional bool; true marks the TOKENLESS default action —
                                        //   the one that runs when no subcommand keyword is given
-                                       //   (`ops share <slug>`, bare `ops backup`). ≤1 per verb.
+                                       //   (`plainkeep share <slug>`, bare `plainkeep backup`). ≤1 per verb.
     "tty": true,                       // optional bool; true = this action prompts or takes over the
                                        //   terminal ($EDITOR, an fzf picker, a password prompt), so a
                                        //   TUI must SUSPEND and hand off stdio, not capture --json.
@@ -201,11 +202,11 @@ a positional. The rest are optional.
   action is the one selected when the first argument is not another action's name. For most compound
   verbs that is also a real keyword (`task list`, `files ingest` — discoverable from the top-level
   `args[0].default`), but two verbs have a **tokenless** default:
-  - `share` — `ops share <slug>` publishes; there is no `publish` keyword.
-  - `backup` — bare `ops backup` nags.
+  - `share` — `plainkeep share <slug>` publishes; there is no `publish` keyword.
+  - `backup` — bare `plainkeep backup` nags.
 
   For a tokenless default a consumer must **not** offer the `name` as a literal completion; it offers
-  the action's first positional's values instead (this is exactly what `ops complete` does — see §8).
+  the action's first positional's values instead (this is exactly what `plainkeep complete` does — see §8).
   There is at most one `default` action per verb.
 - **Args are in invocation order.** Each action's `args` are listed in the order they are typed.
 - **`risk` inherits, `dry_run` does not.** A per-action `risk` omitted ⇒ the verb's top-level `risk`
@@ -234,22 +235,23 @@ in their enums) and fails the build on drift.
 
 ## 6. Stability policy
 
-- The envelope changes only with an `ops_json` bump; `ops.json` structure only with a `schema` bump.
-- **`ops.json/2` → `ops.json/3`** added two verb fields — `group` (always present) and the optional
+- The envelope changes only with an `ops_json` bump; `plainkeep.json` structure only with a `schema` bump.
+- **`plainkeep.json/2` → `plainkeep.json/3`** added two verb fields — `group` (always present) and the optional
   `actions[]` subcommand grammar (§5.1) — additively. Every v2 field is retained, so the bump is
   backward-compatible for a consumer that ignores the new fields. It is a `schema` bump (not an
   `ops_json`/`api_version` bump) because only this file's shape changed, not the envelope or SDK.
 - `test/run_json.py` round-trips every read-class verb against its declared `output` block, asserts the
   `schema` value + every verb's `group` + every declared `actions[]`'s well-formedness, and fails the
   build on drift; `test/run_plugin.py` snapshots every SDK signature.
-- Consumers should key on `schema` / `ops_json` / `api_version`, not on `ops_version`.
+- Consumers should key on `schema` / `ops_json` / `api_version`, not on `plainkeep_version`.
 
-## 7. `ops setup` layer `status` enum
+## 7. `plainkeep setup` layer `status` enum
 
-Each row `ops setup` emits (`ops setup --json`, and the same rows `ops doctor` folds in) carries a
+Each row `plainkeep setup` emits (`plainkeep setup --json`, and the same rows `plainkeep doctor`
+folds in) carries a
 `status` field from a **closed enum**. A program keys on this, never on the human `detail` string:
 
-| `status` | Meaning | `ops doctor` severity |
+| `status` | Meaning | `plainkeep doctor` severity |
 |---|---|---|
 | `ready` | the layer is operational | `ok` |
 | `partial` | some prerequisites present, some missing | `warn` (optional) / `FAIL` (required) |
@@ -258,7 +260,7 @@ Each row `ops setup` emits (`ops setup --json`, and the same rows `ops doctor` f
 | `not_applicable` | the layer cannot apply on **this host** (e.g. launchd scheduling off macOS); advisory only | `ok` (never a FAIL, even for a required layer) |
 
 `blocked` and `not_applicable` are the two the machine must special-case: neither is a defect, and
-`ops setup --all` **skips** both (and `ready`) rather than attempting them — so they never contribute
+`plainkeep setup --all` **skips** both (and `ready`) rather than attempting them — so they never contribute
 to its exit code.
 
 `--all` is otherwise best-effort: it advances every attemptable layer and exits `1` iff some
@@ -266,16 +268,17 @@ to its exit code.
 and the per-layer `results` carry each failure). Reading `next` is how an agent learns the remediation
 for a `blocked` layer — it must never invent an install command from `detail`.
 
-## 8. The completion contract (`ops complete --json`)
+## 8. The completion contract (`plainkeep complete --json`)
 
-`ops complete [<typed word>...] [--json]` returns the candidates for the **next** word, given the words
-already typed after `ops` (everything *before* the word being completed). It is the structured sibling
-of the zsh helper `ops __complete` (which prints the same candidates as lossy `value:description` text).
+`plainkeep complete [<typed word>...] [--json]` returns the candidates for the **next** word, given
+the words already typed after `plainkeep` (everything *before* the word being completed). It is the
+structured sibling of the zsh helper `plainkeep __complete` (which prints the same candidates as
+lossy `value:description` text).
 
 Both share one brain (`bin/lib/completion.py`) that derives everything from the verb surface + each
 compound verb's `actions[]`/args (§5.1) and the live content providers. There are **no** hardcoded
-subaction tables anywhere — the grammar in `cmd.json` is the single source, so completion, `ops help`,
-the MCP layer, and a future TUI can never drift apart.
+subaction tables anywhere — the grammar in `cmd.json` is the single source, so completion,
+`plainkeep help`, the MCP layer, and a future TUI can never drift apart.
 
 Rows (NDJSON, the standard §1 rows envelope — a header then one object per candidate):
 
@@ -299,6 +302,6 @@ Resolution mirrors §5.1:
 - Within an action: the values for the next positional (or a value-flag's value) — from that arg's
   `enum` (`kind: "enum"`) or its `complete` provider.
 
-Pass only the words **before** the one being completed (`ops complete task move` lists statuses;
-`ops complete wiki open` lists note slugs). `test/run_completion.py` asserts this shape and that the
+Pass only the words **before** the one being completed (`plainkeep complete task move` lists statuses;
+`plainkeep complete wiki open` lists note slugs). `test/run_completion.py` asserts this shape and that the
 offered subactions equal each verb's `actions[]` names (the anti-drift gate).

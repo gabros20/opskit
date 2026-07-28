@@ -1,7 +1,7 @@
 {
   "verb": "backup",
   "summary": "commit/push nag (bare); restic family + git-bundle net: init|status|run|drill|bundle",
-  "usage": "ops backup [status | run [--target local|cloud] --yes | drill --yes | bundle [--dry-run] | init --yes]",
+  "usage": "plainkeep backup [status | run [--target local|cloud] --yes | drill --yes | bundle [--dry-run] | init --yes]",
   "risk": "safe_write",
   "args": [
     {
@@ -20,7 +20,7 @@
     "~/files/backups/bundles/",
     "journal/"
   ],
-  "hints": "Bare `ops backup` is the UNCHANGED read-only commit/push nag (exit 1 = at risk; never pushes for you). Subcommands add the restic durability floor (auto-detected; degrades with an install hint): init (human-run once, --yes, writes .backup/config.json with op:// REFERENCES + renders the launchd plist), status (snapshot age per target, exit 1 if stale >48h or unconfigured), run [--target local|cloud] (cloud is --yes ALWAYS; the scheduled cloud push runs from launchd DIRECTLY with an append-only B2 key, outside this verb), drill (--yes; restore latest snapshot to tmp and diff), bundle (git bundle --all of ~/ops + every ~/work repo into ~/files/backups/bundles/ with retention). Common mistake: expecting bare backup to run restic — it only nags; use `ops backup run`.",
+  "hints": "Bare `plainkeep backup` is the UNCHANGED read-only commit/push nag (exit 1 = at risk; never pushes for you). Subcommands add the restic durability floor (auto-detected; degrades with an install hint): init (human-run once, --yes, writes .backup/config.json with op:// REFERENCES + renders the launchd plist), status (snapshot age per target, exit 1 if stale >48h or unconfigured), run [--target local|cloud] (cloud is --yes ALWAYS; the scheduled cloud push runs from launchd DIRECTLY with an append-only B2 key, outside this verb), drill (--yes; restore latest snapshot to tmp and diff), bundle (git bundle --all of ~/plainkeep + every ~/work repo into ~/files/backups/bundles/ with retention). Common mistake: expecting bare backup to run restic — it only nags; use `plainkeep backup run`.",
   "output": {
     "mode": "scalar",
     "fields": {
@@ -36,7 +36,7 @@
   "actions": [
     {
       "name": "nag",
-      "summary": "read-only commit/push nag (bare `ops backup`; exit 1 = at risk)",
+      "summary": "read-only commit/push nag (bare `plainkeep backup`; exit 1 = at risk)",
       "risk": "read",
       "default": true,
       "args": []
@@ -64,7 +64,7 @@
     },
     {
       "name": "bundle",
-      "summary": "rotated `git bundle --all` of ~/ops + every ~/work repo",
+      "summary": "rotated `git bundle --all` of ~/plainkeep + every ~/work repo",
       "risk": "safe_write",
       "dry_run": true,
       "args": []
@@ -76,7 +76,7 @@
       "tty": true,
       "args": [
         { "name": "--local-repo", "type": "string", "required": false, "help": "local restic repo path" },
-        { "name": "--cloud-repo", "type": "string", "required": false, "help": "cloud restic repo (e.g. b2:bucket:ops)" },
+        { "name": "--cloud-repo", "type": "string", "required": false, "help": "cloud restic repo (e.g. b2:bucket:plainkeep)" },
         { "name": "--password-ref", "type": "string", "required": false, "help": "1Password op:// reference for the restic password" },
         { "name": "--b2-account-ref", "type": "string", "required": false, "help": "op:// reference for the B2 account id" },
         { "name": "--b2-key-ref", "type": "string", "required": false, "help": "op:// reference for the B2 append-only key" }

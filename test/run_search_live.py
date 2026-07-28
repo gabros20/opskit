@@ -81,7 +81,7 @@ def main() -> int:
 
     emb_name, emb_fn = get_embedder()
     if not emb_fn:
-        print(f"{RED}no local embedder reachable (start ollama, or set OPS_EMBED_CMD).{RESET}")
+        print(f"{RED}no local embedder reachable (start ollama, or set PLAINKEEP_EMBED_CMD).{RESET}")
         return 2
 
     # Per-model asymmetric prompt prefixes (doc, query). Required by embeddinggemma/e5/mxbai;

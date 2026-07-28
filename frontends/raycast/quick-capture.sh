@@ -2,17 +2,17 @@
 # Raycast Script Command — quick-capture (proposal Part 3.3).
 #
 # @raycast.schemaVersion 1
-# @raycast.title Ops Capture
+# @raycast.title Plainkeep Capture
 # @raycast.mode compact
-# @raycast.packageName ops
+# @raycast.packageName plainkeep
 # @raycast.icon 🧠
 # @raycast.argument1 { "type": "text", "placeholder": "note text" }
-# @raycast.description Capture a note into the ops inbox for later triage.
-# @raycast.author ops
+# @raycast.description Capture a note into the plainkeep inbox for later triage.
+# @raycast.author plainkeep
 #
-# Shells to `ops` on PATH (fallback: $OPS_HOME/ops) so the guardrail + .logs apply — the frontend
+# Shells to `plainkeep` on PATH (fallback: $PLAINKEEP_HOME/plainkeep) so the guardrail + .logs apply — the frontend
 # has zero privileged access; every write re-enters through the dispatcher.
 set -euo pipefail
-OPS="$(command -v ops || true)"
-[ -n "$OPS" ] || OPS="${OPS_HOME:-$HOME/ops}/ops"
-exec "$OPS" capture "$1"
+PLAINKEEP="$(command -v plainkeep || true)"
+[ -n "$PLAINKEEP" ] || PLAINKEEP="${PLAINKEEP_HOME:-$HOME/plainkeep}/plainkeep"
+exec "$PLAINKEEP" capture "$1"

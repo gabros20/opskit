@@ -1,6 +1,6 @@
 # Plugins — add your own verbs without forking the engine
 
-This doc shows how to add a verb `ops` doesn't ship, from a private one-off to a distributable pack. It's for anyone writing their own verbs or installing packs.
+This doc shows how to add a verb `plainkeep` doesn't ship, from a private one-off to a distributable pack. It's for anyone writing their own verbs or installing packs.
 
 Adding a *core* verb to the engine instead? Read [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
@@ -16,10 +16,10 @@ The only difference is where it lives. Core verbs resolve from `bin/`; plugin ve
 Resolution order:
 
 ```
-bin/  →  plugins/<pack>/<verb>/  →  $OPS_PATH  (colon-separated)
+bin/  →  plugins/<pack>/<verb>/  →  $PLAINKEEP_PATH  (colon-separated)
 ```
 
-Plugins land in the same manifest as core verbs. So they show up in `ops help`, `ops.json`, tab-completion, the `ops ui` terminal UI, and the MCP tool list with zero extra wiring. The guardrail gates them exactly like core verbs.
+Plugins land in the same manifest as core verbs. So they show up in `plainkeep help`, `plainkeep.json`, tab-completion, the `plainkeep ui` terminal UI, and the MCP tool list with zero extra wiring. The guardrail gates them exactly like core verbs.
 
 ---
 
@@ -28,9 +28,9 @@ Plugins land in the same manifest as core verbs. So they show up in `ops help`, 
 ### Write a local verb (2 minutes)
 
 ```sh
-ops new verb standup          # scaffolds plugins/local/standup/{run.py,cmd.json}
+plainkeep new verb standup          # scaffolds plugins/local/standup/{run.py,cmd.json}
 $EDITOR plugins/local/standup/run.py
-ops standup                   # it's live — help/completion/ops.json pick it up automatically
+plainkeep standup                   # it's live — help/completion/plainkeep.json pick it up automatically
 ```
 
 The scaffold gives you argument parsing, `--json` emission, and a `cmd.json` that defaults to the safest risk class.
@@ -39,7 +39,7 @@ Fill in `summary`, `usage`, `risk`, `reads`/`writes`, `output`, and `hints`. See
 
 ### Import only the SDK
 
-A plugin imports **one** module: `lib.api`. It's frozen at `OPS_API_VERSION = "1.0"`.
+A plugin imports **one** module: `lib.api`. It's frozen at `PLAINKEEP_API_VERSION = "1.0"`.
 
 Everything else in `bin/lib/` is private and may change without notice.
 
@@ -52,7 +52,7 @@ The [reference tables](#reference) below list every export and every command.
 A pack is a git repo (or directory) of verb folders plus a manifest:
 
 ```
-ops-greeter/
+plainkeep-greeter/
 ├── plugin.json
 └── hello/
     ├── run.py
@@ -74,16 +74,16 @@ Its `plugin.json`:
 }
 ```
 
-`ops plugin add` validates this against the schema. It refuses a pack whose `api` range doesn't cover the installed `OPS_API_VERSION`, and it refuses any verb name that collides with an engine verb.
+`plainkeep plugin add` validates this against the schema. It refuses a pack whose `api` range doesn't cover the installed `PLAINKEEP_API_VERSION`, and it refuses any verb name that collides with an engine verb.
 
 ### Install, trust, update, remove
 
 ```sh
-ops plugin add you/ops-greeter@v0.1.0 --yes   # shallow-clone into plugins/greeter/ (a local path works too)
-ops plugin list                               # name · version · pinned commit · trust state · verbs
-ops plugin trust greeter --yes                # lift the ceiling to the pack's declared risks
-ops plugin update greeter --yes               # explicit re-pin; refuses to cross min_ops_version
-ops plugin remove greeter --yes               # delete dir + lock entry
+plainkeep plugin add you/plainkeep-greeter@v0.1.0 --yes   # shallow-clone into plugins/greeter/ (a local path works too)
+plainkeep plugin list                               # name · version · pinned commit · trust state · verbs
+plainkeep plugin trust greeter --yes                # lift the ceiling to the pack's declared risks
+plainkeep plugin update greeter --yes               # explicit re-pin; refuses to cross min_ops_version
+plainkeep plugin remove greeter --yes               # delete dir + lock entry
 ```
 
 Every install and trust decision is recorded in the committed `plugins/plugins.lock.json` (resolved commit sha + accepted risk ceiling). Your vault's plugin state stays reproducible and auditable.
@@ -94,7 +94,7 @@ Every install and trust decision is recorded in the committed `plugins/plugins.l
 
 Read this before installing anything.
 
-- **A manifest is a claim, not a permission.** A pack's self-declared risk classes never take effect at install. Until you run `ops plugin trust`, the guardrail caps *every* verb from that pack at `confirm`. That includes `--dry-run` calls: this is the one place dry-run does **not** downgrade, so an untrusted pack can't use it as a probe.
+- **A manifest is a claim, not a permission.** A pack's self-declared risk classes never take effect at install. Until you run `plainkeep plugin trust`, the guardrail caps *every* verb from that pack at `confirm`. That includes `--dry-run` calls: this is the one place dry-run does **not** downgrade, so an untrusted pack can't use it as a probe.
 - **Trust lifts the ceiling to the declared classes, not above them.** A trusted plugin still keeps the transmit-block and the path-wall. `deny`-class actions stay denied for everyone.
 - **Nothing auto-updates.** `update` is explicit and re-pins. There's no central registry: the git repo *is* the plugin, and trust is per-owner. Audit before you trust, like any code you run.
 
@@ -106,30 +106,30 @@ Read this before installing anything.
 
 | Export | What it's for |
 |---|---|
-| `OPS_HOME`, `WIKI`, `INBOX` | the filesystem roots |
+| `PLAINKEEP_HOME`, `WIKI`, `INBOX` | the filesystem roots |
 | `append_journal(line)` | the shared activity record — call it after any meaningful action |
 | `slugify`, `today`, `fm_field`, `link_targets` | slugs, dates, frontmatter reads, wikilink extraction |
 | `classify(action, path…)` | the Iron Law seam — gives your verb the same path-wall + transmit-block a core verb has; call it before any write you compute yourself |
 | `load_types`, `type_dir`, `is_type`, `render_note` | the data-driven note types, so your notes match the vault's conventions |
-| `run_agent(prompt, scope=…)` | borrow the configured model, with a deterministic fallback when `OPS_AGENT=none` |
+| `run_agent(prompt, scope=…)` | borrow the configured model, with a deterministic fallback when `PLAINKEEP_AGENT=none` |
 | `emit`, `emit_rows`, `fail` | the `--json` envelope + exit-code protocol |
 
 ### Plugin commands
 
 | Command | What it does |
 |---|---|
-| `ops new verb <name>` | scaffold `plugins/local/<name>/{run.py,cmd.json}` |
-| `ops plugin add <owner/repo>[@tag] --yes` | shallow-clone into `plugins/<pack>/` (a local path works too) |
-| `ops plugin list` | show name · version · pinned commit · trust state · verbs |
-| `ops plugin trust <name> --yes` | lift the ceiling to the pack's declared risks |
-| `ops plugin update <name> --yes` | explicit re-pin; refuses to cross `min_ops_version` |
-| `ops plugin remove <name> --yes` | delete the dir + lock entry |
+| `plainkeep new verb <name>` | scaffold `plugins/local/<name>/{run.py,cmd.json}` |
+| `plainkeep plugin add <owner/repo>[@tag] --yes` | shallow-clone into `plugins/<pack>/` (a local path works too) |
+| `plainkeep plugin list` | show name · version · pinned commit · trust state · verbs |
+| `plainkeep plugin trust <name> --yes` | lift the ceiling to the pack's declared risks |
+| `plainkeep plugin update <name> --yes` | explicit re-pin; refuses to cross `min_ops_version` |
+| `plainkeep plugin remove <name> --yes` | delete the dir + lock entry |
 
 ---
 
 ## Gotchas
 
-- **Don't put a verb in `bin/`.** `script/update` owns that path and will merge upstream over it. That's exactly what `plugins/local/` is for, and `ops new verb` refuses to scaffold into `bin/`.
-- **Re-enter, never import.** If your verb needs another verb, shell out to `ops <verb> --json`. Don't import its code — the guardrail must see every call.
+- **Don't put a verb in `bin/`.** `script/update` owns that path and will merge upstream over it. That's exactly what `plugins/local/` is for, and `plainkeep new verb` refuses to scaffold into `bin/`.
+- **Re-enter, never import.** If your verb needs another verb, shell out to `plainkeep <verb> --json`. Don't import its code — the guardrail must see every call.
 - **Declare `output` and `hints`.** They're what agents and the MCP tool list see. A verb without them is invisible to half the ecosystem.
 - **One pack name = one directory** under `plugins/`. The resolver reads `plugins/<pack>/<verb>/`, so nesting deeper won't resolve.

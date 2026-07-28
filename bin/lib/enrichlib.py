@@ -11,7 +11,7 @@ the shadow note's frontmatter.
 - Honest floor: a tiny stdlib frequency+stopword extractor, no pip deps — YAKE/RAKE fragment
   agglutinative Hungarian and are pip deps anyway, so the *true* floor is stdlib-only (QA R3).
 - Guards: empty/sentinel/short text never reaches the model (hallucinated keywords on garbage in);
-  `OPS_ENRICH=off` and `OPS_ENRICH_FAKE` are per-stage seams (no global OPS_MODELS_FAKE, QA §4).
+  `PLAINKEEP_ENRICH=off` and `PLAINKEEP_ENRICH_FAKE` are per-stage seams (no global PLAINKEEP_MODELS_FAKE, QA §4).
 
 Pure stdlib (urllib, hashlib, re). No server beyond the local Ollama daemon.
 """
@@ -23,7 +23,7 @@ import re
 import urllib.request
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-DEFAULT_MODEL = os.environ.get("OPS_ENRICH_MODEL", "gemma4:e4b")
+DEFAULT_MODEL = os.environ.get("PLAINKEEP_ENRICH_MODEL", "gemma4:e4b")
 MIN_CHARS = 40                          # below this, there's nothing worth summarizing
 SENTINEL = "_(no text extracted)_"      # files/run.py's empty-extraction marker
 SEED = 7                                # fixed — pinned determinism, not a tuning knob (QA R5)
@@ -48,7 +48,7 @@ _SENT_END = re.compile(r"(?<=[.!?])\s+")
 
 
 def _fake() -> bool:
-    return os.environ.get("OPS_ENRICH_FAKE", "").lower() in ("1", "true", "yes")
+    return os.environ.get("PLAINKEEP_ENRICH_FAKE", "").lower() in ("1", "true", "yes")
 
 
 def _post(path: str, payload: dict, timeout: int = 120) -> dict:
@@ -134,7 +134,7 @@ def _call_model(text: str, model: str) -> dict | None:
         out = _post("/api/generate", {
             "model": model, "prompt": prompt, "format": schema, "stream": False,
             "options": {"temperature": 0, "seed": SEED},
-            "keep_alive": os.environ.get("OPS_ENRICH_KEEP_ALIVE", "0"),
+            "keep_alive": os.environ.get("PLAINKEEP_ENRICH_KEEP_ALIVE", "0"),
         })
         data = _parse_json_object(out.get("response", ""))
         if not isinstance(data, dict):
@@ -158,7 +158,7 @@ def enrich(text: str, *, model: str | None = None) -> dict:
                 "backend": "fake", "key": key}
 
     stripped = (text or "").strip()
-    off = os.environ.get("OPS_ENRICH", "").strip().lower() == "off"
+    off = os.environ.get("PLAINKEEP_ENRICH", "").strip().lower() == "off"
     if off or not stripped or stripped == SENTINEL or len(stripped) < MIN_CHARS:
         backend = "none" if not stripped else "floor"
         return {"description": "", "keywords": keyword_floor(stripped), "backend": backend, "key": key}

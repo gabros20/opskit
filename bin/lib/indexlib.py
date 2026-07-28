@@ -5,7 +5,7 @@ Implements exactly what the validated spec calls stage 1:
   - SQLite FTS5 over the content tree (wiki/tasks/journal), chunked by markdown heading,
     incremental by file content hash,
   - the wikilink graph (one-hop expansion) fused with keyword via reciprocal-rank fusion,
-  - one rebuildable file at .index/ops.sqlite (the rebuild rule: rm -rf .index && ops index).
+  - one rebuildable file at .index/plainkeep.sqlite (the rebuild rule: rm -rf .index && plainkeep index).
 
 No vectors here — that's stage 2 (sqlite-vec + local Ollama), added only when a real query log
 shows FTS5+graph missing (ADR-002). Pure stdlib (sqlite3); FTS5 ships with SQLite.
@@ -20,10 +20,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-OPS_HOME = Path(os.environ.get("OPS_HOME", Path(__file__).resolve().parents[2]))
-CONTENT = Path(os.environ.get("OPS_CONTENT", OPS_HOME / "wiki"))
-INDEX_DIR = OPS_HOME / ".index"
-DB = INDEX_DIR / "ops.sqlite"
+PLAINKEEP_HOME = Path(os.environ.get("PLAINKEEP_HOME", Path(__file__).resolve().parents[2]))
+CONTENT = Path(os.environ.get("PLAINKEEP_CONTENT", PLAINKEEP_HOME / "wiki"))
+INDEX_DIR = PLAINKEEP_HOME / ".index"
+DB = INDEX_DIR / "plainkeep.sqlite"
 
 LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
@@ -38,7 +38,7 @@ _sys.path.insert(0, str(Path(__file__).resolve().parent))  # let sibling `embed`
 
 
 def _vectors_on() -> bool:
-    return os.environ.get("OPS_VECTORS", "").lower() in ("1", "true", "yes", "on")
+    return os.environ.get("PLAINKEEP_VECTORS", "").lower() in ("1", "true", "yes", "on")
 
 
 def _vec_modules():
@@ -63,7 +63,7 @@ def _embed_stale(con, rel: str, model: str) -> bool:
 
 
 def _rerank_on() -> bool:
-    return os.environ.get("OPS_RERANK", "").lower() in ("1", "true", "yes", "on")
+    return os.environ.get("PLAINKEEP_RERANK", "").lower() in ("1", "true", "yes", "on")
 
 
 def _candidate_texts(paths: list[str], limit: int = 1200) -> dict:
@@ -130,7 +130,7 @@ def _norm_link(target: str) -> str:
 def _note_provenance(text: str) -> tuple[str, str]:
     """(author, derived_from) from the note's frontmatter — '' when absent (proposal Part 4.3).
     Inline + stdlib so indexlib stays dependency-free and standalone-loadable; the provenance planes
-    become filterable so `ops search --author human` can exclude agent + derived material."""
+    become filterable so `plainkeep search --author human` can exclude agent + derived material."""
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
         return "", ""
@@ -162,9 +162,9 @@ def index(root: Path | str = CONTENT, verbose: bool = True, changed_only: bool =
     Sharding is transparent: it recurses the tree, so `notes/<aa>/<slug>.md` filesystem fanout
     (and per-area sub-repos pointed at via the content root) index without special handling.
 
-    `changed_only` (proposal Part 3.1 — `ops index --changed`): the external-edit fast path for a
+    `changed_only` (proposal Part 3.1 — `plainkeep index --changed`): the external-edit fast path for a
     vault Obsidian is also editing. Instead of hashing every file, skip any file whose mtime is at
-    or before the last recorded build time (assumed unchanged) — the full `ops index` still does the
+    or before the last recorded build time (assumed unchanged) — the full `plainkeep index` still does the
     complete hash pass, so this is a pure accelerator. `.obsidian/`, `.trash/`, `.smart-env/` are
     ignored either way.
     """
@@ -178,13 +178,13 @@ def index(root: Path | str = CONTENT, verbose: bool = True, changed_only: bool =
     vec_on = _vectors_on()
     emb, vs = _vec_modules() if vec_on else (None, None)
     if vec_on and not (emb and vs):
-        print("OPS_VECTORS=1 but lancedb isn't importable by the python3 that runs ops — "
+        print("PLAINKEEP_VECTORS=1 but lancedb isn't importable by the python3 that runs plainkeep — "
               "indexing keyword-only (stage 1).\n"
               "  Enable vectors: pip install -r requirements.txt into THAT interpreter "
-              "(verify: python3 -c 'import lancedb'), then re-run `ops index`. See requirements.txt.")
+              "(verify: python3 -c 'import lancedb'), then re-run `plainkeep index`. See requirements.txt.")
         vec_on = False
     model = emb.model_name() if vec_on else None
-    BATCH = int(os.environ.get("OPS_EMBED_BATCH", "32"))
+    BATCH = int(os.environ.get("PLAINKEEP_EMBED_BATCH", "32"))
     COMMIT_EVERY = 200
 
     # --- pass 1: keyword/graph (fast), collect the embed worklist ---
@@ -261,7 +261,7 @@ def index(root: Path | str = CONTENT, verbose: bool = True, changed_only: bool =
             vs.maybe_build_ann()
         except Exception as e:
             print(f"vector pass failed ({type(e).__name__}: {e}) — keyword/graph index is complete; "
-                  "vectors skipped. Check the embedder (Ollama) and lancedb, then re-run `ops index`.")
+                  "vectors skipped. Check the embedder (Ollama) and lancedb, then re-run `plainkeep index`.")
             vec_on = False  # keep the summary honest: don't claim vectors were written
 
     n = con.execute("SELECT COUNT(*) FROM files").fetchone()[0]
@@ -277,14 +277,14 @@ def _fts_query(q: str) -> str:
     return " OR ".join(f'"{t}"' for t in toks) or '""'
 
 
-LOG_DIR = OPS_HOME / ".logs"
+LOG_DIR = PLAINKEEP_HOME / ".logs"
 QUERY_LOG = LOG_DIR / "queries.jsonl"
 
 
 def log_query(query: str, hits: list[tuple[str, str, float]]) -> None:
     """Append a search to .logs/queries.jsonl — the real query log that settles the vector
     question over time (ADR-002). Add the slug that actually answered as `relevant` later to
-    turn a logged query into a labeled benchmark case (`ops search --mark`, future)."""
+    turn a logged query into a labeled benchmark case (`plainkeep search --mark`, future)."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     rec = {
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),

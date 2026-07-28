@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops close — daily close: summarize the day into the journal and flag loose ends (§16).
+plainkeep close — daily close: summarize the day into the journal and flag loose ends (§16).
 Pure-shell fallback (no agent): assemble today's commits + completed tasks, and flag active tasks
 with no progress today + uncommitted changes. (An agent would write prose; this writes the facts.)
 """
@@ -35,21 +35,21 @@ def main(argv):
         block.append(f"- ⚠ {len(no_progress)} active task(s) with no progress today: "
                      + ", ".join(f.stem for f in no_progress))
     if dirty:
-        block.append(f"- ⚠ {len(dirty)} uncommitted change(s) in ~/ops (commit before backup)")
+        block.append(f"- ⚠ {len(dirty)} uncommitted change(s) in ~/plainkeep (commit before backup)")
     if not dry:
         with open(note, "a", encoding="utf-8") as fh:
             fh.write("\n".join(block) + "\n")
         paths.append_journal("closed the day" + (" (automated)" if automated else ""))
 
     data = {
-        "journal": str(note.relative_to(paths.OPS_HOME)),
+        "journal": str(note.relative_to(paths.PLAINKEEP_HOME)),
         "commits": len(commits), "completed": len(done_today),
         "no_progress": len(no_progress), "no_progress_ids": [f.stem for f in no_progress],
         "uncommitted": len(dirty), "dry_run": dry,
     }
 
     def render(_):
-        print(f"day {'would close' if dry else 'closed'} -> {note.relative_to(paths.OPS_HOME)}"
+        print(f"day {'would close' if dry else 'closed'} -> {note.relative_to(paths.PLAINKEEP_HOME)}"
               + ("  (dry run — nothing written)" if dry else ""))
         print(f"  commits today: {len(commits)} | completed: {len(done_today)} | "
               f"active without progress: {len(no_progress)} | uncommitted: {len(dirty)}")

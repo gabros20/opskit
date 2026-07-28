@@ -31,7 +31,7 @@ except Exception:
     EXIT_OK, EXIT_USAGE, EXIT_CONFIRM, EXIT_NOT_FOUND, EXIT_DENY = 0, 2, 3, 4, 5
 
 # Verb resolution (Part 2.1): the resolver is the single source of truth for the verb set and
-# cmd.json lookup, so plugin verbs (plugins/<pack>/, $OPS_PATH) are gated identically to engine ones.
+# cmd.json lookup, so plugin verbs (plugins/<pack>/, $PLAINKEEP_PATH) are gated identically to engine ones.
 # Falls back to a bin/-only glob if loaded in isolation (the parity test execs this file standalone
 # with only stdlib on the path — resolver still imports there, but keep the guard defensive).
 try:
@@ -39,11 +39,11 @@ try:
 except Exception:
     _resolver = None
 
-HOME = os.environ.get("OPS_TEST_HOME", os.environ.get("HOME", "/Users/tamas"))
-OPS_HOME = Path(os.environ.get("OPS_HOME", Path(__file__).resolve().parents[2]))
+HOME = os.environ.get("PLAINKEEP_TEST_HOME", os.environ.get("HOME", "/Users/tamas"))
+PLAINKEEP_HOME = Path(os.environ.get("PLAINKEEP_HOME", Path(__file__).resolve().parents[2]))
 BIN = Path(__file__).resolve().parents[1]
 
-OPS = f"{HOME}/ops"
+VAULT = f"{HOME}/plainkeep"
 WORK = f"{HOME}/work"
 FILES = f"{HOME}/files"
 DOTFILES = f"{HOME}/dotfiles"
@@ -121,8 +121,8 @@ def _write_verdict(path, action):
         return Decision(DENY, "iCloud/family path is walled off — propose, never write", "deny")
     if _in_originals(path):
         return Decision(DENY, "~/files/**/in/ originals are read-only evidence", "deny")
-    if _under(path, OPS):
-        return Decision(ALLOW, "write inside ~/ops is a revertible git diff", "safe_write")
+    if _under(path, VAULT):
+        return Decision(ALLOW, "write inside ~/plainkeep is a revertible git diff", "safe_write")
     if _under(path, FILES):
         return Decision(ALLOW, "write inside ~/files (out/work/research)", "safe_write")
     if _under(path, f"{WORK}/.worktrees"):
@@ -187,11 +187,11 @@ def classify(action: dict) -> Decision:
         return primary
     if kind == "verb":
         v = (action.get("verb") or "").strip()
-        if v.startswith("ops "):
-            verb = v[4:].split()[0] if len(v) > 4 else ""
+        if v.startswith("plainkeep "):
+            verb = v[10:].split()[0] if len(v) > 10 else ""
             if verb and verb not in _known_verbs():
-                return Decision(DENY, f"unknown/invented ops verb: '{verb}'", "deny")
-            return Decision(ALLOW, "known ops verb", "read")
+                return Decision(DENY, f"unknown/invented plainkeep verb: '{verb}'", "deny")
+            return Decision(ALLOW, "known plainkeep verb", "read")
         return Decision(ALLOW, "raw shell command (path wall + adapter scoping govern it)", "read")
     return Decision(DENY, f"unrecognized action kind: {kind}", "deny")
 
@@ -226,7 +226,7 @@ def _declares_dry_run(verb: str) -> bool:
 def _plugin_lock() -> dict:
     """The `{pack: entry}` map from plugins/plugins.lock.json (empty on any failure)."""
     try:
-        f = OPS_HOME / "plugins" / "plugins.lock.json"
+        f = PLAINKEEP_HOME / "plugins" / "plugins.lock.json"
         return json.loads(f.read_text(encoding="utf-8")).get("plugins", {})
     except Exception:
         return {}
@@ -236,7 +236,7 @@ def _plugin_ceiling(verb: str) -> str | None:
     """The trust ceiling for a verb from an EXTERNALLY-installed pack (proposal Part 2.2): 'confirm'
     if the verb belongs to a pack recorded in plugins.lock.json that has not been trusted — a pack's
     self-declared risk NEVER takes effect at install. Returns None for engine verbs, for user-placed
-    packs with no lock entry (plugins/local, $OPS_PATH — the user put them there directly), and for
+    packs with no lock entry (plugins/local, $PLAINKEEP_PATH — the user put them there directly), and for
     explicitly trusted packs (their declared risk then stands). The transmit-block + path-wall in
     classify() apply to every verb regardless, so a trusted pack is still walled."""
     if _resolver is None:
@@ -259,7 +259,7 @@ def gate(verb: str, args: list[str], risk: str | None = None) -> Decision:
     downgraded to a read — a true dry-run IS a read — so confirm-class verbs stay explorable without
     `--yes`."""
     if verb not in _known_verbs():
-        return Decision(DENY, f"unknown/invented verb: '{verb}' (not in ops.json)", "deny")
+        return Decision(DENY, f"unknown/invented verb: '{verb}' (not in plainkeep.json)", "deny")
     risk = risk or risk_of(verb) or "confirm"  # §5: new/undeclared verbs default to confirm
     yes = ("--yes" in args) or ("-y" in args)
     dry = "--dry-run" in args
@@ -279,10 +279,10 @@ def gate(verb: str, args: list[str], risk: str | None = None) -> Decision:
 
 def _log(verb, args, d: Decision):
     try:
-        logdir = OPS_HOME / ".logs"
+        logdir = PLAINKEEP_HOME / ".logs"
         logdir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        with open(logdir / "ops.log", "a", encoding="utf-8") as f:
+        with open(logdir / "plainkeep.log", "a", encoding="utf-8") as f:
             f.write(f"{ts}\t{verb} {' '.join(args)}\t{d.verdict}\t{d.reason}\n")
     except Exception:
         pass
@@ -290,7 +290,7 @@ def _log(verb, args, d: Decision):
 
 def _remediation(verb: str, args: list[str]) -> str:
     """The exact re-run line a confirm-class refusal should print — self-teaching, not a class name."""
-    parts = ["ops", verb, *args]
+    parts = ["plainkeep", verb, *args]
     if "--yes" not in args and "-y" not in args:
         parts.append("--yes")
     return "re-run: " + " ".join(parts)
@@ -310,8 +310,8 @@ def main_cli(argv: list[str]) -> int:
     known = _known_verbs()
     if verb not in known:
         near = difflib.get_close_matches(verb, sorted(known), n=3, cutoff=0.6)
-        hint = f" did you mean: {', '.join(near)}?" if near else " (run: ops help)"
-        print(f"ops: unknown verb '{verb}'.{hint}", file=sys.stderr)
+        hint = f" did you mean: {', '.join(near)}?" if near else " (run: plainkeep help)"
+        print(f"plainkeep: unknown verb '{verb}'.{hint}", file=sys.stderr)
         return EXIT_NOT_FOUND
     d = gate(verb, args)
     _log(verb, args, d)

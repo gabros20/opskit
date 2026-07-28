@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ops start — daily start: open today's journal, carry forward open tasks, show the dashboard (§16)."""
+"""plainkeep start — daily start: open today's journal, carry forward open tasks, show the dashboard (§16)."""
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -37,18 +37,18 @@ def main(argv):
     y = paths.journal_path(date.today() - timedelta(days=1))
     data = {
         "date": date.today().isoformat(),
-        "journal": str(note.relative_to(paths.OPS_HOME)), "created": created,
+        "journal": str(note.relative_to(paths.PLAINKEEP_HOME)), "created": created,
         "active": len(active), "waiting": len(waiting), "inbox": inbox,
         "active_tasks": [{"id": f.stem, "title": paths.title_of(f)} for f in active],
         "waiting_tasks": [{"id": f.stem, "title": paths.title_of(f),
                            "why": paths.fm_field(f, "why") or None} for f in waiting],
-        "yesterday": str(y.relative_to(paths.OPS_HOME)) if y.exists() else None,
+        "yesterday": str(y.relative_to(paths.PLAINKEEP_HOME)) if y.exists() else None,
         "dry_run": dry,
     }
 
     def render(_):
         print(f"good morning — {date.today().isoformat()}" + ("  (dry run — nothing written)" if dry else ""))
-        print(f"  journal: {note.relative_to(paths.OPS_HOME)}"
+        print(f"  journal: {note.relative_to(paths.PLAINKEEP_HOME)}"
               + (" (would create)" if (dry and created) else " (created)" if created else ""))
         print(f"  active:  {len(active)} task(s)")
         for f in active[:10]:
@@ -58,9 +58,9 @@ def main(argv):
             for f in waiting[:5]:
                 print(f"    ⏸ {f.stem} {paths.title_of(f)} — {paths.fm_field(f, 'why') or 'why: ?'}")
         if inbox:
-            print(f"  inbox:   {inbox} item(s) to triage  (ops triage)")
+            print(f"  inbox:   {inbox} item(s) to triage  (plainkeep triage)")
         if y.exists():
-            print(f"  yesterday: {y.relative_to(paths.OPS_HOME)}")
+            print(f"  yesterday: {y.relative_to(paths.PLAINKEEP_HOME)}")
 
     output.emit(data, "start", human=render)
     if not dry:

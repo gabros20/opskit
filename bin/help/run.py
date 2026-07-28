@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""ops help [verb] [--json] — render the command surface from the cmd.json manifest (§4.3).
---json returns the ops.json/3 document (list) or one verb's contract (single verb)."""
+"""plainkeep help [verb] [--json] — render the command surface from the cmd.json manifest (§4.3).
+--json returns the plainkeep.json/3 document (list) or one verb's contract (single verb)."""
 import json
 import sys
 from pathlib import Path
@@ -13,7 +13,7 @@ def main(argv):
     _, argv = output.parse_argv(argv)
     verb = argv[0] if argv else None
     try:
-        p = manifest.write_manifest()  # keep ops.json fresh on every help
+        p = manifest.write_manifest()  # keep plainkeep.json fresh on every help
         doc = json.loads(p.read_text(encoding="utf-8"))
     except Exception:
         doc = {"schema": manifest.SCHEMA, "verbs": []}

@@ -1,7 +1,7 @@
 {
   "verb": "capture",
   "summary": "thought -> inbox (also: pipe stdin)",
-  "usage": "ops capture \"<text>\"",
+  "usage": "plainkeep capture \"<text>\"",
   "risk": "safe_write",
   "args": [
     {
@@ -15,7 +15,7 @@
     "inbox/",
     "journal/"
   ],
-  "hints": "Zero-decision dump of a thought into inbox/ for later triage. Common mistake: using it for an actionable to-do \u2014 use `ops task add` instead.",
+  "hints": "Zero-decision dump of a thought into inbox/ for later triage. Common mistake: using it for an actionable to-do \u2014 use `plainkeep task add` instead.",
   "output": {
     "mode": "scalar",
     "fields": {

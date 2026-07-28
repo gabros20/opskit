@@ -2,14 +2,14 @@
 # Raycast Script Command — task-add (proposal Part 3.3).
 #
 # @raycast.schemaVersion 1
-# @raycast.title Ops Task Add
+# @raycast.title Plainkeep Task Add
 # @raycast.mode compact
-# @raycast.packageName ops
+# @raycast.packageName plainkeep
 # @raycast.icon ✅
 # @raycast.argument1 { "type": "text", "placeholder": "task title" }
-# @raycast.description Add a task to the ops task system.
-# @raycast.author ops
+# @raycast.description Add a task to the plainkeep task system.
+# @raycast.author plainkeep
 set -euo pipefail
-OPS="$(command -v ops || true)"
-[ -n "$OPS" ] || OPS="${OPS_HOME:-$HOME/ops}/ops"
-exec "$OPS" task add "$1"
+PLAINKEEP="$(command -v plainkeep || true)"
+[ -n "$PLAINKEEP" ] || PLAINKEEP="${PLAINKEEP_HOME:-$HOME/plainkeep}/plainkeep"
+exec "$PLAINKEEP" task add "$1"

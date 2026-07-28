@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ops consolidate [--automated] — the nightly dream-lite maintenance pass (§9, §15). Zero-LLM:
+plainkeep consolidate [--automated] — the nightly dream-lite maintenance pass (§9, §15). Zero-LLM:
 scans the wiki for orphans + stale notes, summarizes the day's activity (commits, completed tasks,
 captures), and writes a digest into today's journal. Read + a single journal append; safe to cron.
 """
@@ -61,13 +61,13 @@ def main(argv):
             fh.write("\n".join(block) + "\n")
         paths.append_journal("consolidated" + (" (automated)" if "--automated" in argv else ""))
 
-    data = {"dry_run": dry, "journal": str(note.relative_to(paths.OPS_HOME)),
+    data = {"dry_run": dry, "journal": str(note.relative_to(paths.PLAINKEEP_HOME)),
             "notes": n_notes, "orphans": orphans, "stale": stale,
             "commits": commits, "done_today": len(done_today), "captures": captures}
 
     def render(_):
         head = "would consolidate ->" if dry else "consolidate ->"
-        print(f"{head} {note.relative_to(paths.OPS_HOME)}")
+        print(f"{head} {note.relative_to(paths.PLAINKEEP_HOME)}")
         print(f"  wiki: {n_notes} notes, {len(orphans)} orphans, {len(stale)} stale | "
               f"today: {commits} commits, {len(done_today)} done, {captures} to triage")
         if dry:

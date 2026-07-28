@@ -2,9 +2,9 @@
 """
 run_obsidian.py — Obsidian as Frontend Zero + plaintext views (proposal Part 3.1/3.2). Offline,
 stdlib only (PyYAML used only if present). Covers:
-  1. `ops wiki canvas` — byte-deterministic re-runs + valid JSON Canvas 1.0 shape; hub 1-hop/depth-2
+  1. `plainkeep wiki canvas` — byte-deterministic re-runs + valid JSON Canvas 1.0 shape; hub 1-hop/depth-2
      and tag mode;
-  2. `ops index --changed` — the external-edit fast path (only files touched since the last build
+  2. `plainkeep index --changed` — the external-edit fast path (only files touched since the last build
      reindex; .obsidian/.trash are ignored either way);
   3. frontmatter reader tolerates Obsidian Properties normalization (key reorder, flow ↔ block lists);
   4. doctor Obsidian lints fire on fixtures (non-lowercase tag, wikilink in frontmatter) + --init
@@ -107,7 +107,7 @@ def main() -> int:
     # ---- 1. canvas: determinism + JSON Canvas shape + tag mode ----
     with tempfile.TemporaryDirectory() as td:
         h = Path(td)
-        env = {**os.environ, "OPS_HOME": str(h), "OPS_NO_OPEN": "1"}
+        env = {**os.environ, "PLAINKEEP_HOME": str(h), "PLAINKEEP_NO_OPEN": "1"}
         note(h, "notes/alpha.md", "Alpha", "see [[beta]] and [[gamma]]")
         note(h, "notes/beta.md", "Beta", "back to [[alpha]] and [[delta]]")
         note(h, "notes/gamma.md", "Gamma", "")
@@ -158,7 +158,7 @@ def main() -> int:
     # ---- 2. index --changed: mtime fast path + ignore rules ----
     with tempfile.TemporaryDirectory() as td:
         h = Path(td)
-        env = {**os.environ, "OPS_HOME": str(h)}
+        env = {**os.environ, "PLAINKEEP_HOME": str(h)}
         note(h, "notes/a.md", "A", "alpha content")
         note(h, "notes/b.md", "B", "beta content")
         (h / "wiki" / ".trash").mkdir(parents=True, exist_ok=True)
@@ -196,7 +196,7 @@ def main() -> int:
     # ---- 4. doctor lints + --init seeds .obsidian/ ----
     with tempfile.TemporaryDirectory() as td:
         h = Path(td)
-        env = {**os.environ, "OPS_HOME": str(h)}
+        env = {**os.environ, "PLAINKEEP_HOME": str(h)}
         shutil.copytree(pack, h / "templates" / "obsidian")
         note(h, "notes/badtag.md", "Bad Tag", "body", tags="[Not_Lowercase]")
         note(h, "notes/fmlink.md", "FM Link", "clean body",
@@ -224,7 +224,7 @@ def main() -> int:
         # clean vault: no false lint positives, canvas file is not flagged as a binary
         with tempfile.TemporaryDirectory() as td2:
             h2 = Path(td2)
-            env2 = {**os.environ, "OPS_HOME": str(h2)}
+            env2 = {**os.environ, "PLAINKEEP_HOME": str(h2)}
             note(h2, "notes/clean.md", "Clean", "body [[clean]]")
             run(env2, "doctor", "--init")
             dc = run(env2, "doctor")

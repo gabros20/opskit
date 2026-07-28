@@ -1,23 +1,24 @@
-# Personal OS — SEARCH-ONLY optional dependencies (the stage-2 vectors + stage-3 rerank planes).
+# plainkeep — SEARCH-ONLY optional dependencies (the stage-2 vectors + stage-3 rerank planes).
 #
-# This is the isolated set `ops setup search` installs into $OPS_HOME/.venv (see ADR-009 and
-# docs/agent-terminal-search.md). It is deliberately a STRICT SUBSET of requirements.txt: only the
-# packages the retrieval layer needs (lancedb + fastembed). The file-processing packages
+# This is the isolated set `plainkeep setup search` installs into $PLAINKEEP_HOME/.venv (see ADR-009
+# and docs/agent-terminal-search.md). It is deliberately a STRICT SUBSET of requirements.txt: only
+# the packages the retrieval layer needs (lancedb + fastembed). The file-processing packages
 # (Pillow / trafilatura / mlx-vlm) belong to the `models` setup layer, NOT here — keeping the search
 # venv small and its purpose single. The two live-search STATUS probes import exactly these two.
 #
-# WHICH interpreter: `ops setup search` installs these into $OPS_HOME/.venv, and the `ops` dispatcher
-# prefers $OPS_HOME/.venv/bin/python3 when it exists — so `ops index` / `ops search` import them with
-# no manual PATH surgery. The stdlib-only keyword floor (stage 1) needs NONE of this.
+# WHICH interpreter: `plainkeep setup search` installs these into $PLAINKEEP_HOME/.venv, and the
+# `plainkeep` dispatcher prefers $PLAINKEEP_HOME/.venv/bin/python3 when it exists — so `plainkeep
+# index` / `plainkeep search` import them with no manual PATH surgery. The stdlib-only keyword floor
+# (stage 1) needs NONE of this.
 #
-# Stage-2 vectors (OPS_VECTORS=1): lancedb (embedded, file-based ANN; no server). LanceDB stopped
-# publishing macOS-Intel (x86_64) wheels after 0.25.x, so the two markers are mutually exclusive and
-# `pip install -r` resolves cleanly on every host (mirrors requirements.txt's split).
+# Stage-2 vectors (PLAINKEEP_VECTORS=1): lancedb (embedded, file-based ANN; no server). LanceDB
+# stopped publishing macOS-Intel (x86_64) wheels after 0.25.x, so the two markers are mutually
+# exclusive and `pip install -r` resolves cleanly on every host (mirrors requirements.txt's split).
 lancedb>=0.25,<0.26 ; platform_system == "Darwin" and platform_machine == "x86_64"
 lancedb>=0.33 ; platform_system != "Darwin" or platform_machine != "x86_64"
 #
-# Stage-3 rerank (OPS_RERANK=1): fastembed — ONNX runtime cross-encoder, no torch.
+# Stage-3 rerank (PLAINKEEP_RERANK=1): fastembed — ONNX runtime cross-encoder, no torch.
 fastembed>=0.4
 #
 # ...plus a local embedder, NOT a pip dep: a running Ollama with the model pulled (default
-# embeddinggemma; override with OPS_EMBED_MODEL). `ops setup search` pulls it for you.
+# embeddinggemma; override with PLAINKEEP_EMBED_MODEL). `plainkeep setup search` pulls it for you.

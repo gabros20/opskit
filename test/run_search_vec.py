@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 run_search_vec.py — tests the REAL stage-2 hybrid (LanceDB vectors + EmbeddingGemma) through the
-production engine (bin/lib/indexlib.py with OPS_VECTORS=1). Skips cleanly if the embedder or
+production engine (bin/lib/indexlib.py with PLAINKEEP_VECTORS=1). Skips cleanly if the embedder or
 lancedb isn't available (so run_all stays green on machines without them).
 
-Proves: (1) `ops index` embeds note-level vectors into LanceDB; (2) a zero-lexical-overlap semantic
+Proves: (1) `plainkeep index` embeds note-level vectors into LanceDB; (2) a zero-lexical-overlap semantic
 query that keyword MISSES is recovered by the vector arm; (3) lexical queries don't regress;
 (4) enabling vectors back-embeds an already-keyword-indexed corpus; (5) incremental re-index is a no-op.
 
@@ -59,8 +59,8 @@ def main() -> int:
             f = content / k
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_text(v, encoding="utf-8")
-        os.environ["OPS_HOME"] = str(home)
-        os.environ["OPS_CONTENT"] = str(content)
+        os.environ["PLAINKEEP_HOME"] = str(home)
+        os.environ["PLAINKEEP_CONTENT"] = str(content)
         import indexlib
         import vectorstore
 
@@ -68,13 +68,13 @@ def main() -> int:
             return [p for p, _h, _s in indexlib.search(q, k=k)]
 
         # 1) keyword-only first (vectors off) — establishes the miss
-        os.environ["OPS_VECTORS"] = "0"
+        os.environ["PLAINKEEP_VECTORS"] = "0"
         indexlib.index(content, verbose=False)
         kw_sem = topk(SEMANTIC_Q)
         results.append(("keyword misses the semantic query", SEMANTIC_TARGET not in kw_sem[:1], f"kw top3={kw_sem}"))
 
         # 2) enable vectors → back-embeds the already-indexed corpus (no content change)
-        os.environ["OPS_VECTORS"] = "1"
+        os.environ["PLAINKEEP_VECTORS"] = "1"
         indexlib.index(content, verbose=False)
         results.append(("enabling vectors back-embeds corpus", vectorstore.count() == len(NOTES),
                         f"lance rows={vectorstore.count()}"))
@@ -101,9 +101,9 @@ def main() -> int:
         # 6) stage-3: cross-encoder rerank (if a backend is installed) doesn't break the answers
         import rerank
         if rerank.available():
-            os.environ["OPS_RERANK"] = "1"
+            os.environ["PLAINKEEP_RERANK"] = "1"
             rr_sem, rr_lex = topk(SEMANTIC_Q), topk(LEXICAL_Q)
-            os.environ["OPS_RERANK"] = "0"
+            os.environ["PLAINKEEP_RERANK"] = "0"
             results.append((f"rerank [{rerank.backend()}] keeps semantic (top-3)", SEMANTIC_TARGET in rr_sem,
                             f"top3={rr_sem}"))
             results.append(("rerank keeps lexical (top-1)", rr_lex[:1] == [LEXICAL_TARGET], f"top3={rr_lex}"))

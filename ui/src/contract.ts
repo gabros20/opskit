@@ -1,6 +1,6 @@
-// The ops.json/3 machine contract, loaded from `ops help --json`. ops-ui generates its menus + forms
-// from this — new verbs/actions appear automatically; nothing is hardcoded.
-import { runOps } from "./ops.js";
+// The plainkeep.json/3 machine contract, loaded from `plainkeep help --json`. plainkeep-ui generates
+// its menus + forms from this — new verbs/actions appear automatically; nothing is hardcoded.
+import { runPlainkeep } from "./plainkeep.js";
 
 export type Risk = "read" | "safe_write" | "draft_only" | "confirm" | "deny";
 export type ArgType = "string" | "int" | "enum" | "slug" | "path" | "flag";
@@ -51,17 +51,17 @@ export interface Manifest {
 const SUPPORTED_SCHEMA_MAJOR = 3;
 
 export async function loadManifest(): Promise<Manifest> {
-  const res = await runOps(["help"]);
+  const res = await runPlainkeep(["help"]);
   const data = res.envelope?.data as any;
   if (!data || !Array.isArray(data.verbs)) {
-    throw new Error("`ops help --json` did not return a verb manifest — is this an ops.json/3 vault?");
+    throw new Error("`plainkeep help --json` did not return a verb manifest — is this a plainkeep.json/3 vault?");
   }
-  const schema: string = data.schema ?? "ops.json/?";
+  const schema: string = data.schema ?? "plainkeep.json/?";
   const major = Number(String(schema).split("/")[1]);
   if (Number.isFinite(major) && major < SUPPORTED_SCHEMA_MAJOR) {
     throw new Error(
-      `this vault reports ${schema}; ops-ui needs ops.json/${SUPPORTED_SCHEMA_MAJOR}+. ` +
-        `Update the ops engine (script/update) — the older contract lacks the actions[] grammar.`,
+      `this vault reports ${schema}; plainkeep-ui needs plainkeep.json/${SUPPORTED_SCHEMA_MAJOR}+. ` +
+        `Update the plainkeep engine (script/update) — the older contract lacks the actions[] grammar.`,
     );
   }
   return data as Manifest;
@@ -84,12 +84,12 @@ export function groupVerbs(m: Manifest): { group: string; verbs: Verb[] }[] {
   return groups.map((g) => ({ group: g, verbs: byGroup.get(g)!.sort((a, b) => a.verb.localeCompare(b.verb)) }));
 }
 
-// Completion candidates for an arg, via `ops complete --json`.
+// Completion candidates for an arg, via `plainkeep complete --json`.
 export interface Candidate { value: string; description?: string; kind?: string }
 
 export async function complete(priorWords: string[]): Promise<Candidate[]> {
   try {
-    const res = await runOps(["complete", ...priorWords]);
+    const res = await runPlainkeep(["complete", ...priorWords]);
     return res.rows as unknown as Candidate[];
   } catch {
     return [];

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """run_setup.py — exercises script/setup + script/update against a throwaway clone, with the roots
-and PATH redirected into a temp dir (OPS_ROOTS_HOME / OPS_BIN_DIR) so real ~/ is never touched."""
+and PATH redirected into a temp dir (PLAINKEEP_ROOTS_HOME / PLAINKEEP_BIN_DIR) so real ~/ is never touched."""
 from __future__ import annotations
 import os
 import re
@@ -27,18 +27,18 @@ def git(repo, *a):
 def main() -> int:
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
-        vault, home, bindir, compdir = tmp / "ops", tmp / "home", tmp / "bin", tmp / "comp"
+        vault, home, bindir, compdir = tmp / "plainkeep", tmp / "home", tmp / "bin", tmp / "comp"
         cl = subprocess.run(["git", "clone", "-q", str(REPO), str(vault)], capture_output=True, text=True)
         if cl.returncode != 0:
             print("git clone failed:", cl.stderr); return 1
-        env = {**os.environ, "OPS_ROOTS_HOME": str(home), "OPS_BIN_DIR": str(bindir),
-               "OPS_COMP_DIR": str(compdir), "OPS_HOME": str(vault)}
+        env = {**os.environ, "PLAINKEEP_ROOTS_HOME": str(home), "PLAINKEEP_BIN_DIR": str(bindir),
+               "PLAINKEEP_COMP_DIR": str(compdir), "PLAINKEEP_HOME": str(vault)}
 
         # dry-run changes nothing
         subprocess.run([str(vault / "script" / "setup"), "--lean", "--yes", "--dry-run",
                         "--upstream", UPSTREAM], capture_output=True, text=True, env=env)
-        check("dry-run creates no symlink", not (bindir / "ops").exists())
-        check("dry-run installs no completion", not (compdir / "_ops").exists())
+        check("dry-run creates no symlink", not (bindir / "plainkeep").exists())
+        check("dry-run installs no completion", not (compdir / "_plainkeep").exists())
         check("dry-run leaves test/ intact", bool(git(vault, "ls-files", "test/").stdout.strip()))
 
         # real run
@@ -46,10 +46,10 @@ def main() -> int:
                             "--upstream", UPSTREAM], capture_output=True, text=True, env=env)
         ok = r.returncode == 0
         check("setup completes", ok, r.stdout + r.stderr)
-        check("ops put on PATH (symlink)", (bindir / "ops").is_symlink()
-              and os.readlink(bindir / "ops") == str(vault / "ops"))
-        check("zsh completion installed (symlink)", (compdir / "_ops").is_symlink()
-              and os.readlink(compdir / "_ops") == str(vault / "script" / "completions" / "_ops"))
+        check("plainkeep put on PATH (symlink)", (bindir / "plainkeep").is_symlink()
+              and os.readlink(bindir / "plainkeep") == str(vault / "plainkeep"))
+        check("zsh completion installed (symlink)", (compdir / "_plainkeep").is_symlink()
+              and os.readlink(compdir / "_plainkeep") == str(vault / "script" / "completions" / "_plainkeep"))
         check("sibling roots created", (home / "work").is_dir() and (home / "files").is_dir())
         check("sibling roots are NOT inside the repo", not (vault / "work").exists())
         check("upstream remote set", git(vault, "remote", "get-url", "upstream").stdout.strip() == UPSTREAM)
@@ -59,7 +59,7 @@ def main() -> int:
         check("lean: engine kept (bin/)", bool(git(vault, "ls-files", "bin/").stdout.strip()))
         check("lean: design docs kept", bool(git(vault, "ls-files", "docs/design/").stdout.strip()))
         check("doctor passes after setup", subprocess.run(
-            [str(vault / "ops"), "doctor"], capture_output=True, text=True, env=env).returncode == 0)
+            [str(vault / "plainkeep"), "doctor"], capture_output=True, text=True, env=env).returncode == 0)
 
         # update guards cleanly with no reachable remote
         u = subprocess.run([str(vault / "script" / "update"), "--remote", "nope"],
@@ -72,7 +72,7 @@ def main() -> int:
         check("engine manifest lists only framework paths",
               "bin" in paths and "skills" in paths and not (content & set(paths)), str(paths))
 
-        # --- issue #5: script/update must survive a corrupted/invalid .ops-engine-ref (never merge
+        # --- issue #5: script/update must survive a corrupted/invalid .plainkeep-engine-ref (never merge
         # against garbage) AND not abort on unhashable engine paths (the .codex/skills symlink). Each
         # case gets a FRESH clone (one update per vault = real usage; a reused vault would inherit the
         # prior run's staged state). `origin` = the local template clone, a reachable remote for the
@@ -85,10 +85,10 @@ def main() -> int:
             v = tmp / f"refcase{i}"
             subprocess.run(["git", "clone", "-q", str(REPO), str(v)], capture_output=True, text=True)
             shutil.copy(REPO / "script" / "update", v / "script" / "update")
-            (v / ".ops-engine-ref").write_text(ref_text)
+            (v / ".plainkeep-engine-ref").write_text(ref_text)
             r = subprocess.run([str(v / "script" / "update"), "--remote", "origin", "--branch", "main"],
-                               capture_output=True, text=True, env={**env, "OPS_HOME": str(v)})
-            return r, (v / ".ops-engine-ref").read_text().strip()
+                               capture_output=True, text=True, env={**env, "PLAINKEEP_HOME": str(v)})
+            return r, (v / ".plainkeep-engine-ref").read_text().strip()
 
         u, ref_after = _update_case(cur + prev, 1)  # two SHAs concatenated (the reported corruption)
         check("corrupted double-SHA ref → warns, no spurious conflicts, exit 0",

@@ -1,7 +1,7 @@
 {
   "verb": "plugin",
   "summary": "install/list/trust/update/remove plugin packs (untrusted until you trust them)",
-  "usage": "ops plugin add <owner/repo|path>[@tag] --yes | list | trust <name> --yes | update <name> --yes | remove <name> --yes",
+  "usage": "plainkeep plugin add <owner/repo|path>[@tag] --yes | list | trust <name> --yes | update <name> --yes | remove <name> --yes",
   "risk": "safe_write",
   "reads": ["plugins", "plugins/plugins.lock.json"],
   "writes": ["plugins", "plugins/plugins.lock.json"],
@@ -9,7 +9,7 @@
     {"name": "action", "required": false, "default": "list"},
     {"name": "target", "required": false, "default": "-"}
   ],
-  "hints": "Installs a pack under plugins/<name>/, but its verbs are capped at confirm until `ops plugin trust <name> --yes` — self-declared risk never takes effect at install. add/update/remove/trust need --yes; list is read-only. Common mistake: expecting a freshly added pack to run at its declared risk.",
+  "hints": "Installs a pack under plugins/<name>/, but its verbs are capped at confirm until `plainkeep plugin trust <name> --yes` — self-declared risk never takes effect at install. add/update/remove/trust need --yes; list is read-only. Common mistake: expecting a freshly added pack to run at its declared risk.",
   "output": {
     "mode": "rows",
     "fields": {
@@ -33,7 +33,7 @@
       "summary": "install a pack (capped at confirm until trusted); needs --yes",
       "risk": "confirm",
       "args": [
-        { "name": "target", "type": "string", "required": true, "help": "owner/repo, a local path, optionally @tag", "example": "acme/ops-pack@v1" }
+        { "name": "target", "type": "string", "required": true, "help": "owner/repo, a local path, optionally @tag", "example": "acme/example-pack@v1" }
       ]
     },
     {

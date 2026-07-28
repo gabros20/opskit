@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Layered installer for the local ops system."""
+"""Layered installer for the local plainkeep system."""
 from __future__ import annotations
 import os
 import subprocess
@@ -27,7 +27,7 @@ def _valid_ids() -> list[str]:
 
 
 def _fake() -> bool:
-    return (os.environ.get("OPS_SETUP_FAKE") or "").strip().lower() in ("1", "true", "yes", "on")
+    return (os.environ.get("PLAINKEEP_SETUP_FAKE") or "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _dashboard_rows() -> list[dict]:
@@ -62,7 +62,7 @@ def _confirm_message(layer_id: str) -> str:
 def _action_failed(layer_id: str, exc: Exception) -> None:
     layer = next(layer for layer in setuplib.LAYERS if layer.id == layer_id)
     yes = " --yes" if layer.gate == "confirm" else ""
-    hint = f"fix the reported setup prerequisite, then re-run: ops setup {layer_id}{yes}"
+    hint = f"fix the reported setup prerequisite, then re-run: plainkeep setup {layer_id}{yes}"
     if isinstance(exc, subprocess.CalledProcessError):
         cmd = " ".join(str(part) for part in (exc.cmd if isinstance(exc.cmd, (list, tuple)) else [exc.cmd]))
         output.fail(output.EXIT_UNEXPECTED,
@@ -103,7 +103,7 @@ def _advance_one(layer_id: str, *, yes: bool, dry: bool = False) -> int:
     # skipped, not installed, so demanding --yes for it would be a spurious exit 3.
     if not dry and before["status"] not in SKIP_STATUSES and layer.gate == "confirm" and not yes:
         output.fail(output.EXIT_CONFIRM, _confirm_message(layer_id),
-                    hint=f"re-run: ops setup {layer_id} --yes", verb="setup")
+                    hint=f"re-run: plainkeep setup {layer_id} --yes", verb="setup")
     try:
         res = setuplib.advance(layer_id, yes=(yes or dry), fake=(_fake() or dry))
     except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
@@ -181,7 +181,7 @@ def _advance_all(*, yes: bool, dry: bool = False) -> int:
         if confirm and not yes:
             output.fail(output.EXIT_CONFIRM,
                         f"setup layers need --yes: {', '.join(confirm)}",
-                        hint="re-run: ops setup --all --yes", verb="setup")
+                        hint="re-run: plainkeep setup --all --yes", verb="setup")
     results = []
     attempted_failed = False
     for layer_id in AUTO_LAYERS:
@@ -252,10 +252,10 @@ def _run_wizard(rows, ask, say) -> dict:
     advanced: list[str] = []
     skipped: list[str] = []
     handoffs: list[str] = []
-    say("ops setup — guided first run")
+    say("plainkeep setup — guided first run")
     say("  safe defaults are pre-selected; press Enter to accept each.")
     say("  search / models / automation default to OFF (no vectors, no model pulls, no jobs).")
-    say("  the terminal UI (ops ui) defaults to ON — a small verified binary download.")
+    say("  the terminal UI (plainkeep ui) defaults to ON — a small verified binary download.")
     for row in rows:
         lid, status = row["id"], row["status"]
         if status == "ready":
@@ -302,8 +302,8 @@ def _run_wizard(rows, ask, say) -> dict:
     say("")
     say("next steps (yours to run — setup never pushes):")
     say("  • point origin at your GitHub and push:  git push -u origin main")
-    say("  • configure encrypted backups:           ops backup init")
-    say("  • re-check state anytime:                ops setup   (read-only dashboard)")
+    say("  • configure encrypted backups:           plainkeep backup init")
+    say("  • re-check state anytime:                plainkeep setup   (read-only dashboard)")
     return {"advanced": advanced, "skipped": skipped, "handoff": handoffs}
 
 
@@ -311,19 +311,19 @@ def _wizard(*, json_on: bool, dry: bool) -> int:
     # tty-guard (Task 11): the wizard is interactive-only. No tty, or a machine/preview mode
     # (--json / --dry-run) paired with it, means we must NOT prompt — fail with exit 2 and print the
     # exact non-interactive alternatives ("refusals teach"). --dry-run is refused rather than silently
-    # advancing: the wizard's advance path is real (fake only under OPS_SETUP_FAKE), so a --dry-run
+    # advancing: the wizard's advance path is real (fake only under PLAINKEEP_SETUP_FAKE), so a --dry-run
     # here could not preview without a second code path; point at the dashboard's own preview instead.
     if json_on or dry or not sys.stdin.isatty():
         output.fail(output.EXIT_USAGE,
-                    "ops setup --wizard is interactive-only (needs a tty; not with --json or --dry-run)",
-                    hint="non-interactive instead: `ops setup --all --yes` to apply, "
-                         "`ops setup --json` to inspect, `ops setup --all --dry-run` to preview",
+                    "plainkeep setup --wizard is interactive-only (needs a tty; not with --json or --dry-run)",
+                    hint="non-interactive instead: `plainkeep setup --all --yes` to apply, "
+                         "`plainkeep setup --json` to inspect, `plainkeep setup --all --dry-run` to preview",
                     verb="setup")
     _run_wizard(setuplib.status(), input, print)
     return output.EXIT_OK
 
 
-USAGE = "usage: ops setup [<layer> [--yes] | --all [--yes] | --wizard] [--dry-run]"
+USAGE = "usage: plainkeep setup [<layer> [--yes] | --all [--yes] | --wizard] [--dry-run]"
 
 
 def main(argv: list[str]) -> int:
@@ -336,8 +336,8 @@ def main(argv: list[str]) -> int:
     if wizard:
         if all_ or argv:
             output.fail(output.EXIT_USAGE,
-                        "ops setup --wizard walks every layer — pass no <layer> and not --all",
-                        hint="run: ops setup --wizard", verb="setup")
+                        "plainkeep setup --wizard walks every layer — pass no <layer> and not --all",
+                        hint="run: plainkeep setup --wizard", verb="setup")
         return _wizard(json_on=json_on, dry=dry)
     if all_ and argv:
         output.fail(output.EXIT_USAGE, USAGE, verb="setup")

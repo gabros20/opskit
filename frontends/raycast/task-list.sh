@@ -2,13 +2,13 @@
 # Raycast Script Command — task-list (proposal Part 3.3).
 #
 # @raycast.schemaVersion 1
-# @raycast.title Ops Task List
+# @raycast.title Plainkeep Task List
 # @raycast.mode fullOutput
-# @raycast.packageName ops
+# @raycast.packageName plainkeep
 # @raycast.icon 📋
-# @raycast.description Active and waiting ops tasks.
-# @raycast.author ops
+# @raycast.description Active and waiting plainkeep tasks.
+# @raycast.author plainkeep
 set -euo pipefail
-OPS="$(command -v ops || true)"
-[ -n "$OPS" ] || OPS="${OPS_HOME:-$HOME/ops}/ops"
-exec "$OPS" task list
+PLAINKEEP="$(command -v plainkeep || true)"
+[ -n "$PLAINKEEP" ] || PLAINKEEP="${PLAINKEEP_HOME:-$HOME/plainkeep}/plainkeep"
+exec "$PLAINKEEP" task list

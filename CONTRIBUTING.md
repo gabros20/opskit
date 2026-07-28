@@ -1,8 +1,8 @@
 # Contributing
 
-This repo is the **template/engine** for the `~/ops` system. A user's own vault is a copy of it; the
-framework files (`bin/`, `skills/`, `ops`, the adapters, `docs/`, `script/`) travel and update, while
-their content (`wiki/ tasks/ journal/ jobs/registry.json`) is theirs. The boundary is
+This repo is the **template/engine** for the `~/plainkeep` system. A user's own vault is a copy of
+it; the framework files (`bin/`, `skills/`, `plainkeep`, the adapters, `docs/`, `script/`) travel and
+update, while their content (`wiki/ tasks/ journal/ jobs/registry.json`) is theirs. The boundary is
 [`script/engine.txt`](script/engine.txt).
 
 ## Run the tests
@@ -18,13 +18,14 @@ All suites must stay green. CI (`.github/workflows/ci.yml`) runs `run_all.py` on
 
 > [!IMPORTANT]
 > **Adding a verb for your own vault?** Don't touch `bin/` — that's the engine, and `script/update`
-> owns it. `ops new verb <name>` scaffolds into `plugins/local/<name>/` (update-safe, same shape,
-> same guardrail); see [`docs/plugins.md`](docs/plugins.md). The steps below are for contributing a
-> **core engine verb** to this template.
+> owns it. `plainkeep new verb <name>` scaffolds into `plugins/local/<name>/` (update-safe, same
+> shape, same guardrail); see [`docs/plugins.md`](docs/plugins.md). The steps below are for
+> contributing a **core engine verb** to this template.
 
-A new engine verb costs exactly one directory under `bin/`. Nothing else to wire — `ops help`, the
-manifest, the guardrail, and every agent learn it from the same place. Scaffold with
-`ops new verb <name>` and move the folder from `plugins/local/` into `bin/`, or create it by hand:
+A new engine verb costs exactly one directory under `bin/`. Nothing else to wire — `plainkeep help`,
+the manifest, the guardrail, and every agent learn it from the same place. Scaffold with
+`plainkeep new verb <name>` and move the folder from `plugins/local/` into `bin/`, or create it by
+hand:
 
 1. **`bin/<verb>/run.py`** — the implementation. Import shared helpers from `lib`:
    ```python
@@ -41,19 +42,19 @@ manifest, the guardrail, and every agent learn it from the same place. Scaffold 
    **`dry_run`** for mutating verbs — shapes in [`docs/machine-contract.md`](docs/machine-contract.md).
    Emit through `lib.output` (`emit` / `emit_rows` / `fail`), never hand-rolled JSON.
 3. **Register the group** in `bin/lib/manifest.py` `GROUPS` (optional but tidy).
-4. **`ops help`** — regenerates `ops.json`. Confirm the verb appears.
-5. **`test/run_<verb>.py`** — cover it against a temp `OPS_HOME` (and `OPS_ROOTS_HOME` for the sibling
-   roots). Add it to `test/run_all.py`.
-6. **`ops doctor`** — should stay all-green.
+4. **`plainkeep help`** — regenerates `plainkeep.json`. Confirm the verb appears.
+5. **`test/run_<verb>.py`** — cover it against a temp `PLAINKEEP_HOME` (and `PLAINKEEP_ROOTS_HOME`
+   for the sibling roots). Add it to `test/run_all.py`.
+6. **`plainkeep doctor`** — should stay all-green.
 
 ### Conventions
 
-- **Flat verbs, shallow subactions.** `ops task add …` is fine; never nest deeper.
+- **Flat verbs, shallow subactions.** `plainkeep task add …` is fine; never nest deeper.
 - **Plaintext is truth.** No binaries in `wiki/`; indexes are disposable caches.
 - **The guardrail is the system's, not the verb's.** Don't re-implement safety per verb — declare the
   right `risk` and (for verbs that handle caller-supplied paths) call `guardrail.classify()`.
-- **The roots are walls.** Write only inside `~/ops`, `~/files`, and the task's `~/work` repo. Never
-  iCloud/family paths; never transmit (drafts only).
+- **The roots are walls.** Write only inside `~/plainkeep`, `~/files`, and the task's `~/work` repo.
+  Never iCloud/family paths; never transmit (drafts only).
 
 The full rationale lives in [`docs/design/PERSONAL_OS_DESIGN.md`](docs/design/PERSONAL_OS_DESIGN.md)
 and the decision log [`docs/DECISIONS.md`](docs/DECISIONS.md).

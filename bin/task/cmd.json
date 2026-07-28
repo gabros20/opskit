@@ -1,7 +1,7 @@
 {
   "verb": "task",
   "summary": "list | add \"<title>\" | show <id> | move <id> <status> | done <id>",
-  "usage": "ops task <action> [args]",
+  "usage": "plainkeep task <action> [args]",
   "risk": "safe_write",
   "args": [
     {

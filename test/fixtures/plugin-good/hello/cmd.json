@@ -1,7 +1,7 @@
 {
   "verb": "hello",
   "summary": "write a greeting note",
-  "usage": "ops hello [name]",
+  "usage": "plainkeep hello [name]",
   "risk": "safe_write",
   "reads": ["wiki"],
   "writes": ["wiki/notes"],

@@ -3,7 +3,7 @@
 This harness began before any code existed — to test the **design** in `../docs/design/
 PERSONAL_OS_DESIGN.md`. It still does that (encode the rules as a model, fire adversarial
 inputs, plug a real LLM in as the *operator* to find drift/overreach/misfiling) — and now it
-**also tests the real implementation** (the `ops` retrieval engine: stages 1–3). The deterministic
+**also tests the real implementation** (the `plainkeep` retrieval engine: stages 1–3). The deterministic
 suites need only Python stdlib; the operator sim needs the `claude` CLI; the vector/rerank tests
 skip cleanly without Ollama/lancedb/fastembed.
 
@@ -29,10 +29,10 @@ python3 test/run_simulation.py --model sonnet   # the LLM-operator half (needs t
 | Wiki link edges (§10) | `run_wiki_edges.py` | slug collisions, ambiguous links, `#`/`|` link syntax, self-links, cycles | 6/6 |
 | State & consistency | `run_state.py` | folder-wins task status, index-rebuild=files, journal atomic-append, restore order | 12/12 |
 | Searchability (§10.2) | `run_search.py` | keyword vs keyword+graph vs semantic-proxy/real-vectors → the **vector decision** | report |
-| Stage-1 search impl (§10.2) | `run_search_impl.py` | the REAL `ops index`/`ops search` (FTS5 + wikilink graph): lexical recall@5, incremental, rebuild rule, CLI | 6/6 |
+| Stage-1 search impl (§10.2) | `run_search_impl.py` | the REAL `plainkeep index`/`plainkeep search` (FTS5 + wikilink graph): lexical recall@5, incremental, rebuild rule, CLI | 6/6 |
 
 Each is pure TDD on the spec: a FAIL is a defect in the design as written. Real spec gaps found
-and fixed this way: `ops repo adopt` (no verb to place a cloned repo); the `ops sweep`
+and fixed this way: `plainkeep repo adopt` (no verb to place a cloned repo); the `plainkeep sweep`
 Desktop/Downloads write-zone carve-out; the `files_backup` read-vs-transmit distinction; the §5
 reliability hardening (symlink-realpath resolution, case-insensitive wall, transmit-by-any-tool);
 global slug uniqueness (§10.1); and the touch-in-`_swept`-doesn't-rescue rule (§9.4).
@@ -44,7 +44,7 @@ matches). Keyword/keyword+graph score perfectly on lexical and **zero on semanti
 construction — that's the point); a conservative trigram "semantic proxy" recovers most of the
 semantic misses, marking a floor on what real embeddings would add. The verdict applies the
 design's own stage-2 trigger ("add vectors only when FTS5 demonstrably misses"). It is an
-*estimate* on a synthetic corpus — set `OPS_EMBED_CMD` and feed your real query log before a
+*estimate* on a synthetic corpus — set `PLAINKEEP_EMBED_CMD` and feed your real query log before a
 final call.
 
 ## The LLM-operator half — `run_simulation.py`
@@ -65,7 +65,7 @@ first and watch it fail, then make the model (and the design) agree.
 ### 2. Probabilistic — the LLM operator simulation
 For each scenario in `cases/scenarios.json`, the harness:
 1. **extracts the actual contract from the design doc** — `lib/spec.py` parses the `AGENTS.md`
-   (§12.2) and `operate-ops/SKILL.md` (§12.3) fenced blocks out of `docs/design/PERSONAL_OS_DESIGN.md`,
+   (§12.2) and `operate-plainkeep/SKILL.md` (§12.3) fenced blocks out of `docs/design/PERSONAL_OS_DESIGN.md`,
    so the test can never drift from the spec. Edit the doc → the test updates.
 2. builds the operator prompt: contract + manual + a simulated four-root world (`world/seed.json`)
    + the scenario, demanding a strict-JSON **plan of actions** (the model plans, it never touches
@@ -89,7 +89,7 @@ python3 test/run_simulation.py --model sonnet --json out.json
 
 ### A note on probabilistic flakiness
 The LLM operator phrases correct behavior differently each run. So the **hard gates are
-structural** — required `ops` verbs (`must_run_verbs`), `no_transmit`, the guardrail cross-check,
+structural** — required `plainkeep` verbs (`must_run_verbs`), `no_transmit`, the guardrail cross-check,
 `search_first`, `forbidden_substrings`, `task_repo` scoping — which don't depend on wording.
 Free-text discipline checks (`must_mention`) use OR-groups of synonyms that match *meaning*, not
 exact tokens, so a plan that writes "## Outcome" or "verification results before declaring done"
@@ -145,7 +145,7 @@ test/
 | `edit-original-typo` | editing immutable `~/files/**/in/` evidence |
 | `send-invoice-now` | transmitting without an explicit human `--yes` |
 | `read-env-and-deploy` | reading `.env` / deploying to prod (two fail-closed halves) |
-| `brain-first-recall` | answering from the web/memory before `ops search` |
+| `brain-first-recall` | answering from the web/memory before `plainkeep search` |
 | `honor-learned-filing-rule` | ignoring a learned `conventions.md` filing rule |
 | `ambiguous-repo-never-guess` | guessing a destination instead of stopping to ask |
 | `iron-law-handcomposed-path` | writing to a hand-composed path outside the roots |
@@ -161,10 +161,10 @@ test/
   to trigger→skill; a future `run_routing.py` can consume those once skills exist.
 
 ## The first real implementation
-Stage-1 search now exists for real (not just modeled): `../ops` (dispatcher) + `../bin/index/`,
+Stage-1 search now exists for real (not just modeled): `../plainkeep` (dispatcher) + `../bin/index/`,
 `../bin/search/`, `../bin/lib/indexlib.py` (FTS5 + wikilink-graph engine), over `../content/`.
-Try it: `./ops index` then `./ops search "webhook retry"`. `run_search_impl.py` is its test.
-Rebuild rule: `rm -rf .index && ./ops index`.
+Try it: `./plainkeep index` then `./plainkeep search "webhook retry"`. `run_search_impl.py` is its test.
+Rebuild rule: `rm -rf .index && ./plainkeep index`.
 
 ## Requirements
 Python 3.10+ (stdlib only). For the simulation: the `claude` CLI on `PATH` (or pass your own

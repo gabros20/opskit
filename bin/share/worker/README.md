@@ -1,6 +1,6 @@
-# ops share worker
+# plainkeep share worker
 
-A tiny Cloudflare Worker + KV store implementing capability-URL, expiring shares for `ops share`
+A tiny Cloudflare Worker + KV store implementing capability-URL, expiring shares for `plainkeep share`
 (`docs/design/proposals/2026-07-10-capability-url-share.md`, ADR-008). It stores the **plaintext**
 OPSX bundle (raw wiki markdown + rendered HTML) under a 24-char unguessable token (~124 bits) — the
 token IS the secret; there is no encryption and no key. Modeled on SharzyL/pastebin-worker.
@@ -13,9 +13,9 @@ token IS the secret; there is no encryption and no key. Modeled on SharzyL/paste
 | `GET` | `/<id>` | `Accept: text/html` (browser) | — | rendered HTML half (CSP + `Link: rel="alternate"` to the `.md` form) |
 | `GET` | `/<id>` | any other `Accept` (curl, agent fetch tools) | — | markdown half, `text/markdown` (content negotiation) |
 | `GET` | `/<id>.md` | — | — | markdown half, `text/markdown` — the canonical agent form |
-| `GET` | `/<id>?raw=1` | — | — | the whole stored OPSX blob, `application/octet-stream` (`ops share pull`, debugging) |
+| `GET` | `/<id>?raw=1` | — | — | the whole stored OPSX blob, `application/octet-stream` (`plainkeep share pull`, debugging) |
 | `DELETE` | `/<id>` | `X-Admin-Token` | — | `204` (admin only) |
-| any GET on a legacy (non-OPSX / encrypted) blob | — | — | — | `410` `{error: "legacy encrypted share — re-publish with current ops share"}` |
+| any GET on a legacy (non-OPSX / encrypted) blob | — | — | — | `410` `{error: "legacy encrypted share — re-publish with current plainkeep share"}` |
 
 The id regex accepts `[a-z0-9]{10,32}` — 24-char tokens are current; 10-char legacy ids still route
 (to the 410 above) until their TTL expires.
@@ -24,7 +24,7 @@ The id regex accepts `[a-z0-9]{10,32}` — 24-char tokens are current; 10-char l
 self-contained HTML page in a browser (inline CSS, data-URI images, no JS — nothing to execute, so
 `Content-Security-Policy: default-src 'none'; img-src data:; style-src 'unsafe-inline'` is safe to
 send unconditionally). Append `.md`, or let content negotiation do it on the bare URL, and you get
-the exact wiki markdown instead — the same thing `ops share pull` fetches locally. See
+the exact wiki markdown instead — the same thing `plainkeep share pull` fetches locally. See
 `docs/share-agent-markdown.md`.
 
 Expiry is native KV `expirationTtl` (1:1 from `--expires`, so there is no cleanup code). Revoke is a
@@ -37,16 +37,16 @@ Expiry is native KV `expirationTtl` (1:1 from `--expires`, so there is no cleanu
 ```sh
 cd bin/share/worker
 cp wrangler.toml.example wrangler.toml
-wrangler kv namespace create OPS_SHARE     # paste the id into wrangler.toml
+wrangler kv namespace create PLAINKEEP_SHARE     # paste the id into wrangler.toml
 wrangler deploy
 wrangler secret put PUBLISH_TOKEN          # optional but recommended — see below
-ops share init --endpoint https://ops-share.<subdomain>.workers.dev
+plainkeep share init --endpoint https://plainkeep-share.<subdomain>.workers.dev
 ```
 
 `PUBLISH_TOKEN` is optional: if the secret is unset, `PUT /` stays open (graceful for a fresh deploy
 before you've run the secret step). Once set, every publish must send a matching `X-Publish-Token`
 header or the worker returns `401` — this is what stops a discovered endpoint from being used as a
-free anonymous file host. `ops share init --yes` generates the token, runs `wrangler secret put
+free anonymous file host. `plainkeep share init --yes` generates the token, runs `wrangler secret put
 PUBLISH_TOKEN` for you, and writes it to `.share/config.json` (vault-private, same handling as the
 `admin_token`s already in `.share/ledger.json`).
 
@@ -60,12 +60,12 @@ Free tier: 100k requests/day, 1k KV writes/day — a collection coalesces into O
   an accepted tradeoff, not an oversight — see `docs/design/proposals/2026-07-10-capability-url-share.md`
   and ADR-008 (`docs/DECISIONS.md`) for why no zero-knowledge variant also satisfies "one link an
   agent can fetch."
-- `ops share` publishes only; it is confirm-class (`--yes`) because a PUT is a transmission. The
+- `plainkeep share` publishes only; it is confirm-class (`--yes`) because a PUT is a transmission. The
   human sends the resulting link.
 - The worker is vendored inside the engine boundary (`bin/share/worker/`) so fixes distribute via
   `script/update`.
 - Cloudflare bot-management **403s the default `Python-urllib/x.y` User-Agent** (a `PUT` that works
-  from `curl` fails from stdlib `urllib` for this reason alone). `ops share` sends
-  `User-Agent: ops-share/1.0` so the edge lets it through; keep that header if you customize the
+  from `curl` fails from stdlib `urllib` for this reason alone). `plainkeep share` sends
+  `User-Agent: plainkeep-share/1.0` so the edge lets it through; keep that header if you customize the
   client. When forwarding a link (e.g. over Telegram), send it **whole** — the token is the entire
   secret, and a truncated link does not resolve.

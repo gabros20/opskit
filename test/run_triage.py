@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""run_triage.py — exercises `ops triage`: dry-run, --yes auto-file, and the interactive
-override -> filing-rule learning loop (§10). Temp OPS_HOME; stdlib only."""
+"""run_triage.py — exercises `plainkeep triage`: dry-run, --yes auto-file, and the interactive
+override -> filing-rule learning loop (§10). Temp PLAINKEEP_HOME; stdlib only."""
 from __future__ import annotations
 import json
 import os
@@ -30,7 +30,7 @@ def seed(home: Path, caps: dict):
 
 
 def triage(home: Path, *args, stdin=None):
-    env = {**os.environ, "OPS_HOME": str(home)}
+    env = {**os.environ, "PLAINKEEP_HOME": str(home)}
     return subprocess.run([sys.executable, str(REPO / "bin/triage/run.py"), *args],
                           input=stdin, capture_output=True, text=True, env=env)
 

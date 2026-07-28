@@ -1,7 +1,7 @@
 # AGENTS.md — {{name}}
 
 Operating contract for any agent working in this `~/work` repo. (The system-wide contract
-lives in `~/ops/AGENTS.md`; this file is repo-local and wins for repo-specific rules.)
+lives in `~/plainkeep/AGENTS.md`; this file is repo-local and wins for repo-specific rules.)
 
 ## Ground rules
 - This repo is one project under `~/work`. Operate only here and in its sanctioned
@@ -16,5 +16,5 @@ lives in `~/ops/AGENTS.md`; this file is repo-local and wins for repo-specific r
 - `script/test` — the test suite (make this the single source of truth for "is it green?").
 
 ## Knowledge
-- The durable "why" for this project lives in its wiki hub `[[{{slug}}]]` in `~/ops`, not here.
+- The durable "why" for this project lives in its wiki hub `[[{{slug}}]]` in `~/plainkeep`, not here.
   Keep this repo signal-only (code + the docs a contributor needs).

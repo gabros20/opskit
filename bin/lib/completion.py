@@ -1,13 +1,13 @@
 """
-completion.py — the ONE completion brain (ops.json/3). Both `ops __complete` (the zsh tab-completion
-helper) and `ops complete --json` (the structured contract for the future TUI + agents) derive their
+completion.py — the ONE completion brain (plainkeep.json/3). Both `plainkeep __complete` (the zsh tab-completion
+helper) and `plainkeep complete --json` (the structured contract for the future TUI + agents) derive their
 candidates from here, and this derives everything from a single source: the verb surface + each
 compound verb's `actions[]` grammar (via `manifest.load_cmds()` → the cmd.json sidecars) plus live
 content providers (note slugs, task ids, hubs, note types, statuses). There are NO hardcoded subaction
 tables — the grammar lives in cmd.json, so completion can never drift from the real surface (the
-anti-drift payoff of the ops.json/3 refactor).
+anti-drift payoff of the plainkeep.json/3 refactor).
 
-`candidates(prior)` takes the words already typed after `ops` and returns the candidates for the NEXT
+`candidates(prior)` takes the words already typed after `plainkeep` and returns the candidates for the NEXT
 word as `(value, description, kind)` triples. `kind` is `verb` | `action` | `enum` | a provider name
 (`note-slug`/`asset-slug`/`task-id`/`hub`/`note-type`/`status`/`layer`).
 """
@@ -126,13 +126,13 @@ def _walk(action, arg_toks):
 
 
 def candidates(prior: list[str]) -> list:
-    """Candidates for the next word after the already-typed `prior` words (everything after `ops`).
+    """Candidates for the next word after the already-typed `prior` words (everything after `plainkeep`).
     Returns (value, description, kind) triples."""
     cmds = _cmds()
     if not prior:
         return _verb_rows(cmds)
     verb = prior[0]
-    if verb == "help":                       # `ops help <verb>` completes to the verb list
+    if verb == "help":                       # `plainkeep help <verb>` completes to the verb list
         return _verb_rows(cmds)
     c = cmds.get(verb)
     if not c:

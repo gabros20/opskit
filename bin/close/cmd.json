@@ -1,7 +1,7 @@
 {
   "verb": "close",
   "summary": "daily close: summarize the day into the journal, flag loose ends",
-  "usage": "ops close [--automated] [--dry-run]",
+  "usage": "plainkeep close [--automated] [--dry-run]",
   "risk": "safe_write",
   "dry_run": true,
   "reads": [

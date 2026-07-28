@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-ops models list | status | stop [--all] [<model>] | pull [--stage <s>|--all] --yes
+plainkeep models list | status | stop [--all] [<model>] | pull [--stage <s>|--all] --yes
         | test <stage> [--model <m>] [--input <file>] --yes — the download/offload/on-demand test
 surface for the model layer behind every stage (search-enrichment proposal §2.1). Model choice is env
-config (OPS_OCR/OPS_VLM/OPS_ENRICH_MODEL/OPS_EMBED_MODEL/OPS_RERANK_MODEL); this verb lets you SEE what
+config (PLAINKEEP_OCR/PLAINKEEP_VLM/PLAINKEEP_ENRICH_MODEL/PLAINKEEP_EMBED_MODEL/PLAINKEEP_RERANK_MODEL); this verb lets you SEE what
 each stage is configured to use, whether it's actually pulled/available, offload a resident model, and
 A/B a candidate on a sample without wiring anything — adopt it after by setting its env var.
 
 Risk: safe_write at the surface so `list`/`status` (read) and `stop` (unloads a model — reloads on
 next use, no data loss) stay free of --yes. The two TRANSMITTING/downloading subactions self-gate:
 `pull` and `test` can each pull gigabytes, so both refuse without --yes -> EXIT_CONFIRM(3), mirroring
-how `ops share`/`ops backup` gate their own transmitting subactions.
+how `plainkeep share`/`plainkeep backup` gate their own transmitting subactions.
 
 Every real model call goes over urllib to the local Ollama daemon (bin/lib/embed.py's pattern) or an
 existing lib's own dispatch (imagelib for ocr/vlm, embed for embed, enrichlib for enrich, rerank for
@@ -88,14 +88,14 @@ def _ollama_model_for(stage: str) -> str | None:
     under the current config (stt/rerank use their own pip-managed runtimes; ocr's mlx/apple/tesseract
     backends auto-fetch or ship their own weights)."""
     if stage == "vlm":
-        m = (os.environ.get("OPS_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip()
+        m = (os.environ.get("PLAINKEEP_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip()
         return None if m.lower() == "none" else m
     if stage == "enrich":
         return enrichlib.DEFAULT_MODEL
     if stage == "embed":
-        return os.environ.get("OPS_EMBED_MODEL", "embeddinggemma")
+        return os.environ.get("PLAINKEEP_EMBED_MODEL", "embeddinggemma")
     if stage == "ocr":
-        m = (os.environ.get("OPS_OCR", "auto") or "auto").strip().lower()
+        m = (os.environ.get("PLAINKEEP_OCR", "auto") or "auto").strip().lower()
         return m if m not in ("auto", "none", "apple", "tesseract", "glm-ocr") else None
     return None  # stt, rerank: not ollama-backed
 
@@ -105,7 +105,7 @@ def _ollama_model_for(stage: str) -> str | None:
 def _vlm_backend(model: str) -> tuple[str, bool]:
     if model.lower() == "none":
         return "none", False
-    mlx_enabled = (os.environ.get("OPS_MLX", "auto") or "auto").strip().lower() != "off"
+    mlx_enabled = (os.environ.get("PLAINKEEP_MLX", "auto") or "auto").strip().lower() != "off"
     status = imagelib.backends_status()
     if mlx_enabled and status["mlx_vlm"]:
         return "mlx-vlm", True  # HF auto-fetches the model on first use
@@ -116,8 +116,8 @@ def _vlm_backend(model: str) -> tuple[str, bool]:
 
 def _stage_info(stage: str) -> dict:
     if stage == "stt":
-        # S1 (OPS_STT_MODEL retrofit) is not shipped yet — report the cascade files/run.py._tier_audio
-        # actually runs (`ops help models` links back to the proposal), env read for forward-compat.
+        # S1 (PLAINKEEP_STT_MODEL retrofit) is not shipped yet — report the cascade files/run.py._tier_audio
+        # actually runs (`plainkeep help models` links back to the proposal), env read for forward-compat.
         if _have_mod("parakeet_mlx"):
             model, runtime, available = "parakeet-tdt-0.6b-v2", "mlx (parakeet-mlx)", True
         elif _have_mod("mlx_whisper"):
@@ -126,24 +126,24 @@ def _stage_info(stage: str) -> dict:
             model, runtime, available = "base", "faster-whisper", True
         else:
             model, runtime, available = "-", "none", False
-        model = os.environ.get("OPS_STT_MODEL") or model
+        model = os.environ.get("PLAINKEEP_STT_MODEL") or model
         return {"stage": stage, "model": model, "runtime": runtime, "available": available}
     if stage == "ocr":
-        model = (os.environ.get("OPS_OCR", "auto") or "auto").strip().lower()
+        model = (os.environ.get("PLAINKEEP_OCR", "auto") or "auto").strip().lower()
         runtime = imagelib.ocr_backend_label() or "none"
         return {"stage": stage, "model": model, "runtime": runtime, "available": runtime != "none"}
     if stage == "vlm":
-        model = (os.environ.get("OPS_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip()
+        model = (os.environ.get("PLAINKEEP_VLM", "qwen3-vl:4b") or "qwen3-vl:4b").strip()
         runtime, available = _vlm_backend(model)
         return {"stage": stage, "model": model, "runtime": runtime, "available": available}
     if stage == "enrich":
         model = enrichlib.DEFAULT_MODEL
         return {"stage": stage, "model": model, "runtime": "ollama", "available": _ollama_has(model)}
     if stage == "embed":
-        model = os.environ.get("OPS_EMBED_MODEL", embed.model_name())
+        model = os.environ.get("PLAINKEEP_EMBED_MODEL", embed.model_name())
         return {"stage": stage, "model": model, "runtime": "ollama", "available": _ollama_has(model)}
     # rerank
-    model = os.environ.get("OPS_RERANK_MODEL") or "(auto-picked)"
+    model = os.environ.get("PLAINKEEP_RERANK_MODEL") or "(auto-picked)"
     if _have_mod("fastembed"):
         runtime, available = "fastembed", True
     elif _have_mod("sentence_transformers"):
@@ -183,7 +183,7 @@ def cmd_stop(argv):
     all_ = "--all" in argv
     model = next((a for a in argv if not a.startswith("-")), None)
     if not all_ and not model:
-        output.fail(output.EXIT_USAGE, "usage: ops models stop [--all] [<model>]", verb="models")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep models stop [--all] [<model>]", verb="models")
     if not shutil.which("ollama"):
         output.fail(output.EXIT_UNEXPECTED, "ollama not installed", hint="brew install ollama", verb="models")
     if all_:
@@ -204,7 +204,7 @@ def cmd_pull(argv):
     all_ = "--all" in argv
     stage = argv[argv.index("--stage") + 1] if "--stage" in argv else None
     if not all_ and not stage:
-        output.fail(output.EXIT_USAGE, "usage: ops models pull [--stage <s>|--all] --yes", verb="models")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep models pull [--stage <s>|--all] --yes", verb="models")
     stages = list(STAGES) if all_ else [stage]
     for s in stages:
         if s not in STAGES:
@@ -217,7 +217,7 @@ def cmd_pull(argv):
         rerun_args = [a for a in argv if a not in ("--yes", "-y")] + ["--yes"]
         output.fail(output.EXIT_CONFIRM,
                     f"pulling {len(pullable)} model(s) downloads gigabytes ({names})",
-                    hint="re-run: ops models pull " + " ".join(rerun_args), verb="models")
+                    hint="re-run: plainkeep models pull " + " ".join(rerun_args), verb="models")
     if pullable and not shutil.which("ollama"):
         output.fail(output.EXIT_UNEXPECTED, "ollama not installed", hint="brew install ollama", verb="models")
     pulled = []
@@ -260,29 +260,29 @@ def _run_stage_test(stage: str, model: str | None, input_path: str | None) -> st
         if not input_path:
             raise ValueError("--input <image> required for ocr")
         if model:
-            os.environ["OPS_OCR"] = model
+            os.environ["PLAINKEEP_OCR"] = model
         text, backend = imagelib.read_text(input_path)
         return f"[{backend}] {text}"
     if stage == "vlm":
         if not input_path:
             raise ValueError("--input <image> required for vlm")
         if model:
-            os.environ["OPS_VLM"] = model
+            os.environ["PLAINKEEP_VLM"] = model
         cap, desc, backend = imagelib.describe(input_path)
         return f"[{backend}] {cap}\n{desc}"
     if stage == "embed":
-        vec = embed.embed_query("ops models test", model=model)
+        vec = embed.embed_query("plainkeep models test", model=model)
         return f"[{model or embed.model_name()}] embedded a {len(vec)}-dim vector"
     if stage == "rerank":
-        docs = ["ops is a local-first personal operating system", "bananas are yellow"]
+        docs = ["plainkeep is a local-first personal operating system", "bananas are yellow"]
         scores = rerank.rerank("personal productivity system", docs)
         return f"[{rerank.backend()}] " + ", ".join(f"{d!r}={s:.3f}" for d, s in zip(docs, scores))
     # enrich
     if input_path:
         text = Path(input_path).read_text(encoding="utf-8", errors="replace")
     else:
-        text = ("ops is a local-first, git-versioned personal operating system: wiki notes, tasks, "
-                "journal, and one `ops <verb>` command surface across ~/ops, ~/work, and ~/files.")
+        text = ("plainkeep is a local-first, git-versioned personal operating system: wiki notes, tasks, "
+                "journal, and one `plainkeep <verb>` command surface across ~/plainkeep, ~/work, and ~/files.")
     result = enrichlib.enrich(text, model=model)
     return (f"[{result['backend']}] {result['description']}\n"
             f"keywords: {', '.join(result['keywords'])}")
@@ -293,7 +293,7 @@ def cmd_test(argv):
     stage = pos[0] if pos else ""
     if stage not in STAGES:
         output.fail(output.EXIT_USAGE,
-                    f"usage: ops models test <stage> [--model <m>] [--input <file>] --yes  "
+                    f"usage: plainkeep models test <stage> [--model <m>] [--input <file>] --yes  "
                     f"(stage one of: {', '.join(STAGES)})", verb="models")
     yes = ("--yes" in argv) or ("-y" in argv)
     model = argv[argv.index("--model") + 1] if "--model" in argv else None
@@ -301,7 +301,7 @@ def cmd_test(argv):
     if not yes:
         output.fail(output.EXIT_CONFIRM,
                     f"testing '{stage}' runs a real model (may pull gigabytes first)",
-                    hint=f"re-run: ops models test {stage} --yes", verb="models")
+                    hint=f"re-run: plainkeep models test {stage} --yes", verb="models")
     t0 = time.time()
     try:
         out = _run_stage_test(stage, model, input_path)  # pragma: no cover - real model call
@@ -326,7 +326,7 @@ def main(argv):
     if action == "test":
         return cmd_test(rest)
     output.fail(output.EXIT_USAGE,
-               "usage: ops models list | status | stop [--all] [<model>] | "
+               "usage: plainkeep models list | status | stop [--all] [<model>] | "
                "pull [--stage <s>|--all] --yes | test <stage> [--model <m>] [--input <file>] --yes",
                verb="models")
 

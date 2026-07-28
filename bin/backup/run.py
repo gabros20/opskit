@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-ops backup — the durability family (§14, proposal Part 5.1). Bare `ops backup` is UNCHANGED: the
-read-only nag that verifies ~/ops is committed + pushed and exits 1 if at risk (it NEVER commits or
+plainkeep backup — the durability family (§14, proposal Part 5.1). Bare `plainkeep backup` is UNCHANGED: the
+read-only nag that verifies ~/plainkeep is committed + pushed and exits 1 if at risk (it NEVER commits or
 pushes — §3, transmit is the human's call). Subcommands add the restic floor + git-bundle safety net:
 
   backup init        interactive, human-run ONCE (confirm/--yes): collect a local external-SSD restic
@@ -10,12 +10,12 @@ pushes — §3, transmit is the human's call). Subcommands add the restic floor 
   backup status      snapshot age per configured target; exit 1 if stale >48h or unconfigured. Works
                      WITHOUT restic (reports unconfigured / install hint).
   backup run [--target local|cloud]   restic backup of ~/files, ~/dotfiles + working-tree mirrors of
-                     ~/ops and ~/work, then `restic check`. Cloud is confirm-class ALWAYS (--yes).
+                     ~/plainkeep and ~/work, then `restic check`. Cloud is confirm-class ALWAYS (--yes).
                      The SCHEDULED cloud push runs from launchd invoking restic DIRECTLY with an
                      append-only B2 key — OUTSIDE this verb surface (see the rendered plist).
   backup drill       restore latest snapshot (or --subset N) to tmp, diff vs source, fail loud
                      (confirm/--yes). A backup that has never been restored is a hypothesis.
-  backup bundle      rotated `git bundle --all` of ~/ops + every ~/work repo into
+  backup bundle      rotated `git bundle --all` of ~/plainkeep + every ~/work repo into
                      ~/files/backups/bundles/ with retention (keep last N) — closes the
                      remote-less-repo-has-one-copy hole. Captured by restic.
 
@@ -36,21 +36,21 @@ from lib import output, paths  # noqa: E402
 
 GREEN, RED, YEL, DIM, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 
-BACKUP_DIR = paths.OPS_HOME / ".backup"
+BACKUP_DIR = paths.PLAINKEEP_HOME / ".backup"
 CONFIG = BACKUP_DIR / "config.json"
-STALE_HOURS = int(os.environ.get("OPS_BACKUP_STALE_HOURS", "48"))
-BUNDLE_KEEP = int(os.environ.get("OPS_BUNDLE_KEEP", "3"))
-RESTIC_HINT = "install restic: brew install restic  (then `ops backup init`)"
+STALE_HOURS = int(os.environ.get("PLAINKEEP_BACKUP_STALE_HOURS", "48"))
+BUNDLE_KEEP = int(os.environ.get("PLAINKEEP_BUNDLE_KEEP", "3"))
+RESTIC_HINT = "install restic: brew install restic  (then `plainkeep backup init`)"
 
 
 # --------------------------------------------------------------------------- the bare nag (UNCHANGED)
 
 def cmd_nag():
-    if not (paths.OPS_HOME / ".git").exists():
+    if not (paths.PLAINKEEP_HOME / ".git").exists():
         data = {"git_repo": False, "branch": None, "upstream": None,
                 "dirty": 0, "unpushed": 0, "at_risk": True}
         output.emit(data, "backup", human=lambda _:
-                    f"{YEL}~/ops is not a git repo — your knowledge is NOT versioned. run: git init{RESET}")
+                    f"{YEL}~/plainkeep is not a git repo — your knowledge is NOT versioned. run: git init{RESET}")
         return 1
 
     dirty = [ln for ln in paths.git("status", "--porcelain").splitlines() if ln.strip()]
@@ -66,7 +66,7 @@ def cmd_nag():
             "dirty": len(dirty), "dirty_files": dirty[:8], "unpushed": ahead, "at_risk": risk}
 
     def render(_):
-        print(f"ops repo: {branch}" + (f" → {upstream}" if upstream else " (no remote tracking)"))
+        print(f"plainkeep repo: {branch}" + (f" → {upstream}" if upstream else " (no remote tracking)"))
         if dirty:
             print(f"  {RED}● {len(dirty)} uncommitted change(s){RESET} — run: git add -A && git commit")
             for ln in dirty[:8]:
@@ -128,8 +128,8 @@ def _latest_snapshot_ts(repo: str):
 
 
 def _backup_paths() -> list[Path]:
-    """~/files, ~/dotfiles, and the working-tree mirrors of ~/ops and ~/work (existing paths only)."""
-    cands = [paths.FILES_ROOT, paths.ROOTS_HOME / "dotfiles", paths.OPS_HOME, paths.WORK_ROOT]
+    """~/files, ~/dotfiles, and the working-tree mirrors of ~/plainkeep and ~/work (existing paths only)."""
+    cands = [paths.FILES_ROOT, paths.ROOTS_HOME / "dotfiles", paths.PLAINKEEP_HOME, paths.WORK_ROOT]
     return [p for p in cands if p.exists()]
 
 
@@ -143,7 +143,7 @@ def cmd_status(argv):
     if not targets:
         at_risk = True
         rows.append({"target": "(none)", "configured": False, "age_hours": None,
-                     "stale": True, "note": "no .backup/config.json — run: ops backup init"})
+                     "stale": True, "note": "no .backup/config.json — run: plainkeep backup init"})
     for name, t in targets.items():
         repo = t.get("repo", "")
         ts = _latest_snapshot_ts(repo)
@@ -184,15 +184,15 @@ def cmd_run(argv):
     yes = ("--yes" in argv) or ("-y" in argv)
     dry = "--dry-run" in argv
     if target not in ("local", "cloud"):
-        output.fail(output.EXIT_USAGE, "usage: ops backup run [--target local|cloud]", verb="backup")
+        output.fail(output.EXIT_USAGE, "usage: plainkeep backup run [--target local|cloud]", verb="backup")
     if target == "cloud" and not yes and not dry:
         output.fail(output.EXIT_CONFIRM, "cloud backup publishes off-machine (a transmission)",
-                    hint="re-run: ops backup run --target cloud --yes", verb="backup")
+                    hint="re-run: plainkeep backup run --target cloud --yes", verb="backup")
     cfg = _config()
     t = cfg.get("targets", {}).get(target)
     if not t:
         output.fail(output.EXIT_UNEXPECTED, f"target '{target}' not configured",
-                    hint="run: ops backup init", verb="backup")
+                    hint="run: plainkeep backup init", verb="backup")
     if not _have_restic():
         output.fail(output.EXIT_UNEXPECTED, "restic not installed", hint=RESTIC_HINT, verb="backup")
     repo = t["repo"]
@@ -201,7 +201,7 @@ def cmd_run(argv):
         return output.emit({"target": target, "repo": repo, "paths": src, "dry_run": True},
                            "backup", human=lambda _: f"dry-run: would `restic backup` {len(src)} path(s) to {target}")
     # pragma: no cover - requires restic + a repo; never run for cloud in tests
-    b = _restic(repo, "backup", *src, "--tag", "ops", timeout=3600)
+    b = _restic(repo, "backup", *src, "--tag", "plainkeep", timeout=3600)
     sys.stdout.write(b.stdout)
     if b.returncode != 0:
         output.fail(output.EXIT_UNEXPECTED, "restic backup failed", hint=b.stderr.strip(), verb="backup")
@@ -217,13 +217,13 @@ def cmd_drill(argv):
     yes = ("--yes" in argv) or ("-y" in argv)
     if not yes:
         output.fail(output.EXIT_CONFIRM, "drill restores a snapshot to a temp dir",
-                    hint="re-run: ops backup drill --yes", verb="backup")
+                    hint="re-run: plainkeep backup drill --yes", verb="backup")
     if not _have_restic():
         output.fail(output.EXIT_UNEXPECTED, "restic not installed", hint=RESTIC_HINT, verb="backup")
     cfg = _config()
     t = cfg.get("targets", {}).get("local") or next(iter(cfg.get("targets", {}).values()), None)
     if not t:
-        output.fail(output.EXIT_UNEXPECTED, "no backup target configured", hint="run: ops backup init",
+        output.fail(output.EXIT_UNEXPECTED, "no backup target configured", hint="run: plainkeep backup init",
                     verb="backup")
     repo = t["repo"]
     # pragma: no cover - requires restic + a populated repo; never in tests
@@ -238,8 +238,8 @@ def cmd_drill(argv):
 # --------------------------------------------------------------------------- bundle (offline, restic-free)
 
 def _bundle_repos() -> list[tuple[str, Path]]:
-    """(name, repo) for ~/ops + every ~/work repo (registry = repos on disk, like `repo health`)."""
-    out = [("ops", paths.OPS_HOME)]
+    """(name, repo) for ~/plainkeep + every ~/work repo (registry = repos on disk, like `repo health`)."""
+    out = [("plainkeep", paths.PLAINKEEP_HOME)]
     if paths.WORK_ROOT.exists():
         for g in sorted(paths.WORK_ROOT.rglob(".git")):
             repo = g.parent
@@ -293,8 +293,8 @@ def _plist(cfg: dict) -> str:
     B2 key resolved at runtime from op:// via `op read` — the never-transmit tension resolved: the
     human consents once, then it is machine infrastructure that can only ADD to history."""
     cloud = cfg.get("targets", {}).get("cloud", {})
-    repo = cloud.get("repo", "b2:BUCKET:ops")
-    pw = cloud.get("password_ref", "op://Private/ops-restic/password")
+    repo = cloud.get("repo", "b2:BUCKET:plainkeep")
+    pw = cloud.get("password_ref", "op://Private/plainkeep-restic/password")
     acct = cloud.get("b2_account_ref", "op://Private/b2-append-only/account")
     key = cloud.get("b2_key_ref", "op://Private/b2-append-only/key")
     src = " ".join(str(p) for p in _backup_paths())
@@ -302,7 +302,7 @@ def _plist(cfg: dict) -> str:
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.ops.backup.cloud</string>
+  <key>Label</key><string>com.plainkeep.backup.cloud</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/sh</string><string>-c</string>
@@ -313,8 +313,8 @@ export B2_ACCOUNT_KEY="$(op read {key})"; \\
 restic backup {src} --tag scheduled &amp;&amp; restic check</string>
   </array>
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
-  <key>StandardOutPath</key><string>{paths.OPS_HOME}/.logs/backup-cloud.log</string>
-  <key>StandardErrorPath</key><string>{paths.OPS_HOME}/.logs/backup-cloud.log</string>
+  <key>StandardOutPath</key><string>{paths.PLAINKEEP_HOME}/.logs/backup-cloud.log</string>
+  <key>StandardErrorPath</key><string>{paths.PLAINKEEP_HOME}/.logs/backup-cloud.log</string>
 </dict>
 </plist>
 """
@@ -328,15 +328,15 @@ def cmd_init(argv):
 
     if not yes:
         output.fail(output.EXIT_CONFIRM, "init writes .backup/config.json + renders the launchd plist",
-                    hint="re-run: ops backup init --local-repo <path> --cloud-repo b2:<bucket>:ops "
+                    hint="re-run: plainkeep backup init --local-repo <path> --cloud-repo b2:<bucket>:plainkeep "
                          "--password-ref op://... --yes", verb="backup")
     # References ONLY — op:// values are stored verbatim and NEVER resolved (§4).
     cfg = {
         "targets": {
-            "local": {"repo": flag("--local-repo", "/Volumes/Backup/restic-ops"),
-                      "password_ref": flag("--password-ref", "op://Private/ops-restic/password")},
-            "cloud": {"repo": flag("--cloud-repo", "b2:ops-backup:ops"),
-                      "password_ref": flag("--password-ref", "op://Private/ops-restic/password"),
+            "local": {"repo": flag("--local-repo", "/Volumes/Backup/restic-plainkeep"),
+                      "password_ref": flag("--password-ref", "op://Private/plainkeep-restic/password")},
+            "cloud": {"repo": flag("--cloud-repo", "b2:plainkeep-backup:plainkeep"),
+                      "password_ref": flag("--password-ref", "op://Private/plainkeep-restic/password"),
                       "b2_account_ref": flag("--b2-account-ref", "op://Private/b2-append-only/account"),
                       "b2_key_ref": flag("--b2-key-ref", "op://Private/b2-append-only/key")},
         },
@@ -344,19 +344,19 @@ def cmd_init(argv):
     }
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     CONFIG.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    plist_path = BACKUP_DIR / "com.ops.backup.cloud.plist"
+    plist_path = BACKUP_DIR / "com.plainkeep.backup.cloud.plist"
     plist_path.write_text(_plist(cfg), encoding="utf-8")
-    label = "com.ops.backup.cloud"
+    label = "com.plainkeep.backup.cloud"
     steps = [
         f"cp {plist_path} ~/Library/LaunchAgents/{label}.plist",
         f"launchctl load ~/Library/LaunchAgents/{label}.plist",
     ]
-    data = {"config": str(CONFIG.relative_to(paths.OPS_HOME)),
-            "plist": str(plist_path.relative_to(paths.OPS_HOME)),
+    data = {"config": str(CONFIG.relative_to(paths.PLAINKEEP_HOME)),
+            "plist": str(plist_path.relative_to(paths.PLAINKEEP_HOME)),
             "install_steps": steps, "targets": list(cfg["targets"])}
     return output.emit(data, "backup", human=lambda _:
-                       f"{GREEN}wrote{RESET} {CONFIG.relative_to(paths.OPS_HOME)} (op:// references only)\n"
-                       f"rendered plist: {plist_path.relative_to(paths.OPS_HOME)}\n"
+                       f"{GREEN}wrote{RESET} {CONFIG.relative_to(paths.PLAINKEEP_HOME)} (op:// references only)\n"
+                       f"rendered plist: {plist_path.relative_to(paths.PLAINKEEP_HOME)}\n"
                        f"install the scheduled cloud push yourself (never done for you):\n  "
                        + "\n  ".join(steps))
 
@@ -367,7 +367,7 @@ def main(argv):
     _, argv = output.parse_argv(argv)
     action = argv[0] if argv else ""
     if not action or action.startswith("-"):
-        return cmd_nag()  # bare `ops backup` (and `ops backup --json`) — UNCHANGED
+        return cmd_nag()  # bare `plainkeep backup` (and `plainkeep backup --json`) — UNCHANGED
     rest = argv[1:]
     if action == "status":
         return cmd_status(rest)
@@ -380,7 +380,7 @@ def main(argv):
     if action == "init":
         return cmd_init(rest)
     output.fail(output.EXIT_USAGE,
-                "usage: ops backup [status|run|drill|bundle|init]  (bare = commit/push nag)",
+                "usage: plainkeep backup [status|run|drill|bundle|init]  (bare = commit/push nag)",
                 verb="backup")
 
 
